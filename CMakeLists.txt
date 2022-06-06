@@ -7,8 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 #SET(CMAKE_CXX_FLAGS "-std=c++17 -O0") # profiling
 #SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG -std=c++17 -Wreturn-type -O0") # debugging
 
-#remove -pthread
-SET(CMAKE_CXX_FLAGS "-std=c++17 -O3") # turbo fast
+SET(CMAKE_CXX_FLAGS "-std=c++17 -O3")
 
 
 
@@ -68,9 +67,8 @@ file(GLOB SOURCES
         src/CONTESTS/PACE22/Reducer.cpp
         src/CONTESTS/PACE22/exact/DFVSSolverE.cpp
         src/CONTESTS/PACE22/exact/CliqueCoverLS.cpp
+        )
 
-        ) # include all source files
 
-
-add_executable(DiFVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES}) # PACE22 version
+add_executable(DiFVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES})
 target_link_libraries( DiFVerSeS stdc++fs )
