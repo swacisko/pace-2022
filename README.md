@@ -43,20 +43,21 @@ Optional: build solvers mentioned in 'Requirements' section and place properly n
 
 **Usage:**
 
-Given a graph in a file example_input.txt, you can run DiVerSeS in the following way
+Given a graph in a file example_input.txt, you can run DiVerSeS e.g. in the following way
  
 ./DiVerSeS < example_input.txt > example_output.out 2>example_logs.err
 
 DiVerSeS (version from heuristic track, on main branch) will run for 590 seconds (default) or until it receives SIGTERM signal (e.g. using "kill -s SIGTERM $pid" command in linux).<br>
 The exact version of DiVerSeS will terminate for itself and does not need SIGTERM to be sent to the process. Please do not send the signal to the process if you use an exact algorithm.
+ 
+You can specify the time limit (in milliseconds) for the heuristic solver DiVerSeS with '-\-time-limit' option. Please bear in mind that this limit may not be observed if you run the solver on large graphs with relatively small time limit. Changing just time limit to value other than the default (and not adapting properly the workflow of DiVerSeS) may not be an optimal way to produce best results within the specified time limit (especailly for large graphs) - the heuristic solver was optimized to provide best results within 10 minutes on optil.io platform.
 
-<br> 
-You can specify the time limit (in milliseconds) for the heuristic solver DiVerSeS with '-\-time-limit' option. Please bear in mind that this limit may not be observed if you run the solver on large graphs with relatively small time limit. Changing just time limit to value other than the default (and not adapting properly the workflow of DiVerSeS) may not be an optimal way to produce best results within the specified time limit (especailly for large graphs) - the heuristic solver was optimized to provide best results within 10 minutes on optil.io platform. <br>
+To use exact solver, please specify '-\-track=exact' option. You can disable logs using '-\-quiet=true' option. You can also provide a path to the file with input data using '-\-file=some_path' option (if not provided, then solver will read data from standard input).
 
-To use exact solver, please specify '-\-track-exact' option. You can disable logs using '-\-quiet' option. You can also provide a path to the file with input data using '-\-file=some_path' option (if not provided, then solver will read data from standard input).
+<br>
 
 Exemplary usage with additional parameters:
 
 ./DiVerSeS -\-time-limit=60000 -\-file=example_input.txt > example_output_heuristic.out
 
-./DiVerSeS -\-time-limit=5000 -\-quiet -\-track=exact < example_input.txt > example_output_exact.out
+./DiVerSeS -\-quiet=true -\-track=exact < example_input.txt > example_output_exact.out
