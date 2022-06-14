@@ -61,3 +61,10 @@ Exemplary usage with additional parameters:
 ./DiVerSeS -\-time-limit=60000 -\-file=example_input.txt > example_output_heuristic.out
 
 ./DiVerSeS -\-quiet=true -\-track=exact < example_input.txt > example_output_exact.out
+
+
+***
+
+**Used software:**
+
+DiVerSeS makes use (optionally) of two solvers mentioned in 'Requirements' section. It also uses NuMVC and FastVC solvers (for original versions look [here](https://lcs.ios.ac.cn/~caisw/VC.html), versions used by DiVerSeS were downloaded from [here](https://github.com/fmoessbauer/LibMVC)) for finding high-quality vertex covers. 
