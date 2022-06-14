@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(DiFVerSeS)
+project(DiVerSeS)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -15,7 +15,6 @@ include_directories(
         include
         include/graphs
         include/combinatorics
-        include/algebra
         include/utils
         include/datastructures
 #        include/CONTESTS/PACE22/*
@@ -70,5 +69,5 @@ file(GLOB SOURCES
         )
 
 
-add_executable(DiFVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES})
-target_link_libraries( DiFVerSeS stdc++fs )
+add_executable(DiVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES})
+target_link_libraries( DiVerSeS stdc++fs )

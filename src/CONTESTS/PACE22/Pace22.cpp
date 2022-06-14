@@ -9,18 +9,23 @@
 #include <CONTESTS/PACE22/exact/DFVSSolverE.h>
 #include <utils/TimeMeasurer.h>
 #include <graphs/VertexCover/approximation/LibMVC/fastvc.h>
+#include <filesystem>
 #include "CONTESTS/PACE22/heur/DFVSSolverH.h"
 #include "MemoryUtils.h"
+#include "getopt.h"
 
 constexpr bool USE_ONLY_AF = false;
 
-constexpr bool write_solution = false; // if true, then DFVS solution will be written to stdout
-constexpr bool err = true;
+constexpr bool write_solution = true; // if true, then DFVS solution will be written to stdout
 
 bool use_heuristic_solver = true;
 bool use_exact_solver = !use_heuristic_solver;
 
 constexpr bool lite_track = false;
+bool MUTE_MODE = false;
+string input_filepath = "";
+
+static int time_limit_millis = 590'000;
 
 vector<DFVSReduction*> initialReductions(VVI &V, Config cnf, bool heuristic_track){
 
@@ -112,7 +117,7 @@ vector<DFVSReduction*> initialReductions(VVI &V, Config cnf, bool heuristic_trac
     red.cnf.reducer_max_twin_merge_neighborhood_size = 16;
     red.cnf.reducer_simple_cycle_max_branch_depth = 50;
 
-    red.cnf.reducer_max_time_millis = 120'000;
+    red.cnf.reducer_max_time_millis = 120 * time_limit_millis / 590;
     if(!heuristic_track) red.cnf.reducer_max_time_millis = 500'000;
 
     int MAX_MILLIS_PER_REDUCTION = 10'000;
@@ -183,17 +188,79 @@ vector<DFVSReduction*> initialReductions(VVI &V, Config cnf, bool heuristic_trac
     return reductions;
 }
 
+
+
+void initializeParams(int argc, char **argv) {
+    string time_limit = "time-limit";
+    string track = "track";
+    string quiet = "quiet";
+    string file = "file";
+
+    static struct option long_options[] = {
+            {time_limit.c_str(), required_argument, 0, 0},
+            {track.c_str(), required_argument, 0, 0},
+            {quiet.c_str(), required_argument, 0, 0},
+            {file.c_str(), required_argument, 0, 0},
+            {0, 0,                                           0, 0}
+    };
+
+    while (1) {
+        int option_index = 0;
+        int c;
+        string option, option_name;
+
+        c = getopt_long(argc, argv, "l:",
+                        long_options, &option_index);
+        if (c == -1) break;
+        switch (c) {
+            case 0:
+                option = string(optarg);
+                option_name = string(long_options[option_index].name);
+
+                if (option_name == time_limit) {
+                    time_limit_millis = stoi(option);
+                }
+                if(option_name == track){
+                    if( option == "exact" ){
+                        use_heuristic_solver = false;
+                        use_exact_solver = true;
+                    }
+                }
+                if(option_name == quiet){
+                    if( option == "true" ) MUTE_MODE = true;
+                }
+                if(option_name == file){
+                    input_filepath = option;
+                }
+
+                break;
+            case '?':
+                break;
+            default:
+                printf("?? getopt returned character code 0%o ??\n", c);
+        }
+    }
+
+    if( input_filepath != "" && !filesystem::exists( input_filepath ) ){
+        cerr << "File " << input_filepath << ", provided as input file, does not exist" << endl;
+        exit(1);
+    }
+
+}
+
+
 /**
  * MAIN ALGORITHM MAY NOT RUN DETERMINISTICALLY!
  * That is because some algorithms, like NuMVC, are run for e.g. 1'000 milliseconds. They may not find
  * the same solutions if run twice with the same time limit.
  */
-int main(){
+int main(int argc, char** argv){
     MemoryUtils::increaseStack();
     Config::addSigtermCheck();
 
+    initializeParams(argc, argv);
+
     auto old_clog_buf = clog.rdbuf();
-    constexpr bool MUTE_MODE = false;
     if(MUTE_MODE){
         clog << "MUTE MODE" << endl;
         clog.rdbuf( nullptr );
@@ -203,9 +270,16 @@ int main(){
 
     if( use_heuristic_solver ){
         if(lite_track) main_cnf.sw.setLimit("main", 295'000); // heuristic track
-        else main_cnf.sw.setLimit("main", 590'000); // heuristic track - wait for SIGTERM or 590 seconds
+//        else main_cnf.sw.setLimit("main", 590'000); // heuristic track - wait for SIGTERM or 590 seconds
+        else main_cnf.sw.setLimit("main", time_limit_millis); // heuristic track - wait for SIGTERM or 590 seconds
     }
-    else main_cnf.sw.setLimit("main", 3'600'000); // exact track
+    else{
+        time_limit_millis = 300'000'000;
+        main_cnf.sw.setLimit("main", time_limit_millis); // exact track - time limit set to 'almost infinity'
+    }
+
+    clog << "Using " << (use_heuristic_solver ? "heuristic" : "exact") << " version of DiVerSeS solver" << endl;
+    clog << "Running DiVerSeS for " << (1.0 * time_limit_millis / 1000) << " seconds" << endl;
 
     main_cnf.sw.start("main");
 
@@ -214,7 +288,7 @@ int main(){
 
     VVI V;
 
-    string test_path = "";
+    string test_path = ""; // for tests
 //    test_path = "pace22_exact/e_127";
 //    test_path = "pace22_heur/h_039";
 
@@ -222,7 +296,14 @@ int main(){
         ifstream str(test_path.c_str());
         V = Utils::readGraph(str);
         str.close();
-    }else{
+    }else if( input_filepath != "" ){
+        clog << "Reading input from file: " << input_filepath << endl;
+        ifstream str(input_filepath.c_str());
+        V = Utils::readGraph(str);
+        str.close();
+    }
+    else{
+        clog << "Reading input from standard input" << endl;
         V = Utils::readGraph(cin);
     }
 
@@ -237,10 +318,10 @@ int main(){
     vector<DFVSReduction*> reductions;
     if(!USE_ONLY_AF) {
     // uncomment following two line not to use the whole set of reductions (WGYC will be used only)
-//        if (use_exact_solver && Utils::isPIGraph(V)) {}
-//        else reductions = initialReductions(V, main_cnf);
+        if (use_exact_solver && Utils::isPIGraph(V) && filesystem::exists("vc_solver") ) {}
+        else reductions = initialReductions(V, main_cnf, use_heuristic_solver);
 
-        reductions = initialReductions(V, main_cnf, use_heuristic_solver);
+//        reductions = initialReductions(V, main_cnf, use_heuristic_solver);
     }
 
     InducedGraph g = GraphInducer::induceByNonisolatedNodes(V);
@@ -454,7 +535,7 @@ int main(){
 
     ENDL(10);
 
-    if(MUTE_MODE) clog.rdbuf(old_clog_buf);
+//    if(MUTE_MODE) clog.rdbuf(old_clog_buf);
 
     DEBUG(origV_dfvs.size());
 
@@ -480,9 +561,10 @@ int main(){
         for(int d : origV_dfvs) cout << d+1 << "\n";
         cout << flush;
     }
-    else{
-        if(err) return 1;
-    }
+
+    DEBUG(origV_dfvs.size());
+
+    if(MUTE_MODE) clog.rdbuf(old_clog_buf);
 
     return 0;
 }

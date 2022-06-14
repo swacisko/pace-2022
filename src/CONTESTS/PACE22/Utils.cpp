@@ -19,6 +19,7 @@
 #include <graphs/VertexCover/kernelization/KernelizerVC.h>
 #include <CONTESTS/PACE22/heur/HittingSetLS.h>
 #include <CONTESTS/PACE22/exact/DFVSSolverE.h>
+#include <filesystem>
 #include "CONTESTS/PACE22/Utils.h"
 #include "graphs/GraphUtils.h"
 
@@ -783,40 +784,70 @@ namespace Utils{
         const bool use_wgyc = true;
         VI vc;
 
-        if(use_wgyc) {
-            ofstream out("subgraph_wgyc.txt");
-            GraphWriter::writeGraphDIMACS(V2, out, false, 1);
-            out.close();
+        if( // we simply use DFVSSolverE as a vc solver if the desired solver is not present
+                (use_wgyc && !filesystem::exists("vc_solver"))
+                ||
+                (!use_wgyc && !filesystem::exists("peaty"))
+        ){
+            vector<DFVSReduction*> reductions;
+            Config cnf;
+            cnf.enableAllReductions();
+            cnf.disableAllRecursiveReductions();
+            cnf.reducer_use_domination_6 = false; // time-consuming
+            Reducer red(V2, cnf);
+            reductions = red.reduce();
 
-            TimeMeasurer::start("Running WGYC");
-            auto suppress = system("./vc_solver subgraph_wgyc.txt > temp_wgyc_bin_log_file.txt");
-            TimeMeasurer::stop("Running WGYC");
+            InducedGraph g = GraphInducer::induceByNonisolatedNodes(red.V);
 
-            ifstream wgyc("subgraph_wgyc.txt.vc");
-            string s;
-            int n, sz;
-            wgyc >> s >> s >> n >> sz;
+            VI vc;
+            if(!g.V.empty()) {
+                cnf.disableAllNonbasicReductions();
+                cnf.reducer_use_domination = cnf.reducer_use_folding = true; // we have a VC case
 
-            for (int i = 0; i < sz; i++) {
-                wgyc >> n;
-                vc.push_back(n - 1);
+                DFVSSolverE solver(&g.V, cnf);
+                vc = solver.solveForInputGraph(g.V);
+                g.remapNodes(vc);
             }
-            wgyc.close();
-        }else{
-            ofstream out( "subgraph_peaty.txt" );
-            GraphWriter::writeGraphDIMACS(V2, out, false, 1);
-            out.close();
 
-            TimeMeasurer::start("Running Peaty");
-            auto suppress = system("./peaty < subgraph_peaty.txt > subgraph_peaty.vc");
-            TimeMeasurer::stop("Running Peaty");
+            Reducer::liftSolution(V2.size(), vc, reductions);
+            assert(VCUtils::isVertexCover(V2, vc));
+        }else {
 
-            ifstream in("subgraph_peaty.vc");
-            string s;
-            while( getline(in, s) ){
-                if( s[0] == 'c' || s[0] == 's' ) continue;
-                else{
-                    vc.push_back( stoi(s) - 1 );
+            if (use_wgyc) {
+                ofstream out("subgraph_wgyc.txt");
+                GraphWriter::writeGraphDIMACS(V2, out, false, 1);
+                out.close();
+
+                TimeMeasurer::start("Running WGYC");
+                auto suppress = system("./vc_solver subgraph_wgyc.txt > temp_wgyc_bin_log_file.txt");
+                TimeMeasurer::stop("Running WGYC");
+
+                ifstream wgyc("subgraph_wgyc.txt.vc");
+                string s;
+                int n, sz;
+                wgyc >> s >> s >> n >> sz;
+
+                for (int i = 0; i < sz; i++) {
+                    wgyc >> n;
+                    vc.push_back(n - 1);
+                }
+                wgyc.close();
+            } else {
+                ofstream out("subgraph_peaty.txt");
+                GraphWriter::writeGraphDIMACS(V2, out, false, 1);
+                out.close();
+
+                TimeMeasurer::start("Running Peaty");
+                auto suppress = system("./peaty < subgraph_peaty.txt > subgraph_peaty.vc");
+                TimeMeasurer::stop("Running Peaty");
+
+                ifstream in("subgraph_peaty.vc");
+                string s;
+                while (getline(in, s)) {
+                    if (s[0] == 'c' || s[0] == 's') continue;
+                    else {
+                        vc.push_back(stoi(s) - 1);
+                    }
                 }
             }
         }

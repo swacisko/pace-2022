@@ -117,7 +117,7 @@ public:
         reducer_use_domination = true;
         reducer_use_domination_3 = true;
         reducer_use_domination_4 = true;
-        reducer_use_domination_6 = true; // do not enable this by default - very time consuming
+        reducer_use_domination_6 = true;
         reducer_use_reverse_triangle_gadgets = true;
         reducer_use_mixed_domination = true;
         reducer_use_mixed_domination_full = true;

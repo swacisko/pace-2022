@@ -13,6 +13,7 @@
 #include <utils/Stopwatch.h>
 #include <CONTESTS/PACE22/heur/DFVSImprover.h>
 #include <CONTESTS/PACE22/exact/CliqueCoverLS.h>
+#include <filesystem>
 #include "CONTESTS/PACE22/exact/DFVSSolverE.h"
 
 DFVSSolverE::DFVSSolverE( VVI* orig, Config c) : rnd(0,1'000'000'000ll * 1'000'000'000) {
@@ -53,7 +54,8 @@ VI DFVSSolverE::solve2(VVI V, VVI revV, int partial_dfvs_size, int rec_depth, in
     bool needs_further_branching = true;
 
     bool check_lower_bound = true; // here can be a condition, such as "check LB only if rec_depth % 3 == 2"
-    constexpr bool use_clique_cover_lb_instead_of_wgyc = false;
+//    constexpr bool use_clique_cover_lb_instead_of_wgyc = false;
+    const bool use_clique_cover_lb_instead_of_wgyc = ( !filesystem::exists("vc_solver") );
     bool push_vc = (!use_clique_cover_lb_instead_of_wgyc);
 
     int current_lb = 0;
@@ -162,6 +164,7 @@ VI DFVSSolverE::solve(VVI V, VVI revV, VI partial_dfvs, int partial_dfvs_size, i
     VI vc_dfvs;
     bool needs_further_branching = true;
 
+    // using solve() instead of solve2() we need vc_solver
     bool check_lower_bound = true; // here can be a condition, such as "check LB only if rec_depth % 3 == 2"
     bool push_vc = check_lower_bound; // original
     if( check_lower_bound ){
@@ -348,7 +351,9 @@ int DFVSSolverE::getBranchingNode(VVI &V, VVI &revV, int rec_depth) {
     int N = V.size();
     VVI H;
 
-    const bool select_branching_node_from_nonpi = true; // original
+//    const bool select_branching_node_from_nonpi = true; // original
+    const bool select_branching_node_from_nonpi = (!Utils::isPIGraph(V));
+
     if(select_branching_node_from_nonpi){  // selecting a branching node form nonpiV \ vcs.back()
         H = Utils::getNonPIGraph(V);
         VVI revH = GraphUtils::reverseGraph(H);
@@ -598,7 +603,8 @@ VI DFVSSolverE:: solveForInputGraph(VVI V) {
         double threshold = 0.3;
 
         VI exact_partial;
-        if( 1.0 * pi_arcs / all_arcs < threshold && g.V.size() > 40 ){ // for small graphs we use branching
+        if( filesystem::exists("findminhs")
+            &&    (1.0 * pi_arcs / all_arcs < threshold && g.V.size() > 40) ){ // for small graphs we use branching
             assert( Utils::isFVS(g.V, heur_dfvs) );
             DFVSImprover impr(g.V, cnf);
             if( 1.0 * pi_arcs / all_arcs < 0.1 ) {

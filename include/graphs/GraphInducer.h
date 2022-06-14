@@ -28,6 +28,8 @@ struct InducedGraph{
         WRITE_ALL( V, "Graph structure",0 );
 
     }
+
+    void remapNodes( VI & v ){ for(int & d : v) d = nodes[d]; }
 };
 
 struct InducedGraphPI{
