@@ -2,7 +2,7 @@
 
 ***
 
-**DiVerSeS** - a solver for the directed feedback vertex set problem, written as an entry to the PACE 2022 challenge.
+**DiVerSeS** - a solver for the directed feedback vertex set problem, written as an entry to the [PACE 2022 challenge](https://pacechallenge.org/).
 This repository contains code of an exact solver and a heuristic solver.
 
 To use exact solver, please use '-\-track=exact' option. In order to use heuristic solver, please use '-\-track=heuristic' (if not specified, then by default a heuristic solver will be run).
