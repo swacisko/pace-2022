@@ -1,6 +1,6 @@
 # pace-2022
 
-<br>
+***
 
 **DiVerSeS** - a solver for the directed feedback vertex set problem, written as an entry to the PACE 2022 challenge.
 This repository contains code of an exact solver and a heuristic solver.
@@ -10,7 +10,7 @@ To use exact solver, please use '-\-track=exact' option. In order to use heurist
 The heuristic solver was optimized to provide best results within 10 minutes on optil.io platform. 
 If you would like to use the solver in other 'settings', do not hesitate to let me know, I might be able to help you to choose best possible configuration to meet your needs and make DiVerSeS work better in your specific context. Other 'settings' mean e.g. running solver for time limit different than the default 590 seconds, running the solver for some specific graph class (e.g. large sparse random graphs or real-world networks), trying first to produce kernel of smallest possible size using advanced data reduction rules - which may be time consuming for very large graphs and is not used by default - etc. If you have any questions or suggestions, just let me know.
 
-<br>
+***
 
 **Requirements**:
 
@@ -23,9 +23,7 @@ An executable binary of a hitting set solver FINDMINHS (solver available [here](
 
 You may use DiVerSeS without those solvers, but it may be slower on the exact track (when run without WeGotYouCovered solver it will be roughly 2-3 times slower on average when run on public instances of PACE 2022 challenge, when run without FINDMINHS solver it will be loads slower on 'not-kernelizable' graphs with 'low' percentage of bidirectional arcs). The performance of a heuristic solver DiVerSeS should not be visibly affected by not using the two solvers. (please also note that DiVerSeS was not highly tested for use without the two solvers). <br>
 
-<br>
-
-
+***
 
 **Installation**:
 
@@ -41,10 +39,7 @@ After this, the executable file named "DiVerSeS" should be in the "build" direct
 
 Optional: build solvers mentioned in 'Requirements' section and place properly named binaries in the directory where DiVerSeS can be found (in the example this is the "build" directory).
 
-<br>
-
-
-
+***
 
 **Usage:**
 
