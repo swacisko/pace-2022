@@ -39,6 +39,10 @@ After this, the executable file named "DiVerSeS" should be in the "build" direct
 
 Optional: build solvers mentioned in 'Requirements' section and place properly named binaries in the directory where DiVerSeS can be found (in the example this is the "build" directory).
 
+To build FINDMINHS solver you can use "cargo build -\-release" command in FINDMINHS directory (for more details see the solvers site).
+
+To build WGYC solver you can use "./compile.sh" command in WGYC directory (for more details see the solvers site).
+
 ***
 
 **Usage:**
