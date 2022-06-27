@@ -65,7 +65,7 @@ VI Reducer::inOutClique() {
     VVB neigh_marker(N);
     int E = GraphUtils::countEdges(H);
     for( int i=0; i<N; i++ ){
-        if( H[i].size() * H[i].size() >= E ){
+        if( 1ll * H[i].size() * H[i].size() >= 1ll * E ){
             neigh_marker[i] = VB(N,false);
             for( int d : H[i] ) neigh_marker[i][d] = true;
         }
@@ -102,8 +102,18 @@ VI Reducer::inOutClique() {
 
     VI to_merge;
 
+    VB affected(N,false);
+
     for( int i=0; i<N; i++){
         if( V[i].empty() && revV[i].empty() ) continue;
+
+        {
+            if( affected[i] ) continue;
+            bool aff = false;
+            VI temp = StandardUtils::setUnion(V[i], revV[i], helper);
+            for(int d : temp) if(affected[d]) aff = true;
+            if(aff) continue;
+        }
 
         bool isInClique = false;
         if( !revV[i].empty() ) isInClique = isDClique(revV[i]);
@@ -114,6 +124,10 @@ VI Reducer::inOutClique() {
         if( isInClique || isOutClique ){
             if(debug) clog << "inOutClique node " << i << " ---> merging node " << i << endl;
             to_merge.push_back(i);
+
+            affected[i] = true;
+            VI temp = StandardUtils::setUnion(V[i], revV[i], helper);
+            for(int d : temp) affected[d] = true;
         }
     }
 
