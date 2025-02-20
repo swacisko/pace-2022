@@ -10,9 +10,14 @@
 #include <utils/TimeMeasurer.h>
 #include <graphs/VertexCover/approximation/LibMVC/fastvc.h>
 #include <filesystem>
+#include <GraphReader.h>
+
 #include "CONTESTS/PACE22/heur/DFVSSolverH.h"
 #include "MemoryUtils.h"
 #include "getopt.h"
+#include "Makros.h"
+
+#include <omp.h>
 
 constexpr bool USE_ONLY_AF = false;
 
@@ -25,7 +30,7 @@ constexpr bool lite_track = false;
 bool MUTE_MODE = false;
 string input_filepath = "";
 
-static int time_limit_millis = 590'000;
+static int time_limit_millis = 600'000;
 
 vector<DFVSReduction*> initialReductions(VVI &V, Config cnf, bool heuristic_track){
 
@@ -249,12 +254,286 @@ void initializeParams(int argc, char **argv) {
 }
 
 
+struct ExpData {
+    int N, M, pi_arcs, nonpi_arcs;
+    double pi_arcs_fraction;
+    double nonpi_arcs_fraction;
+
+    static vector<string> getHeader() {
+        vector<string> fields{"N", "M", "pi_arcs", "npi_arcs", "paf"};
+        vector<string> res;
+
+        for( string s : { "orig", "basic", "known", "dom" } ) {
+            for(auto f : fields) {
+                res.push_back(s + "-" + f);
+            }
+        }
+
+        return res;
+    }
+
+    void createData(VVI V) {
+        N = V.size();
+        M = GraphUtils::countEdges(V,true);
+        pi_arcs = Utils::countPiEdges(V);
+        nonpi_arcs = M - pi_arcs;
+        if(M) pi_arcs_fraction = (double)pi_arcs / M;
+        else pi_arcs_fraction = 0;
+
+        if(M) nonpi_arcs_fraction = (double)nonpi_arcs / M;
+        else nonpi_arcs_fraction = 0;
+    }
+};
+
+tuple<ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI V) {
+
+    auto induceByNonisolated = [&]() {
+        InducedGraph g = GraphInducer::induceByNonisolatedNodes(V);
+        V = g.V;
+    };
+
+
+
+    auto assignTimeLimits = [&](auto & red) {
+        red.cnf.reducer_max_time_millis = 600'000;
+        int MAX_MILLIS_PER_REDUCTION = 30'000;
+        red.cnf.reducer_nonsimple_cycle_arcs_full_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
+        red.cnf.reducer_domination4_max_time_millis_per_node = 300;
+        red.cnf.reducer_domination_3_4_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
+        red.cnf.reducer_domination5_max_time_millis_per_node = 300;
+        red.cnf.reducer_domination_5_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
+        red.cnf.reducer_mixed_domination_full_max_time_millis_per_node = 300;
+        red.cnf.reducer_mixed_domination_full_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
+    };
+
+    ExpData initV_data, basic_data, known_red_data, dom_data;
+
+    induceByNonisolated();
+    initV_data.createData(V);
+
+    {
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        Reducer red(V, main_cnf);
+        red.disableAllNonbasicReductions();
+        assignTimeLimits(red);
+        auto reductions = red.reduce();
+        V = red.V;
+        induceByNonisolated();
+        basic_data.createData(V);
+    }
+
+    {
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        Reducer red(V, main_cnf);
+        red.disableAllNonbasicReductions();
+        red.cnf.reducer_use_core = true;
+        red.cnf.reducer_use_dome = true;
+        red.cnf.reducer_use_pie = true;
+        red.cnf.reducer_use_inoutclique = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
+        assignTimeLimits(red);
+        auto reductions = red.reduce();
+        V = red.V;
+        induceByNonisolated();
+        known_red_data.createData(V);
+    }
+
+    {
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        Reducer red(V, main_cnf);
+        red.disableAllNonbasicReductions();
+        red.cnf.reducer_use_core = true;
+        red.cnf.reducer_use_dome = true;
+        red.cnf.reducer_use_pie = true;
+        red.cnf.reducer_use_inoutclique = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
+        red.cnf.reducer_use_domination = true;
+        red.cnf.reducer_use_domination_3 = true;
+        red.cnf.reducer_use_domination_4 = true;
+        red.cnf.reducer_use_domination_5 = true;
+        red.cnf.reducer_use_mixed_domination = true;
+        red.cnf.reducer_use_mixed_domination_full = true;
+        assignTimeLimits(red);
+        auto reductions = red.reduce();
+        V = red.V;
+        induceByNonisolated();
+        dom_data.createData(V);
+    }
+
+    return {initV_data, basic_data, known_red_data, dom_data};
+}
+
+int main(int argc, char** argv) {
+    MemoryUtils::increaseStack();
+    ios_base::sync_with_stdio(0);
+    cin.tie(0);
+
+
+    vector<string> instances_e;
+    vector<string> instances_h;
+    for( int i=1; i<=200; i++ ) {
+        string id = "";
+        if( i < 10 ) id += "0";
+        if( i < 100 ) id += "0";
+        id += to_string(i);
+
+        string se = "e_" + id;
+        string sh = "h_" + id;
+
+        instances_e.push_back(se);
+        instances_h.push_back(sh);
+    }
+
+
+    vector<string> instances_all = instances_e + instances_h;
+
+    // clog << "All instances: " << endl;
+    // for( auto s : instances_all ) DEBUG(s);
+
+    auto header = ExpData::getHeader();
+
+    // instances_all.resize(250);
+    // instances_all = StandardUtils::slice(instances_all, 200 + 197, 400);
+
+
+    omp_set_num_threads(1);
+    // DEBUG(omp_get_max_threads());
+    // exit(1);
+
+    bool compute = false;
+    bool create_results_all = true;
+
+    if(compute) {
+        #pragma omp parallel for
+        // for( auto s : instances_all ) {
+        for( int ind = 0; ind < instances_all.size(); ind++ ) {
+            string s = instances_all[ind];
+
+            clog << "Considering instance " << s << endl;
+            s = "datasets/" + s;
+
+            ifstream cur_str(s);
+            auto V = Utils::readGraph(cur_str);
+
+            auto [initV_data, basic_data, known_red_data, dom_data] = createDataForInstance(V);
+
+            ofstream cur_data_os(s + ".csv");
+            cur_data_os.precision(3);
+            cur_data_os << fixed;
+
+            {
+                int cnt = 0;
+                for( auto h : header ) cur_data_os << (cnt++ ? ", " : "") << h;
+                cur_data_os << endl;
+            }
+
+            auto writeData = [&](auto & str, auto & data, bool end_of_line = false) {
+                const auto & r = data;
+                str << r.N << ", " << r.M << ", " << r.pi_arcs << ", " << r.nonpi_arcs << ", " << r.pi_arcs_fraction;
+                if( end_of_line ) str << endl;
+                else str << ", ";
+            };
+
+            writeData(cur_data_os, initV_data);
+            writeData(cur_data_os, basic_data);
+            writeData(cur_data_os, known_red_data);
+            writeData(cur_data_os, dom_data, true);
+
+            // writeData(res_all_str, initV_data);
+            // writeData(res_all_str, basic_data);
+            // writeData(res_all_str, known_red_data);
+            // writeData(res_all_str, dom_data, true);
+        }
+    }
+
+
+    if(create_results_all) {
+        ofstream res_all_str("res_all.csv");
+        res_all_str.precision(3);
+        res_all_str << fixed;
+        {
+            res_all_str << "id";
+            int cnt = 1;
+            for( auto h : header ) res_all_str << (cnt++ ? ", " : "") << h;
+            res_all_str << ", dN / bN, dE / bE, dN / kN, dE / kE";
+            res_all_str << endl;
+        }
+
+        for(auto s : instances_all) {
+            string instance_name = s;
+            s = "datasets/" + s;
+
+            string header_line, data_line;
+            {
+                ifstream cur_str(s + ".csv");
+                getline(cur_str, header_line);
+                getline(cur_str, data_line);
+                // DEBUG(header_line);
+                // DEBUG(data_line);
+            }
+
+            auto trim = [&](string & e) {
+                int p = 0, q = (int)e.size()-1;
+                while(p < e.size()) {
+                    if(e[p] != ' ') break;
+                    p++;
+                }
+                while(q >= 0) {
+                    if( e[q] != ' ' ) break;
+                    q--;
+                }
+                e = e.substr( p, q-p+1 );
+            };
+
+            auto entries = StandardUtils::split(data_line, ",");
+            // DEBUG(entries);
+            // for(auto e : entries) clog << e << endl;
+            for(auto & e : entries) trim(e);
+            // DEBUG(entries);
+            // for(auto e : entries) clog << e << endl;
+            // exit(1);
+
+            int basicN = stoi(entries[5]);
+            int knownN = stoi(entries[10]);
+            int domN = stoi(entries[15]);
+            double domN_basicN = (basicN ?  1.0*domN / basicN : 0 );
+            double domN_knownN = (knownN ? 1.0*domN / knownN : 0 );
+
+            int basicE = stoi(entries[6]);
+            int knownE = stoi(entries[11]);
+            int domE = stoi(entries[16]);
+            double domE_basicE = (basicE ?  1.0*domE / basicE : 0 );
+            double domE_knownE = (knownE ? 1.0*domE / knownE : 0 );
+
+            res_all_str << instance_name;
+            for(auto e : entries) res_all_str << ", " << e;
+            res_all_str << ", " << domN_basicN << ", " << domE_basicE << ", " << domN_knownN << ", " << domE_knownE;
+            res_all_str << endl;
+        }
+    }
+
+    return 0;
+}
+
+
+
 /**
  * MAIN ALGORITHM MAY NOT RUN DETERMINISTICALLY!
  * That is because some algorithms, like NuMVC, are run for e.g. 1'000 milliseconds. They may not find
  * the same solutions if run twice with the same time limit.
  */
-int main(int argc, char** argv){
+int main3(int argc, char** argv){
     MemoryUtils::increaseStack();
     Config::addSigtermCheck();
 

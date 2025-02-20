@@ -49,7 +49,7 @@ VI Reducer::inOut1() {
 }
 
 VI Reducer::inOutClique() {
-    TimeMeasurer::start("Reducer::inOutClique");
+    //TimeMeasurer::start("Reducer::inOutClique");
     const bool debug = false;
 
     int N = V.size();
@@ -131,13 +131,13 @@ VI Reducer::inOutClique() {
         }
     }
 
-    TimeMeasurer::stop("Reducer::inOutClique");
+    //TimeMeasurer::stop("Reducer::inOutClique");
 
     return to_merge;
 }
 
 VI Reducer::core() {
-    TimeMeasurer::start("Reducer::core");
+    //TimeMeasurer::start("Reducer::core");
     const bool debug = false;
 
     int N = V.size();
@@ -225,7 +225,7 @@ VI Reducer::core() {
         was[u] = true;
     }
 
-    TimeMeasurer::stop("Reducer::core");
+    //TimeMeasurer::stop("Reducer::core");
 
     return VI(ALL(zb));
 }
@@ -543,7 +543,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_domination){
-            TimeMeasurer::start("Reducer::domination1");
+            //TimeMeasurer::start("Reducer::domination1");
             VI dominated = domination1();
             addKNR(dominated);
 
@@ -551,20 +551,20 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             total_dominated_nodes1 += dominated.size();
             if(write_progress_on_the_fly) DEBUG(total_dominated_nodes1);
             Utils::removeNodes(V, revV, dominated, helper);
-            TimeMeasurer::stop("Reducer::domination1");
+            //TimeMeasurer::stop("Reducer::domination1");
             if(!dominated.empty()) modified = true;
             if(modified) continue;
 
 
 
-            TimeMeasurer::start("Reducer::domination2");
+            //TimeMeasurer::start("Reducer::domination2");
             if(write_progress_on_the_fly) DEBUG(total_dominated_nodes2);
             dominated = domination2();
             if(write_progress_on_the_fly) DEBUG(total_dominated_nodes2);
             addKNR(dominated);
             total_dominated_nodes2 += dominated.size();
             Utils::removeNodes(V, revV, dominated, helper);
-            TimeMeasurer::stop("Reducer::domination2");
+            //TimeMeasurer::stop("Reducer::domination2");
             if(!dominated.empty()) modified = true;
             if(modified) continue;
         }
@@ -572,18 +572,18 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_unconfined && Utils::isPIGraph(V, revV, helper)){
-            TimeMeasurer::start("Reducer::unconfined");
+            //TimeMeasurer::start("Reducer::unconfined");
             VI uncon = unconfined();
             addKNR(uncon);
             total_unconfined_nodes += uncon.size();
             Utils::removeNodes(V, revV, uncon, helper);
-            TimeMeasurer::stop("Reducer::unconfined");
+            //TimeMeasurer::stop("Reducer::unconfined");
             if(!modified) modified = (!uncon.empty());
             if(modified) continue;
         }
 
         if(cnf.reducer_use_folding){
-            TimeMeasurer::start("Reducer::folding");
+            //TimeMeasurer::start("Reducer::folding");
             auto folds = folding();
             if(write_progress_on_the_fly) DEBUG(total_folds_done);
             total_folds_done += folds.size();
@@ -598,7 +598,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 for(auto *x : folds) res.push_back(x);
             }
 
-            TimeMeasurer::stop("Reducer::folding");
+            //TimeMeasurer::stop("Reducer::folding");
 
             assert( GraphUtils::isSimple(V) );
             assert( GraphUtils::isSimple(revV) );
@@ -607,7 +607,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         }
 
         if(cnf.reducer_use_folding_twins) {
-            TimeMeasurer::start("Reducer::folding_twins");
+            //TimeMeasurer::start("Reducer::folding_twins");
             auto [twin_folds, to_remove] = foldingTwins();
             if (write_progress_on_the_fly) DEBUG(total_twin_folds_done);
             total_twin_folds_done += twin_folds.size() + to_remove.size();
@@ -621,12 +621,12 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 for (auto *x : twin_folds) res.push_back(x);
             }
 
-            TimeMeasurer::stop("Reducer::folding_twins");
+            //TimeMeasurer::stop("Reducer::folding_twins");
             if(modified) continue;
         }
 
         if(cnf.reducer_use_desk){
-            TimeMeasurer::start("Reducer::desk");
+            //TimeMeasurer::start("Reducer::desk");
             auto [desk_folds, desk_dominations, arc_diff] = desk();
             total_desk_folds += desk_folds.size();
             total_desk_dominations += desk_dominations.size();
@@ -638,7 +638,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             }
             if(!modified) modified = ( !desk_folds.empty() || !desk_dominations.empty() || arc_diff );
 
-            TimeMeasurer::stop("Reducer::desk");
+            //TimeMeasurer::stop("Reducer::desk");
             if(modified) continue;
         }
 
@@ -646,7 +646,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if(!cnf.reducer_use_domination){
                 clog << "CAUTION! Calling funnel reduction without domination rule before!" << endl;
             }
-            TimeMeasurer::start("Reducer::funnel");
+            //TimeMeasurer::start("Reducer::funnel");
             if(write_progress_on_the_fly) DEBUG(total_funnels_done);
             auto funnels = funnel();
             total_funnels_done += funnels.size();
@@ -661,17 +661,17 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 for(auto *x : funnels) res.push_back(x);
             }
 
-            TimeMeasurer::stop("Reducer::funnel");
+            //TimeMeasurer::stop("Reducer::funnel");
             if(modified) continue;
         }
 
         if(cnf.reducer_use_domination_6){
-            TimeMeasurer::start("Reducer::domination6");
+            //TimeMeasurer::start("Reducer::domination6");
             VI to_remove = domination6();
             addKNR(to_remove);
             total_dominated_nodes6 += to_remove.size();
             Utils::removeNodes(V, revV, to_remove, helper);
-            TimeMeasurer::stop("Reducer::domination6");
+            //TimeMeasurer::stop("Reducer::domination6");
             if(!modified) modified = (!to_remove.empty());
             if(modified) continue;
         }
@@ -679,11 +679,11 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if( cnf.reducer_use_pie && cnf.reducer_use_nonsimple_cycle_arcs ){
-            TimeMeasurer::start("Reducer::nonsimple_cycle_arcs");
+            //TimeMeasurer::start("Reducer::nonsimple_cycle_arcs");
             if(write_progress_on_the_fly) DEBUG(total_nonsimple_cycle_arcs_removed);
             if(!modified) modified = nonSimpleCycleArc2();
             if(write_progress_on_the_fly) DEBUG(total_nonsimple_cycle_arcs_removed);
-            TimeMeasurer::stop("Reducer::nonsimple_cycle_arcs");
+            //TimeMeasurer::stop("Reducer::nonsimple_cycle_arcs");
 
             if(modified) continue;
         }
@@ -691,14 +691,14 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if( cnf.reducer_use_pie && cnf.reducer_use_mixed_domination ){
-            TimeMeasurer::start("Reducer::mixed_domination");
+            //TimeMeasurer::start("Reducer::mixed_domination");
 
             if (write_progress_on_the_fly) clog << "Running mixed domination" << endl;
             bool changes = mixedDomination();
             if(changes) modified = true;
             if (write_progress_on_the_fly) clog << "Mixed domination applied: " << changes << endl;
 
-            TimeMeasurer::stop("Reducer::mixed_domination");
+            //TimeMeasurer::stop("Reducer::mixed_domination");
 
             if(modified) continue;
         }
@@ -711,11 +711,11 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             mixed_domination_full_cnt++;
 
             if (write_progress_on_the_fly) clog << "Running mixed domination full" << endl;
-            TimeMeasurer::start("Reducer::mixed_domination_full");
+            //TimeMeasurer::start("Reducer::mixed_domination_full");
             bool changes = mixedDominationFull();
             if(changes) modified = true;
             if (write_progress_on_the_fly) clog << "Mixed domination full applied: " << changes << endl;
-            TimeMeasurer::stop("Reducer::mixed_domination_full");
+            //TimeMeasurer::stop("Reducer::mixed_domination_full");
 
             cnf.reducer_mixed_domination_full_max_time_millis_total = old_time_millis;
 
@@ -725,7 +725,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_domination_3) {
-            TimeMeasurer::start("Reducer::domination3");
+            //TimeMeasurer::start("Reducer::domination3");
             VI dominators = domination3();
             addKNR(dominators);
 
@@ -733,13 +733,13 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             total_dominated_nodes3 += dominators.size();
             if (write_progress_on_the_fly) DEBUG(total_dominated_nodes3);
             Utils::removeNodes(V, revV, dominators, helper);
-            TimeMeasurer::stop("Reducer::domination3");
+            //TimeMeasurer::stop("Reducer::domination3");
             if(!dominators.empty()) modified = true;
             if(modified) continue;
         }
 
         if(cnf.reducer_use_edge_neighborhood_blocker){
-            TimeMeasurer::start("Reducer::edge_neighborhood_blocker");
+            //TimeMeasurer::start("Reducer::edge_neighborhood_blocker");
             VPII arcs_to_add = edgeNeighborhoodBlocker();
 
             int arcs_before = GraphUtils::countEdges(V,true);
@@ -750,7 +750,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             int arc_diff = arcs_after - arcs_before;
 
             total_edge_neighborhood_blocker_edges_added += arc_diff;
-            TimeMeasurer::stop("Reducer::edge_neighborhood_blocker");
+            //TimeMeasurer::stop("Reducer::edge_neighborhood_blocker");
 
             if(!modified) modified = (arc_diff > 0);
             if(modified) continue;
@@ -759,13 +759,13 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
 
         if( Utils::isPIGraph(V, revV, helper) ){
-            TimeMeasurer::start("Reducer::LP_relaxation");
+            //TimeMeasurer::start("Reducer::LP_relaxation");
             VVI Vcp = V;
             KernelizerVC kern;
             auto [kern_nodes, edges_removed] = kern.lpDecomposition(Vcp);
             addKNR(kern_nodes);
             Utils::removeNodes(V, revV, kern_nodes,helper);
-            TimeMeasurer::stop("Reducer::LP_relaxation");
+            //TimeMeasurer::stop("Reducer::LP_relaxation");
             if(!modified) modified = (!kern_nodes.empty());
         }
 
@@ -776,7 +776,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             cnf.reducer_domination_3_4_max_time_millis_total /= (1 << (domination4_cnt));
             domination4_cnt++;
 
-            TimeMeasurer::start("Reducer::domination4");
+            //TimeMeasurer::start("Reducer::domination4");
             VI dominators = domination4(cnf.reducer_domination4_max_time_millis_per_node);
             addKNR(dominators);
 
@@ -784,7 +784,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             total_dominated_nodes4 += dominators.size();
             if(write_progress_on_the_fly) DEBUG(total_dominated_nodes4);
             Utils::removeNodes(V, revV, dominators, helper);
-            TimeMeasurer::stop("Reducer::domination4");
+            //TimeMeasurer::stop("Reducer::domination4");
             cnf.reducer_domination_3_4_max_time_millis_total = old_time_millis;
 
             if(!dominators.empty()){
@@ -797,7 +797,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
 
         if(cnf.reducer_use_full_bipartite_blocker){
-            TimeMeasurer::start("Reducer::full_bipartite_blocker");
+            //TimeMeasurer::start("Reducer::full_bipartite_blocker");
             auto reductions = fullBipartiteBlocker();
             total_full_bipartite_blockers += reductions.size();
 
@@ -807,13 +807,13 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             }
 
             if(!reductions.empty()) modified = true;
-            TimeMeasurer::stop("Reducer::full_bipartite_blocker");
+            //TimeMeasurer::stop("Reducer::full_bipartite_blocker");
 
             if(modified) continue;
         }
 
         if(cnf.reducer_use_reverse_triangle_gadgets){
-            TimeMeasurer::start("Reducer::reverse_triangle_gadgets");
+            //TimeMeasurer::start("Reducer::reverse_triangle_gadgets");
             auto [nodes_to_remove, arcs_to_add, rev_tr_gadgets, kern_red_dom6] = reverseTriangleGadget();
             total_reverse_triangle_gadgets_applied += rev_tr_gadgets.size();
             total_reverse_triangle_gadget_dom6_cases += kern_red_dom6.size();
@@ -833,7 +833,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 Utils::addEdges(revV, arcs_to_add, helper);
             }
 
-            TimeMeasurer::stop("Reducer::reverse_triangle_gadgets");
+            //TimeMeasurer::stop("Reducer::reverse_triangle_gadgets");
             if(!modified) modified = (!rev_tr_gadgets.empty() || !kern_red_dom6.empty());
             if(modified) continue;
         }
@@ -842,7 +842,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_cycle_folding){
-            TimeMeasurer::start("Reducer::cycle-folding");
+            //TimeMeasurer::start("Reducer::cycle-folding");
             auto cycle_folds = cycleFolding();
             total_cycle_folds_done += cycle_folds.size();
             if(!cycle_folds.empty()) modified = true;
@@ -852,12 +852,12 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 for(auto *x : cycle_folds) res.push_back(x);
             }
 
-            TimeMeasurer::stop("Reducer::cycle-folding");
+            //TimeMeasurer::stop("Reducer::cycle-folding");
             if(modified) continue;
         }
 
         if(cnf.reducer_use_general_folding){
-            TimeMeasurer::start("Reducer::general_folding");
+            //TimeMeasurer::start("Reducer::general_folding");
             auto reductions = generalFolding();
             total_general_folds_done += reductions.size();
             if(!modified) modified = (!reductions.empty());
@@ -867,7 +867,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 for(auto *x : reductions) res.push_back(x);
             }
 
-            TimeMeasurer::stop("Reducer::general_folding");
+            //TimeMeasurer::stop("Reducer::general_folding");
             if(modified) continue;
         }
 
@@ -879,7 +879,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             cnf.reducer_nonsimple_cycle_arcs_full_max_time_millis_total /= (1<<(nonsimple_arc_full_cnt));
             nonsimple_arc_full_cnt++;
 
-            TimeMeasurer::start("Reducer::nonsimple_cycle_arcs_full");
+            //TimeMeasurer::start("Reducer::nonsimple_cycle_arcs_full");
             VPII arcs_to_remove = nonSimpleCycleArcFull();
 
             if(write_progress_on_the_fly) DEBUG(total_nonsimple_cycle_arcs_full_removed);
@@ -890,7 +890,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             for(auto& [a,b] : arcs_to_remove) swap(a,b);
             Utils::removeEdges( revV, arcs_to_remove, helper );
 
-            TimeMeasurer::stop("Reducer::nonsimple_cycle_arcs_full");
+            //TimeMeasurer::stop("Reducer::nonsimple_cycle_arcs_full");
             modified = !arcs_to_remove.empty();
 
             cnf.reducer_nonsimple_cycle_arcs_full_max_time_millis_total = old_time_millis;
@@ -907,7 +907,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 DEBUG(total_domination5_pi_arcs_added);
             }
 
-            TimeMeasurer::start("Reducer::domination5");
+            //TimeMeasurer::start("Reducer::domination5");
             auto [dominated, arcs_to_add] = domination5(cnf.reducer_domination_5_max_time_millis_total,
                                                         cnf.reducer_domination5_max_time_millis_per_node);
             if( !dominated.empty() ) {
@@ -930,7 +930,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 DEBUG(total_domination5_pi_arcs_added);
             }
 
-            TimeMeasurer::stop("Reducer::domination5");
+            //TimeMeasurer::stop("Reducer::domination5");
             cnf.reducer_domination_5_max_time_millis_total = old_time_millis;
 
             if(check_correspondings) assert(Utils::isCorresponding(V, revV));
@@ -944,7 +944,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_twins_merge){
-            TimeMeasurer::start("Reducer::twins");
+            //TimeMeasurer::start("Reducer::twins");
             if(write_progress_on_the_fly) DEBUG(total_twins_merged);
 
             double millis_done = chrono::duration<double, std::milli >
@@ -954,7 +954,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             bool mod = mergeTwins(millis_left);
 
             if(write_progress_on_the_fly) DEBUG(total_twins_merged);
-            TimeMeasurer::stop("Reducer::twins");
+            //TimeMeasurer::stop("Reducer::twins");
             if(mod) modified = true;
             if(mod) continue;
         }
@@ -962,31 +962,31 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_domination_6inserter){
-            TimeMeasurer::start("Reducer::domination6inserter");
+            //TimeMeasurer::start("Reducer::domination6inserter");
             auto [nodes_removed, pi_edges_added] = domination6Inserter();
             addKNR(nodes_removed);
             total_domination6inserter_nodes_removed += nodes_removed.size();
             total_domination6inserter_pi_edges_inserted += pi_edges_added.size();
-            TimeMeasurer::stop("Reducer::domination6inserter");
+            //TimeMeasurer::stop("Reducer::domination6inserter");
             if(!modified) modified = ( pi_edges_added.size() > 0 || nodes_removed.size() > 0 );
             if(modified) continue;
         }
 
         if(cnf.reducer_use_bottleneck2){
-            TimeMeasurer::start("Reducer::bottleneck2");
+            //TimeMeasurer::start("Reducer::bottleneck2");
 
             VI to_remove = bottleneck2();
             addKNR(to_remove);
             total_bottleneck2_nodes_removed += to_remove.size();
             Utils::removeNodes(V, revV, to_remove, helper);
 
-            TimeMeasurer::stop("Reducer::bottleneck2");
+            //TimeMeasurer::stop("Reducer::bottleneck2");
             if(!modified) modified = !to_remove.empty();
             if(modified) continue;
         }
 
         if(cnf.reducer_use_bottleneck){
-            TimeMeasurer::start("Reducer::bottleneck");
+            //TimeMeasurer::start("Reducer::bottleneck");
 
             if(write_progress_on_the_fly){
                 DEBUG(total_bottlenecks_applied);
@@ -1011,16 +1011,16 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 DEBUG(total_bottleneck_nodes);
             }
 
-            TimeMeasurer::stop("Reducer::bottleneck");
+            //TimeMeasurer::stop("Reducer::bottleneck");
             if(modified) continue;
         }
 
         if(cnf.reducer_use_recursive_reducer){
-            TimeMeasurer::start("Reducer::recursive_reducer");
+            //TimeMeasurer::start("Reducer::recursive_reducer");
             VI removed = recursiveReducer();
             addKNR(removed);
             total_recursive_reducer_nodes_removed += removed.size();
-            TimeMeasurer::stop("Reducer::recursive_reducer");
+            //TimeMeasurer::stop("Reducer::recursive_reducer");
 
             if(!modified) modified = (!removed.empty());
             if(modified) continue;
@@ -1029,7 +1029,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_spiderweb_gadgets){
-            TimeMeasurer::start("Reducer::spiderweb_gadgets");
+            //TimeMeasurer::start("Reducer::spiderweb_gadgets");
 
             if(V.size() > 50){
                 ENDL(1);
@@ -1082,7 +1082,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 DEBUG(total_spiderweb_nodes_added);
             }
 
-            TimeMeasurer::stop("Reducer::spiderweb_gadgets");
+            //TimeMeasurer::stop("Reducer::spiderweb_gadgets");
             if(modified) continue;
         }
 
@@ -1096,7 +1096,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
 
 VPII Reducer::pie() {
-    TimeMeasurer::start("Reducer::pie");
+    //TimeMeasurer::start("Reducer::pie");
 
     int N = V.size();
     VB helper(N,false);
@@ -1118,13 +1118,13 @@ VPII Reducer::pie() {
         }
     }
 
-    TimeMeasurer::stop("Reducer::pie");
+    //TimeMeasurer::stop("Reducer::pie");
 
     return to_remove;
 }
 
 VPII Reducer::dome() {
-    TimeMeasurer::start("Reducer::dome");
+    //TimeMeasurer::start("Reducer::dome");
     constexpr bool debug = false;
 
     const int E = GraphUtils::countEdges(V, true);
@@ -1258,7 +1258,7 @@ VPII Reducer::dome() {
         dominated.resize(unique(ALL(dominated)) - dominated.begin());
     }
 
-    TimeMeasurer::stop("Reducer::dome");
+    //TimeMeasurer::stop("Reducer::dome");
     return dominated;
 }
 
@@ -2183,9 +2183,9 @@ VI Reducer::domination3(bool search_for_simple_cycle, int max_time_millis_per_no
 
     VI perm = CombinatoricUtils::getRandomPermutation(N);
 
-    if(cnf.write_logs && N >= 50){
-        clog << "\rdomination " << (search_for_simple_cycle ? "4" : "3") << "                    " << flush;
-    }
+    // if(cnf.write_logs && N >= 50){
+    //     clog << "\rdomination " << (search_for_simple_cycle ? "4" : "3") << "                    " << flush;
+    // }
 
     for( int a : perm ){
         if(affected[a]) continue;
@@ -2332,7 +2332,7 @@ VPII Reducer::nonSimpleCycleArcFull() {
         const bool add_triangle_arcs = true;
         if(add_triangle_arcs){
 
-            TimeMeasurer::start("Reducer::arc_full_add_triangles");
+            //TimeMeasurer::start("Reducer::arc_full_add_triangles");
             VI order(N);
             iota(ALL(order),0);
             sort(ALL(order), [&]( int a, int b ){ return nonpiV[a].size() > nonpiV[b].size(); } );
@@ -2358,7 +2358,7 @@ VPII Reducer::nonSimpleCycleArcFull() {
                 }
                 for( int d : revnonpiV[a] ) was[d] = false;
             }
-            TimeMeasurer::stop("Reducer::arc_full_add_triangles");
+            //TimeMeasurer::stop("Reducer::arc_full_add_triangles");
         }
     }
 
@@ -2423,9 +2423,9 @@ VPII Reducer::nonSimpleCycleArcFull() {
 
     int progress_cnt = 0;
 
-    if(cnf.write_logs && N > 50){
-        clog << "\rNonsimple cycle arcs full                                     " << flush;
-    }
+    // if(cnf.write_logs && N > 50){
+        // clog << "\rNonsimple cycle arcs full                                     " << flush;
+    // }
 
     VI perm = CombinatoricUtils::getRandomPermutation(N);
     for( int a : perm ){
@@ -2662,9 +2662,9 @@ pair<VI, VPII> Reducer::domination5(int max_time_millis_total, int max_time_mill
 
     VI bs; bs.reserve(N);
 
-    if(cnf.write_logs && V.size() >= 50){
-        clog << "\rdomination5                                    " << flush;
-    }
+    // if(cnf.write_logs && V.size() >= 50){
+    //     clog << "\rdomination5                                    " << flush;
+    // }
 
     for( int a : perm ){
         if(V[a].empty()) continue;
@@ -2818,9 +2818,9 @@ bool Reducer::mixedDomination() {
 
     bool changes_done = false;
 
-    if(cnf.write_logs && V.size() >= 50){
-        clog << "\rmixedDomination                                                " << flush;
-    }
+    // if(cnf.write_logs && V.size() >= 50){
+    //     clog << "\rmixedDomination                                                " << flush;
+    // }
 
     for( int u=0; u<N; u++ ){
 
@@ -3431,7 +3431,7 @@ VI Reducer::bottleneck(int max_millis) {
         const bool expand_xnx_vastly = true;
 
         if (expand_xnx_vastly) {
-            TimeMeasurer::start("Reducer::bottleneck-expand-vastly");
+            //TimeMeasurer::start("Reducer::bottleneck-expand-vastly");
             const bool use_fast_expansion = true;
 
             if(!use_fast_expansion){ // slow expansion
@@ -3500,7 +3500,7 @@ VI Reducer::bottleneck(int max_millis) {
                 for( int d : visited ) was[d] = helper[d] = false;
             }
 
-            TimeMeasurer::stop("Reducer::bottleneck-expand-vastly");
+            //TimeMeasurer::stop("Reducer::bottleneck-expand-vastly");
         }
 
         if (XNX.size() > MAX_SIZE) return;
@@ -5652,7 +5652,7 @@ VI Reducer::recursiveReducer() {
     };
 
     auto proceedForSemiAlternatives = [&](int i){
-        TimeMeasurer::start("proceedForSemiAlternatives");
+        //TimeMeasurer::start("proceedForSemiAlternatives");
         if(semi_alternatives.empty()) return VI();
         VI inters(N,0);
 
@@ -5691,7 +5691,7 @@ VI Reducer::recursiveReducer() {
             Utils::removeNodes( piV, piVcp, to_remove, helper );
         }
 
-        TimeMeasurer::stop("proceedForSemiAlternatives");
+        //TimeMeasurer::stop("proceedForSemiAlternatives");
         return to_remove;
     };
 

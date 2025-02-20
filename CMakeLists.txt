@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 #SET(CMAKE_CXX_FLAGS "-std=c++17 -O0") # profiling
 #SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG -std=c++17 -Wreturn-type -O0") # debugging
 
-SET(CMAKE_CXX_FLAGS "-std=c++17 -O3")
+SET(CMAKE_CXX_FLAGS "-std=c++20 -O3 -fopenmp")
 
 
 

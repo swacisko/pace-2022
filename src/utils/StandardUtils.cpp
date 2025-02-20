@@ -28,8 +28,8 @@ namespace StandardUtils{
             while( p < s.size() ){
                 while( q < s.size() && s[q] != pat[0] ) q++;
                 res.push_back(s.substr(p, q-p));
-                p = q;
                 q++;
+                p = q;
             }
             return res;
         }else{
