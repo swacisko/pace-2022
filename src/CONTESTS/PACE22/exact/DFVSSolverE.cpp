@@ -7,7 +7,7 @@
 #include <CONTESTS/PACE22/Reducer.h>
 #include <graphs/GraphUtils.h>
 #include <CONTESTS/PACE22/heur/DFVSSolverH.h>
-#include <utils/TimeMeasurer.h>
+// #include <utils/TimeMeasurer.h>
 #include <graphs/VertexCover/VCUtils.h>
 #include <combinatorics/CombinatoricUtils.h>
 #include <utils/Stopwatch.h>
@@ -191,11 +191,11 @@ VI DFVSSolverE::solve(VVI V, VVI revV, VI partial_dfvs, int partial_dfvs_size, i
     VVI comps;
 
     if(use_disjoint_comps) {
-        TimeMeasurer::start("Finding SCC");
+        // TimeMeasurer::start("Finding SCC");
         StronglyConnectedComponents scc(V);
         scc.createStronglyConnectedComponents();
         comps = scc.getComponents();
-        TimeMeasurer::stop("Finding SCC");
+        // TimeMeasurer::stop("Finding SCC");
     }else{
         comps = VVI(1, VI(V.size()));
     }
@@ -324,7 +324,7 @@ VI DFVSSolverE::solveForStronglyConnected(VVI V, VVI revV, VI partial_dfvs, int 
 
 
 int DFVSSolverE::getBranchingNode(VVI &V, VVI &revV, int rec_depth) {
-    TimeMeasurer::start("getBranchingNode()");
+    // TimeMeasurer::start("getBranchingNode()");
 
     bool use_fast_branching_node = false;
 
@@ -344,7 +344,7 @@ int DFVSSolverE::getBranchingNode(VVI &V, VVI &revV, int rec_depth) {
             }
         }
         assert(v != -1);
-        TimeMeasurer::stop("getBranchingNode()");
+        // TimeMeasurer::stop("getBranchingNode()");
         return v;
     }
 
@@ -400,7 +400,7 @@ int DFVSSolverE::getBranchingNode(VVI &V, VVI &revV, int rec_depth) {
 
             int E = GraphUtils::countEdges(red.V, true);
             if (E == 0 && red_dfvs.empty()) {
-                TimeMeasurer::stop("getBranchingNode()");
+                // TimeMeasurer::stop("getBranchingNode()");
                 assert(!Utils::hasCycle(red.V));
                 assert(!Utils::hasCycle(H));
                 return -1;
@@ -432,7 +432,7 @@ int DFVSSolverE::getBranchingNode(VVI &V, VVI &revV, int rec_depth) {
         }
     }
 
-    TimeMeasurer::stop("getBranchingNode()");
+    // TimeMeasurer::stop("getBranchingNode()");
     return v; // we return the node that is in maximal number of DCU's
 }
 
@@ -441,9 +441,9 @@ void DFVSSolverE::indent(int d) {
 }
 
 bool DFVSSolverE::hasRedundantNodes(VI partial_dfvs) {
-    TimeMeasurer::start("hasRedundantNodes()");
+    // TimeMeasurer::start("hasRedundantNodes()");
     VI red = Utils::getRedundantNodes(*origV, partial_dfvs, 1e9, true, true);
-    TimeMeasurer::stop("hasRedundantNodes()");
+    // TimeMeasurer::stop("hasRedundantNodes()");
     return red.size() > 0;
 }
 
@@ -463,7 +463,7 @@ bool DFVSSolverE::checkLBUB(VVI &V, VVI & revV, int rec_depth, int partial_size,
 
     int local_lb = 0;
     {
-        TimeMeasurer::start("Lower bounding");
+        // TimeMeasurer::start("Lower bounding");
         vc_dfvs = Utils::getLowerBoundByVCOnPIGraph(V, revV);
         local_lb = vc_dfvs.size();
 
@@ -505,7 +505,7 @@ bool DFVSSolverE::checkLBUB(VVI &V, VVI & revV, int rec_depth, int partial_size,
             }
         }
 
-        TimeMeasurer::stop("Lower bounding");
+        // TimeMeasurer::stop("Lower bounding");
     }
 
     if(write_logs){
@@ -588,7 +588,7 @@ VI DFVSSolverE:: solveForInputGraph(VVI V) {
         int ub = heur_dfvs.size();
 
 
-        TimeMeasurer::start("DFVSSolverE");
+        // TimeMeasurer::start("DFVSSolverE");
         DFVSSolverE solverE(&g.V, cnf);
         solverE.cnf.reducer_use_twins_merge = false;
 
@@ -642,7 +642,7 @@ VI DFVSSolverE:: solveForInputGraph(VVI V) {
         for( int & d : exact_partial ) d = g.nodes[d];
 
         exact_all += exact_partial;
-        TimeMeasurer::stop("DFVSSolverE");
+        // TimeMeasurer::stop("DFVSSolverE");
     }
 
     assert(Utils::isFVS2(V, exact_all));

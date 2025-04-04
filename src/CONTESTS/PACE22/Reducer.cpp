@@ -4,7 +4,7 @@
 
 #include <graphs/GraphUtils.h>
 #include <graphs/scc/StronglyConnectedComponents.h>
-#include <utils/TimeMeasurer.h>
+// #include <utils/TimeMeasurer.h>
 #include <utils/RandomNumberGenerators.h>
 #include <graphs/GraphInducer.h>
 #include <CONTESTS/PACE22/exact/DFVSSolverE.h>
@@ -1712,7 +1712,8 @@ bool Reducer::mergeTwins(int max_milliseconds) {
 
         VVI revgV = GraphUtils::reverseGraph(g.V);
 
-        const bool find_only_vc = (A.size()  > 15);
+        // const bool find_only_vc = (A.size()  > 15);
+        const bool find_only_vc = false;
         if(find_only_vc){
             VI vc = Utils::getLowerBoundByVCOnPIGraph(g.V, revgV);
             return vc.size();
@@ -5131,9 +5132,9 @@ tuple<vector<DeskReduction*>,VI, int> Reducer::desk(){
         int arcs_after = GraphUtils::countEdges(V,true);
         arc_diff = arcs_after - arcs_before;
 
-        if( arc_diff > 0 && V.size() > 50 ){
-                clog << "There were " << arc_diff << " arcs added in desk() reduction" << endl;
-        }
+        // if( arc_diff > 0 && V.size() > 50 ){
+        //         clog << "There were " << arc_diff << " arcs added in desk() reduction" << endl;
+        // }
     }
 
     return {desk_folds, desk_dominations, arc_diff};

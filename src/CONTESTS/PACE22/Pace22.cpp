@@ -263,7 +263,7 @@ struct ExpData {
         vector<string> fields{"N", "M", "pi_arcs", "npi_arcs", "paf"};
         vector<string> res;
 
-        for( string s : { "orig", "basic", "known", "dom" } ) {
+        for( string s : { "orig", "basic", "known", "dom", "dom+lift", "all-non-dom6" } ) {
             for(auto f : fields) {
                 res.push_back(s + "-" + f);
             }
@@ -285,28 +285,29 @@ struct ExpData {
     }
 };
 
-tuple<ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI V) {
+tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI V) {
 
     auto induceByNonisolated = [&]() {
         InducedGraph g = GraphInducer::induceByNonisolatedNodes(V);
         V = g.V;
     };
 
+    auto initV = V;
 
 
     auto assignTimeLimits = [&](auto & red) {
-        red.cnf.reducer_max_time_millis = 600'000;
-        int MAX_MILLIS_PER_REDUCTION = 30'000;
+        red.cnf.reducer_max_time_millis = 3'600'000; // 1 hour max time
+        int MAX_MILLIS_PER_REDUCTION = 100'000;
         red.cnf.reducer_nonsimple_cycle_arcs_full_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
-        red.cnf.reducer_domination4_max_time_millis_per_node = 300;
+        red.cnf.reducer_domination4_max_time_millis_per_node = 1'000;
         red.cnf.reducer_domination_3_4_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
-        red.cnf.reducer_domination5_max_time_millis_per_node = 300;
+        red.cnf.reducer_domination5_max_time_millis_per_node = 1'000;
         red.cnf.reducer_domination_5_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
-        red.cnf.reducer_mixed_domination_full_max_time_millis_per_node = 300;
+        red.cnf.reducer_mixed_domination_full_max_time_millis_per_node = 1'000;
         red.cnf.reducer_mixed_domination_full_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
     };
 
-    ExpData initV_data, basic_data, known_red_data, dom_data;
+    ExpData initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data;
 
     induceByNonisolated();
     initV_data.createData(V);
@@ -345,7 +346,7 @@ tuple<ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI V) {
         known_red_data.createData(V);
     }
 
-    {
+    { // domination rules
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -371,7 +372,93 @@ tuple<ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI V) {
         dom_data.createData(V);
     }
 
-    return {initV_data, basic_data, known_red_data, dom_data};
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        Reducer red(initV, main_cnf);
+        red.disableAllNonbasicReductions();
+        red.cnf.reducer_use_core = true;
+        red.cnf.reducer_use_dome = true;
+        red.cnf.reducer_use_pie = true;
+        red.cnf.reducer_use_inoutclique = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
+        red.cnf.reducer_use_domination = true;
+        red.cnf.reducer_use_domination_3 = true;
+        red.cnf.reducer_use_domination_4 = true;
+        red.cnf.reducer_use_domination_5 = true;
+        red.cnf.reducer_use_mixed_domination = true;
+        red.cnf.reducer_use_mixed_domination_full = true;
+
+        {
+            red.cnf.reducer_use_desk = true;
+            red.cnf.reducer_use_folding = true;
+            red.cnf.reducer_use_folding_twins = true;
+            red.cnf.reducer_use_cycle_folding = true;
+            // red.cnf.reducer_use_unconfined = true;
+            // red.cnf.reducer_use_edge_neighborhood_blocker = true;
+            // red.cnf.reducer_use_full_bipartite_blocker = true;
+            red.cnf.reducer_use_funnel = true;
+            red.cnf.reducer_use_general_folding = true;
+            // red.cnf.reducer_use_twins_merge = true;
+            red.cnf.reducer_use_reverse_triangle_gadgets = true;
+            // red.cnf.reducer_use_bottleneck = true;
+            // red.cnf.reducer_use_bottleneck2 = true;
+        }
+
+        assignTimeLimits(red);
+        auto reductions = red.reduce();
+        V = red.V;
+        induceByNonisolated();
+        dom_and_liftables.createData(V);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        Reducer red(initV, main_cnf);
+        red.disableAllNonbasicReductions();
+        red.cnf.reducer_use_core = true;
+        red.cnf.reducer_use_dome = true;
+        red.cnf.reducer_use_pie = true;
+        red.cnf.reducer_use_inoutclique = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
+        red.cnf.reducer_use_domination = true;
+        red.cnf.reducer_use_domination_3 = true;
+        red.cnf.reducer_use_domination_4 = true;
+        red.cnf.reducer_use_domination_5 = true;
+        red.cnf.reducer_use_mixed_domination = true;
+        red.cnf.reducer_use_mixed_domination_full = true;
+
+        {
+            red.cnf.reducer_use_desk = true;
+            red.cnf.reducer_use_folding = true;
+            red.cnf.reducer_use_folding_twins = true;
+            red.cnf.reducer_use_cycle_folding = true;
+            red.cnf.reducer_use_unconfined = true;
+            red.cnf.reducer_use_edge_neighborhood_blocker = true;
+            red.cnf.reducer_use_full_bipartite_blocker = true;
+            red.cnf.reducer_use_funnel = true;
+            red.cnf.reducer_use_general_folding = true;
+            red.cnf.reducer_use_twins_merge = true;
+            red.cnf.reducer_use_reverse_triangle_gadgets = true;
+            red.cnf.reducer_use_bottleneck = true;
+            red.cnf.reducer_use_bottleneck2 = true;
+        }
+
+        assignTimeLimits(red);
+        auto reductions = red.reduce();
+        V = red.V;
+        induceByNonisolated();
+        all_non6_data.createData(V);
+    }
+
+    return {initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data};
 }
 
 int main(int argc, char** argv) {
@@ -396,7 +483,8 @@ int main(int argc, char** argv) {
     }
 
 
-    vector<string> instances_all = instances_e + instances_h;
+    vector<string> instances_all = instances_e;
+    // vector<string> instances_all = instances_e + instances_h;
 
     // clog << "All instances: " << endl;
     // for( auto s : instances_all ) DEBUG(s);
@@ -407,15 +495,19 @@ int main(int argc, char** argv) {
     // instances_all = StandardUtils::slice(instances_all, 200 + 197, 400);
 
 
-    omp_set_num_threads(1);
+    // omp_set_num_threads(1);
     // DEBUG(omp_get_max_threads());
     // exit(1);
 
-    bool compute = false;
-    bool create_results_all = true;
+    bool compute = true;
+    bool create_results_all = false;
+
+    reverse(ALL(instances_all));
 
     if(compute) {
-        #pragma omp parallel for
+        constexpr int chunk = 1;
+        // #pragma omp parallel for schedule(dynamic,chunk) num_threads(14)
+        #pragma omp parallel for num_threads(12) schedule(dynamic,chunk)
         // for( auto s : instances_all ) {
         for( int ind = 0; ind < instances_all.size(); ind++ ) {
             string s = instances_all[ind];
@@ -426,7 +518,7 @@ int main(int argc, char** argv) {
             ifstream cur_str(s);
             auto V = Utils::readGraph(cur_str);
 
-            auto [initV_data, basic_data, known_red_data, dom_data] = createDataForInstance(V);
+            auto [initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data] = createDataForInstance(V);
 
             ofstream cur_data_os(s + ".csv");
             cur_data_os.precision(3);
@@ -448,7 +540,9 @@ int main(int argc, char** argv) {
             writeData(cur_data_os, initV_data);
             writeData(cur_data_os, basic_data);
             writeData(cur_data_os, known_red_data);
-            writeData(cur_data_os, dom_data, true);
+            writeData(cur_data_os, dom_data);
+            writeData(cur_data_os, dom_and_liftables);
+            writeData(cur_data_os, all_non6_data, true);
 
             // writeData(res_all_str, initV_data);
             // writeData(res_all_str, basic_data);

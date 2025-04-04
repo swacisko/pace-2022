@@ -814,15 +814,21 @@ namespace Utils{
         }else {
 
             if (use_wgyc) {
-                ofstream out("subgraph_wgyc.txt");
+                string subgraph_file = "subgraph_wgyc.txt";
+                ofstream out(subgraph_file);
                 GraphWriter::writeGraphDIMACS(V2, out, false, 1);
                 out.close();
 
-                TimeMeasurer::start("Running WGYC");
-                auto suppress = system("./vc_solver subgraph_wgyc.txt > temp_wgyc_bin_log_file.txt");
-                TimeMeasurer::stop("Running WGYC");
+                // TimeMeasurer::start("Running WGYC");
+                // auto suppress = system("./vc_solver subgraph_wgyc.txt > temp_wgyc_bin_log_file.txt");
+                string log_file = subgraph_file + ".log";
+                string command = "./vc_solver " + subgraph_file + " > " + log_file;
+                auto suppress = system(command.c_str());
+                // TimeMeasurer::stop("Running WGYC");
 
-                ifstream wgyc("subgraph_wgyc.txt.vc");
+                // ifstream wgyc("subgraph_wgyc.txt.vc");
+                string res_file = subgraph_file + ".vc";
+                ifstream wgyc(res_file.c_str());
                 string s;
                 int n, sz;
                 wgyc >> s >> s >> n >> sz;
@@ -837,9 +843,9 @@ namespace Utils{
                 GraphWriter::writeGraphDIMACS(V2, out, false, 1);
                 out.close();
 
-                TimeMeasurer::start("Running Peaty");
+                // TimeMeasurer::start("Running Peaty");
                 auto suppress = system("./peaty < subgraph_peaty.txt > subgraph_peaty.vc");
-                TimeMeasurer::stop("Running Peaty");
+                // TimeMeasurer::stop("Running Peaty");
 
                 ifstream in("subgraph_peaty.vc");
                 string s;
