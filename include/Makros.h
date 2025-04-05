@@ -83,15 +83,18 @@ ostream& operator<<( ostream& str, const pair<_T,_E> & pair){
 }
 
 template<class _T>
-void writeCollectionToStream(ostream& str, _T& col ){
-    str << "{";
-    int ile = 0;
-    for(auto t : col){
-        if(ile++ > 0) str << ", ";
-        str << t;
-    }
-    str << "}";
-}
+void writeCollectionToStream(ostream& str, _T& col );
+
+// template<class _T>
+// void writeCollectionToStream(ostream& str, _T& col ){
+//     str << "{";
+//     int ile = 0;
+//     for(auto t : col){
+//         if(ile++ > 0) str << ", ";
+//         str << t;
+//     }
+//     str << "}";
+// }
 
 template<class _P, class _Q, class _R>
 void writeCollectionToStream(ostream& str, tuple<_P,_Q,_R> col ){
@@ -141,6 +144,16 @@ struct Quadruple{
     _T st,nd,rd, th;
 };
 
+template<class _T>
+void writeCollectionToStream(ostream& str, _T& col ){
+    str << "{";
+    int ile = 0;
+    for(auto t : col){
+        if(ile++ > 0) str << ", ";
+        str << t;
+    }
+    str << "}";
+}
 
 
 

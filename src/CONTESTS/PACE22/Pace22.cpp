@@ -292,7 +292,6 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
         V = g.V;
     };
 
-    auto initV = V;
 
 
     auto assignTimeLimits = [&](auto & red) {
@@ -312,7 +311,9 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
     induceByNonisolated();
     initV_data.createData(V);
 
-    {
+    auto initV = V;
+
+    { // basic rules
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -321,17 +322,19 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
         red.disableAllNonbasicReductions();
         assignTimeLimits(red);
         auto reductions = red.reduce();
+        for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
         basic_data.createData(V);
     }
 
-    {
+    { // some known rules
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
         Reducer red(V, main_cnf);
+        // Reducer red(initV, main_cnf);
         red.disableAllNonbasicReductions();
         red.cnf.reducer_use_core = true;
         red.cnf.reducer_use_dome = true;
@@ -341,6 +344,7 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
         red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
         assignTimeLimits(red);
         auto reductions = red.reduce();
+        for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
         known_red_data.createData(V);
@@ -352,6 +356,7 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
         main_cnf.sw.start("main");
 
         Reducer red(V, main_cnf);
+        // Reducer red(initV, main_cnf);
         red.disableAllNonbasicReductions();
         red.cnf.reducer_use_core = true;
         red.cnf.reducer_use_dome = true;
@@ -367,17 +372,19 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
         red.cnf.reducer_use_mixed_domination_full = true;
         assignTimeLimits(red);
         auto reductions = red.reduce();
+        for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
         dom_data.createData(V);
     }
 
-    if(true){
+    if(true){ // dom + liftables
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        Reducer red(initV, main_cnf);
+        Reducer red(V, main_cnf);
+        // Reducer red(initV, main_cnf);
         red.disableAllNonbasicReductions();
         red.cnf.reducer_use_core = true;
         red.cnf.reducer_use_dome = true;
@@ -410,17 +417,19 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
 
         assignTimeLimits(red);
         auto reductions = red.reduce();
+        for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
         dom_and_liftables.createData(V);
     }
 
-    if(true){
+    if(true){ // all
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        Reducer red(initV, main_cnf);
+        Reducer red(V, main_cnf);
+        // Reducer red(initV, main_cnf);
         red.disableAllNonbasicReductions();
         red.cnf.reducer_use_core = true;
         red.cnf.reducer_use_dome = true;
@@ -445,14 +454,16 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
             red.cnf.reducer_use_full_bipartite_blocker = true;
             red.cnf.reducer_use_funnel = true;
             red.cnf.reducer_use_general_folding = true;
+            red.cnf.reducer_max_general_folding_neighborhood_size = 7;
             red.cnf.reducer_use_twins_merge = true;
             red.cnf.reducer_use_reverse_triangle_gadgets = true;
-            red.cnf.reducer_use_bottleneck = true;
-            red.cnf.reducer_use_bottleneck2 = true;
+            // red.cnf.reducer_use_bottleneck = true;
+            // red.cnf.reducer_use_bottleneck2 = true;
         }
 
         assignTimeLimits(red);
         auto reductions = red.reduce();
+        for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
         all_non6_data.createData(V);
@@ -483,8 +494,8 @@ int main(int argc, char** argv) {
     }
 
 
-    vector<string> instances_all = instances_e;
-    // vector<string> instances_all = instances_e + instances_h;
+    // vector<string> instances_all = instances_e;
+    vector<string> instances_all = instances_e + instances_h;
 
     // clog << "All instances: " << endl;
     // for( auto s : instances_all ) DEBUG(s);
@@ -499,20 +510,55 @@ int main(int argc, char** argv) {
     // DEBUG(omp_get_max_threads());
     // exit(1);
 
-    bool compute = true;
-    bool create_results_all = false;
+    bool compute = false;
+    bool create_results_all = true;
 
-    reverse(ALL(instances_all));
+
 
     if(compute) {
+        reverse(ALL(instances_all));
+
+
+        bool retain_only_absent_csvs = false;
+        if(retain_only_absent_csvs){
+            auto fun = [&]( string f ) {
+                string s = "datasets/" + f + ".csv";
+                return !filesystem::exists(s);
+            };
+            auto it = partition( ALL(instances_all), fun );
+
+            // for(auto s : instances_all){
+            //     if(!filesystem::exists( "datasets/" + s + ".csv" )){
+            //         DEBUG(s);
+            //     }
+            // }
+
+            // DEBUG(instances_all);
+            // DEBUG( (int)(it - instances_all.begin()) );
+            instances_all.resize(it - instances_all.begin());
+            DEBUG(instances_all);
+
+
+            // DEBUG(filesystem::exists("datasets/h_175.csv"));
+            // DEBUG(filesystem::exists("datasets/h_176.csv"));
+            // exit(2);
+        }
+
+        omp_set_num_threads( min( (int)instances_all.size(), 24 ) );
+
+        clog << "There are " << instances_all.size() << " instances to consider" << endl << endl;
+
         constexpr int chunk = 1;
         // #pragma omp parallel for schedule(dynamic,chunk) num_threads(14)
-        #pragma omp parallel for num_threads(12) schedule(dynamic,chunk)
+        // #pragma omp parallel for num_threads(24) schedule(dynamic,chunk)
+        #pragma omp parallel for schedule(dynamic,chunk)
         // for( auto s : instances_all ) {
         for( int ind = 0; ind < instances_all.size(); ind++ ) {
             string s = instances_all[ind];
 
-            clog << "Considering instance " << s << endl;
+            string msg = "Considering instance " + s;
+            msg += " in thread id: " + to_string(omp_get_thread_num() );
+            clog << msg << endl;
             s = "datasets/" + s;
 
             ifstream cur_str(s);
@@ -548,6 +594,8 @@ int main(int argc, char** argv) {
             // writeData(res_all_str, basic_data);
             // writeData(res_all_str, known_red_data);
             // writeData(res_all_str, dom_data, true);
+
+            clog << "\tFinished processing instance " << s << endl;
         }
     }
 
@@ -556,21 +604,26 @@ int main(int argc, char** argv) {
         ofstream res_all_str("res_all.csv");
         res_all_str.precision(3);
         res_all_str << fixed;
-        {
+        { // writing header
             res_all_str << "id";
             int cnt = 1;
             for( auto h : header ) res_all_str << (cnt++ ? ", " : "") << h;
             res_all_str << ", dN / bN, dE / bE, dN / kN, dE / kE";
+            res_all_str << ", dliftN / kN, dliftE / kE, allN / kN, allE / kE";
             res_all_str << endl;
         }
 
         for(auto s : instances_all) {
             string instance_name = s;
-            s = "datasets/" + s;
+            s = "datasets/" + s + ".csv";
+            if(!filesystem::exists(s)){
+                res_all_str << instance_name << endl;
+                continue;
+            }
 
             string header_line, data_line;
             {
-                ifstream cur_str(s + ".csv");
+                ifstream cur_str(s);
                 getline(cur_str, header_line);
                 getline(cur_str, data_line);
                 // DEBUG(header_line);
@@ -598,21 +651,33 @@ int main(int argc, char** argv) {
             // for(auto e : entries) clog << e << endl;
             // exit(1);
 
+            res_all_str << instance_name;
+            for(auto e : entries) res_all_str << ", " << e;
+
+
             int basicN = stoi(entries[5]);
             int knownN = stoi(entries[10]);
             int domN = stoi(entries[15]);
+            int dliftN = stoi(entries[20]);
+            int allN = stoi(entries[25]);
             double domN_basicN = (basicN ?  1.0*domN / basicN : 0 );
             double domN_knownN = (knownN ? 1.0*domN / knownN : 0 );
+            double dliftN_knownN = (knownN ? 1.0*dliftN / knownN : 0 );
+            double allN_knownN = (knownN ? 1.0*allN / knownN : 0 );
 
             int basicE = stoi(entries[6]);
             int knownE = stoi(entries[11]);
             int domE = stoi(entries[16]);
+            int dliftE = stoi(entries[21]);
+            int allE = stoi(entries[26]);
             double domE_basicE = (basicE ?  1.0*domE / basicE : 0 );
             double domE_knownE = (knownE ? 1.0*domE / knownE : 0 );
+            double dliftE_knownE = (knownE ? 1.0*dliftE / knownE : 0 );
+            double allE_knownE = (knownE ? 1.0*allE / knownE : 0 );
 
-            res_all_str << instance_name;
-            for(auto e : entries) res_all_str << ", " << e;
             res_all_str << ", " << domN_basicN << ", " << domE_basicE << ", " << domN_knownN << ", " << domE_knownE;
+            res_all_str << ", " << dliftN_knownN << ", " << dliftE_knownE << ", " << allN_knownN << ", " << allE_knownE;
+
             res_all_str << endl;
         }
     }
