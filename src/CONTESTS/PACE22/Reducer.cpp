@@ -4722,6 +4722,7 @@ vector<FullBipartiteBlockerReduction*> Reducer::fullBipartiteBlocker() {
     constexpr int MAX_AB_DEG = 7; // for efficiency reasons
 
     for( auto [a,b] : pi_edges ){
+        if(V[a].empty() || V[b].empty() || revV[a].empty() || revV[b].empty()) continue;
         if( a > b ) continue;
         if( affected[a] || affected[b] ) continue;
         if( V[a].size() > MAX_AB_DEG || V[b].size() > MAX_AB_DEG ) continue;
@@ -4751,7 +4752,7 @@ vector<FullBipartiteBlockerReduction*> Reducer::fullBipartiteBlocker() {
         for( auto [X,Y] : to_check ){
             StandardUtils::removeFromArrayPreserveOrderInplace(X, rem, helper);
             StandardUtils::removeFromArrayPreserveOrderInplace(Y, rem, helper);
-            if( isDisjoint(X,Y) && hasAllEdges(X,Y) ){
+            if( isDisjoint(X,Y) && hasAllEdges(X,Y) && !XX.empty() && !YY.empty() ){
                 XX = X; YY = Y;
                 break;
             }

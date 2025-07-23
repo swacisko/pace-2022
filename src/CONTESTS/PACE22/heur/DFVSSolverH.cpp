@@ -401,6 +401,12 @@ VI DFVSSolverH::solveForBiconnectedGraph(VVI V, bool allow_improvements_here, co
         }
     }
 
+    // dfvsH = solver.solveByAgentFlowAllWithinDistance(V, 2); // original
+
+    if(!Utils::isFVS(V, dfvsH)){
+        int M = GraphUtils::countEdges(V);
+        dfvsH = Utils::getUpperBoundByVCOnSuperPIGraph(V, 10 + 3'000 * M / 1e6);
+    }
 
 
     if(cnf.write_logs) clog << "Main elapsed seconds: " << cnf.sw.getTime() / 1'000 << endl;

@@ -263,11 +263,27 @@ struct ExpData {
         vector<string> fields{"N", "M", "pi_arcs", "npi_arcs", "paf"};
         vector<string> res;
 
-        for( string s : { "orig", "basic", "known", "dom", "dom+lift", "all-non-dom6" } ) {
+        // writeData(cur_data_os, dom_and_liftables_no_funnel);
+        // writeData(cur_data_os, dom_and_liftables_no_desk);
+        // writeData(cur_data_os, dom_and_liftables_no_folding);
+        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_folding_twins);
+        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_general_folding);
+        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_cycle_folding);
+        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_rev_triangles);
+        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_edge_blocker);
+        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_bipartite_blocker);
+
+        for( string s : { "orig", "basic", "known", "dom", "dom+lift", "all-non-dom6",
+            "all-no-funnel", "no-desk", "no-folding",
+            "no-folding-twins", "no-general-folding", "no-cycle-folding",
+            "no-rev-triangles", "no-edge-blocker", "no-bipartite-blocker"} ) {
             for(auto f : fields) {
                 res.push_back(s + "-" + f);
             }
         }
+
+        res.push_back( "time-dom-sec" );
+        res.push_back("time-all-sec");
 
         return res;
     }
@@ -285,7 +301,9 @@ struct ExpData {
     }
 };
 
-tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI V) {
+tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,int, int,
+ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData>
+createDataForInstance(VVI V) {
 
     auto induceByNonisolated = [&]() {
         InducedGraph g = GraphInducer::induceByNonisolatedNodes(V);
@@ -307,6 +325,10 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
     };
 
     ExpData initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data;
+    ExpData dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
+        dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
+        dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
+        dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker;
 
     induceByNonisolated();
     initV_data.createData(V);
@@ -327,6 +349,8 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
         induceByNonisolated();
         basic_data.createData(V);
     }
+
+    VVI basicV = V;
 
     { // some known rules
         Config main_cnf;
@@ -423,28 +447,29 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
         dom_and_liftables.createData(V);
     }
 
-    if(true){ // all
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
 
-        Reducer red(V, main_cnf);
-        // Reducer red(initV, main_cnf);
+    constexpr bool include_single = false; // if true, then only single rule will be included, otherwise excluded
+    auto setAllForRed = [&](auto & red, const bool use_v2, // #TEST - here use_v2 should be set by default to include_single_variable - ugly nonm,aintainable code
+        bool use_dom45 = false, bool use_nonsimple_cycle_arcs_full = false,
+        bool use_mixed_domination_full = false) {
+
+        // assert(_include_single == include_single);
+
         red.disableAllNonbasicReductions();
         red.cnf.reducer_use_core = true;
         red.cnf.reducer_use_dome = true;
         red.cnf.reducer_use_pie = true;
         red.cnf.reducer_use_inoutclique = true;
         red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = use_nonsimple_cycle_arcs_full;
         red.cnf.reducer_use_domination = true;
         red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = true;
-        red.cnf.reducer_use_domination_5 = true;
+        red.cnf.reducer_use_domination_4 = use_dom45;
+        red.cnf.reducer_use_domination_5 = use_dom45;
         red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = true;
+        red.cnf.reducer_use_mixed_domination_full = use_mixed_domination_full;
 
-        {
+        if(use_v2){
             red.cnf.reducer_use_desk = true;
             red.cnf.reducer_use_folding = true;
             red.cnf.reducer_use_folding_twins = true;
@@ -460,16 +485,202 @@ tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData> createDataForInstance(VVI
             // red.cnf.reducer_use_bottleneck = true;
             // red.cnf.reducer_use_bottleneck2 = true;
         }
+    };
 
+    auto createForRed = [&](auto & red, auto & data) {
         assignTimeLimits(red);
         auto reductions = red.reduce();
         for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
-        all_non6_data.createData(V);
+        data.createData(V);
+    };
+
+
+    if(true){ // all
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = basicV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, true, true, true, true);
+        createForRed(red, all_non6_data);
     }
 
-    return {initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data};
+
+    VVI domV;
+
+    int time_dom_millis = 0;
+    { // basic domination rules - measuring time
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        Stopwatch sw;
+        sw.start("red");
+        V = basicV;
+        Reducer red(V, main_cnf);
+        // Reducer red(initV, main_cnf);
+        red.disableAllNonbasicReductions();
+        red.cnf.reducer_use_core = true;
+        red.cnf.reducer_use_dome = true;
+        red.cnf.reducer_use_pie = true;
+        red.cnf.reducer_use_inoutclique = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = false;
+        red.cnf.reducer_use_domination = true;
+        red.cnf.reducer_use_domination_3 = true;
+        red.cnf.reducer_use_domination_4 = false;
+        red.cnf.reducer_use_domination_5 = false;
+        red.cnf.reducer_use_mixed_domination = true;
+        red.cnf.reducer_use_mixed_domination_full = false;
+        assignTimeLimits(red);
+        auto reductions = red.reduce();
+        for(auto * r : reductions) delete r;
+        sw.stop("red");
+        V = red.V;
+        induceByNonisolated();
+        dom_data.createData(V);
+
+        time_dom_millis = sw.getTime("red");
+        domV = V;
+    }
+
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red,!include_single);
+        red.cnf.reducer_use_desk = include_single;
+        createForRed(red, dom_and_liftables_no_desk);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red,!include_single);
+        red.cnf.reducer_use_folding = include_single;
+        red.cnf.reducer_use_general_folding = include_single;
+        createForRed(red, dom_and_liftables_no_folding);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, !include_single);
+        red.cnf.reducer_use_cycle_folding = include_single;
+        createForRed(red, dom_and_liftables_no_funnel_no_cycle_folding);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, !include_single);
+        red.cnf.reducer_use_folding_twins = include_single;
+        createForRed(red, dom_and_liftables_no_funnel_no_folding_twins);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, !include_single);
+        red.cnf.reducer_use_reverse_triangle_gadgets = include_single;
+        createForRed(red, dom_and_liftables_no_funnel_no_rev_triangles);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, !include_single);
+        red.cnf.reducer_use_edge_neighborhood_blocker = include_single;
+        createForRed(red, dom_and_liftables_no_funnel_no_edge_blocker);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, !include_single);
+        red.cnf.reducer_use_full_bipartite_blocker = include_single;
+        createForRed(red, dom_and_liftables_no_funnel_no_bipartite_blocker);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, !include_single);
+        red.cnf.reducer_use_funnel = include_single;
+        createForRed(red, dom_and_liftables_no_funnel);
+    }
+
+    if(true){
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, !include_single);
+        red.cnf.reducer_use_general_folding = include_single;
+        createForRed(red, dom_and_liftables_no_funnel_no_general_folding);
+    }
+
+    int time_all_millis = 0;
+    if(true){ // all - measuring time in milliseconds
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        Stopwatch sw;
+        sw.start("red");
+        V = basicV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, true, false, false, false);
+        ExpData data;
+        createForRed(red, data);
+        sw.stop("red");
+        time_all_millis = sw.getTime("red");
+    }
+
+
+    // return {initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data};
+    return {initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data,  time_dom_millis, time_all_millis,
+        dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
+        dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
+        dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
+        dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker};
 }
 
 int main(int argc, char** argv) {
@@ -493,6 +704,19 @@ int main(int argc, char** argv) {
         instances_h.push_back(sh);
     }
 
+    // {
+    //     instances_h.clear();
+    //     // instances_e.erase(instances_e.begin(), instances_e.begin() + 100);
+    //     // instances_e.erase(instances_e.begin()+100, instances_e.end());
+    //
+    //     // instances_h = { "h_164", "h_188", "h_189"};
+    //     // instances_h = { "h_177", "h_175", "h_176"};
+    //     // instances_h = {"h_164", "h_177", "h_175", "h_176"};
+    //     // instances_e = {"e_152", "e_154", "e_184", "e_155", "e_157"};
+    //
+    //     // instances_e.clear();
+    // }
+
 
     // vector<string> instances_all = instances_e;
     vector<string> instances_all = instances_e + instances_h;
@@ -510,8 +734,10 @@ int main(int argc, char** argv) {
     // DEBUG(omp_get_max_threads());
     // exit(1);
 
-    bool compute = false;
-    bool create_results_all = true;
+    constexpr bool compute = true;
+    constexpr bool retain_only_absent_csvs = false;
+
+    constexpr bool create_results_all = true;
 
 
 
@@ -519,7 +745,6 @@ int main(int argc, char** argv) {
         reverse(ALL(instances_all));
 
 
-        bool retain_only_absent_csvs = false;
         if(retain_only_absent_csvs){
             auto fun = [&]( string f ) {
                 string s = "datasets/" + f + ".csv";
@@ -564,7 +789,11 @@ int main(int argc, char** argv) {
             ifstream cur_str(s);
             auto V = Utils::readGraph(cur_str);
 
-            auto [initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data] = createDataForInstance(V);
+            auto [initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data, time_dom_millis, time_all_millis,
+                dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
+                dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
+                dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
+                dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker] = createDataForInstance(V);
 
             ofstream cur_data_os(s + ".csv");
             cur_data_os.precision(3);
@@ -588,7 +817,21 @@ int main(int argc, char** argv) {
             writeData(cur_data_os, known_red_data);
             writeData(cur_data_os, dom_data);
             writeData(cur_data_os, dom_and_liftables);
-            writeData(cur_data_os, all_non6_data, true);
+            writeData(cur_data_os, all_non6_data);
+
+            writeData(cur_data_os, dom_and_liftables_no_funnel);
+            writeData(cur_data_os, dom_and_liftables_no_desk);
+            writeData(cur_data_os, dom_and_liftables_no_folding);
+            writeData(cur_data_os, dom_and_liftables_no_funnel_no_folding_twins);
+            writeData(cur_data_os, dom_and_liftables_no_funnel_no_general_folding);
+            writeData(cur_data_os, dom_and_liftables_no_funnel_no_cycle_folding);
+            writeData(cur_data_os, dom_and_liftables_no_funnel_no_rev_triangles);
+            writeData(cur_data_os, dom_and_liftables_no_funnel_no_edge_blocker);
+            writeData(cur_data_os, dom_and_liftables_no_funnel_no_bipartite_blocker);
+
+
+            cur_data_os << (1.0 * time_dom_millis / 1000) << ", ";
+            cur_data_os << (1.0 * time_all_millis / 1000) << endl;
 
             // writeData(res_all_str, initV_data);
             // writeData(res_all_str, basic_data);
