@@ -668,6 +668,9 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(cnf.reducer_use_domination_6){
             //TimeMeasurer::start("Reducer::domination6");
             VI to_remove = domination6();
+
+            if (!to_remove.empty()) DEBUG(to_remove.size());
+
             addKNR(to_remove);
             total_dominated_nodes6 += to_remove.size();
             Utils::removeNodes(V, revV, to_remove, helper);

@@ -69,5 +69,7 @@ file(GLOB SOURCES
         )
 
 
-add_executable(DiVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES})
+add_executable(DiVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES}
+        src/CONTESTS/PACE22/ELDReducer.cpp
+        src/CONTESTS/PACE22/ELDReducer.h)
 target_link_libraries( DiVerSeS stdc++fs )

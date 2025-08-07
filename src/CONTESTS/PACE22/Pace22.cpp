@@ -255,35 +255,17 @@ void initializeParams(int argc, char **argv) {
 
 
 struct ExpData {
-    int N, M, pi_arcs, nonpi_arcs;
-    double pi_arcs_fraction;
-    double nonpi_arcs_fraction;
+    int N, M;
 
     static vector<string> getHeader() {
-        vector<string> fields{"N", "M", "pi_arcs", "npi_arcs", "paf"};
+        vector<string> fields{"N", "M"};
         vector<string> res;
 
-        // writeData(cur_data_os, dom_and_liftables_no_funnel);
-        // writeData(cur_data_os, dom_and_liftables_no_desk);
-        // writeData(cur_data_os, dom_and_liftables_no_folding);
-        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_folding_twins);
-        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_general_folding);
-        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_cycle_folding);
-        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_rev_triangles);
-        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_edge_blocker);
-        // writeData(cur_data_os, dom_and_liftables_no_funnel_no_bipartite_blocker);
-
-        for( string s : { "orig", "basic", "known", "dom", "dom+lift", "all-non-dom6",
-            "all-no-funnel", "no-desk", "no-folding",
-            "no-folding-twins", "no-general-folding", "no-cycle-folding",
-            "no-rev-triangles", "no-edge-blocker", "no-bipartite-blocker"} ) {
+        for( string s : { "orig", "basic", "known", "all"} ) {
             for(auto f : fields) {
                 res.push_back(s + "-" + f);
             }
         }
-
-        res.push_back( "time-dom-sec" );
-        res.push_back("time-all-sec");
 
         return res;
     }
@@ -291,18 +273,10 @@ struct ExpData {
     void createData(VVI V) {
         N = V.size();
         M = GraphUtils::countEdges(V,true);
-        pi_arcs = Utils::countPiEdges(V);
-        nonpi_arcs = M - pi_arcs;
-        if(M) pi_arcs_fraction = (double)pi_arcs / M;
-        else pi_arcs_fraction = 0;
-
-        if(M) nonpi_arcs_fraction = (double)nonpi_arcs / M;
-        else nonpi_arcs_fraction = 0;
     }
 };
 
-tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,int, int,
-ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData>
+tuple<ExpData,ExpData,ExpData,ExpData,int>
 createDataForInstance(VVI V) {
 
     auto induceByNonisolated = [&]() {
@@ -324,12 +298,7 @@ createDataForInstance(VVI V) {
         red.cnf.reducer_mixed_domination_full_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
     };
 
-    ExpData initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data;
-    ExpData dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
-        dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
-        dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
-        dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker;
-
+    ExpData initV_data, basic_data, known_data, all_data;
     induceByNonisolated();
     initV_data.createData(V);
 
@@ -352,122 +321,24 @@ createDataForInstance(VVI V) {
 
     VVI basicV = V;
 
-    { // some known rules
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
 
-        Reducer red(V, main_cnf);
-        // Reducer red(initV, main_cnf);
-        red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
-        assignTimeLimits(red);
-        auto reductions = red.reduce();
-        for(auto * r : reductions) delete r;
-        V = red.V;
-        induceByNonisolated();
-        known_red_data.createData(V);
-    }
-
-    { // domination rules
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        Reducer red(V, main_cnf);
-        // Reducer red(initV, main_cnf);
-        red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
-        red.cnf.reducer_use_domination = true;
-        red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = true;
-        red.cnf.reducer_use_domination_5 = true;
-        red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = true;
-        assignTimeLimits(red);
-        auto reductions = red.reduce();
-        for(auto * r : reductions) delete r;
-        V = red.V;
-        induceByNonisolated();
-        dom_data.createData(V);
-    }
-
-    if(true){ // dom + liftables
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        Reducer red(V, main_cnf);
-        // Reducer red(initV, main_cnf);
-        red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
-        red.cnf.reducer_use_domination = true;
-        red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = true;
-        red.cnf.reducer_use_domination_5 = true;
-        red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = true;
-
-        {
-            red.cnf.reducer_use_desk = true;
-            red.cnf.reducer_use_folding = true;
-            red.cnf.reducer_use_folding_twins = true;
-            red.cnf.reducer_use_cycle_folding = true;
-            // red.cnf.reducer_use_unconfined = true;
-            // red.cnf.reducer_use_edge_neighborhood_blocker = true;
-            // red.cnf.reducer_use_full_bipartite_blocker = true;
-            red.cnf.reducer_use_funnel = true;
-            red.cnf.reducer_use_general_folding = true;
-            // red.cnf.reducer_use_twins_merge = true;
-            red.cnf.reducer_use_reverse_triangle_gadgets = true;
-            // red.cnf.reducer_use_bottleneck = true;
-            // red.cnf.reducer_use_bottleneck2 = true;
-        }
-
-        assignTimeLimits(red);
-        auto reductions = red.reduce();
-        for(auto * r : reductions) delete r;
-        V = red.V;
-        induceByNonisolated();
-        dom_and_liftables.createData(V);
-    }
-
-
-    constexpr bool include_single = false; // if true, then only single rule will be included, otherwise excluded
-    auto setAllForRed = [&](auto & red, const bool use_v2, // #TEST - here use_v2 should be set by default to include_single_variable - ugly nonm,aintainable code
-        bool use_dom45 = false, bool use_nonsimple_cycle_arcs_full = false,
-        bool use_mixed_domination_full = false) {
+    auto setAllForRed = [&](auto & red, const bool use_v2 = true) {
 
         // assert(_include_single == include_single);
 
         red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
+        red.cnf.reducer_use_core = false;
+        red.cnf.reducer_use_dome = false;
+        red.cnf.reducer_use_pie = false;
         red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = use_nonsimple_cycle_arcs_full;
+        red.cnf.reducer_use_nonsimple_cycle_arcs = false;
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = false;
         red.cnf.reducer_use_domination = true;
-        red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = use_dom45;
-        red.cnf.reducer_use_domination_5 = use_dom45;
-        red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = use_mixed_domination_full;
+        red.cnf.reducer_use_domination_3 = false;
+        red.cnf.reducer_use_domination_4 = false;
+        red.cnf.reducer_use_domination_5 = false;
+        red.cnf.reducer_use_mixed_domination = false;
+        red.cnf.reducer_use_mixed_domination_full = false;
 
         if(use_v2){
             red.cnf.reducer_use_desk = true;
@@ -481,9 +352,9 @@ createDataForInstance(VVI V) {
             red.cnf.reducer_use_general_folding = true;
             red.cnf.reducer_max_general_folding_neighborhood_size = 7;
             red.cnf.reducer_use_twins_merge = true;
-            red.cnf.reducer_use_reverse_triangle_gadgets = true;
-            // red.cnf.reducer_use_bottleneck = true;
-            // red.cnf.reducer_use_bottleneck2 = true;
+            red.cnf.reducer_use_reverse_triangle_gadgets = false;
+            red.cnf.reducer_use_bottleneck = false;
+            red.cnf.reducer_use_bottleneck2 = false;
         }
     };
 
@@ -497,190 +368,38 @@ createDataForInstance(VVI V) {
     };
 
 
+    if(true){ // known
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = basicV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red);
+        createForRed(red, known_data);
+    }
+
+    int millis_taken = 0;
     if(true){ // all
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = basicV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, true, true, true, true);
-        createForRed(red, all_non6_data);
-    }
-
-
-    VVI domV;
-
-    int time_dom_millis = 0;
-    { // basic domination rules - measuring time
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
         Stopwatch sw;
-        sw.start("red");
+        string opt = "dom6-eld";
+        sw.start(opt);
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
         V = basicV;
         Reducer red(V, main_cnf);
-        // Reducer red(initV, main_cnf);
-        red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = false;
-        red.cnf.reducer_use_domination = true;
-        red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = false;
-        red.cnf.reducer_use_domination_5 = false;
-        red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = false;
-        assignTimeLimits(red);
-        auto reductions = red.reduce();
-        for(auto * r : reductions) delete r;
-        sw.stop("red");
-        V = red.V;
-        induceByNonisolated();
-        dom_data.createData(V);
+        setAllForRed(red);
+        red.cnf.reducer_use_domination_6 = true;
+        createForRed(red, all_data);
 
-        time_dom_millis = sw.getTime("red");
-        domV = V;
+        sw.stop(opt);
+        millis_taken = sw.getTime(opt);
     }
-
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red,!include_single);
-        red.cnf.reducer_use_desk = include_single;
-        createForRed(red, dom_and_liftables_no_desk);
-    }
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red,!include_single);
-        red.cnf.reducer_use_folding = include_single;
-        red.cnf.reducer_use_general_folding = include_single;
-        createForRed(red, dom_and_liftables_no_folding);
-    }
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, !include_single);
-        red.cnf.reducer_use_cycle_folding = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_cycle_folding);
-    }
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, !include_single);
-        red.cnf.reducer_use_folding_twins = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_folding_twins);
-    }
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, !include_single);
-        red.cnf.reducer_use_reverse_triangle_gadgets = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_rev_triangles);
-    }
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, !include_single);
-        red.cnf.reducer_use_edge_neighborhood_blocker = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_edge_blocker);
-    }
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, !include_single);
-        red.cnf.reducer_use_full_bipartite_blocker = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_bipartite_blocker);
-    }
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, !include_single);
-        red.cnf.reducer_use_funnel = include_single;
-        createForRed(red, dom_and_liftables_no_funnel);
-    }
-
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, !include_single);
-        red.cnf.reducer_use_general_folding = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_general_folding);
-    }
-
-    int time_all_millis = 0;
-    if(true){ // all - measuring time in milliseconds
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        Stopwatch sw;
-        sw.start("red");
-        V = basicV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, true, false, false, false);
-        ExpData data;
-        createForRed(red, data);
-        sw.stop("red");
-        time_all_millis = sw.getTime("red");
-    }
-
 
     // return {initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data};
-    return {initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data,  time_dom_millis, time_all_millis,
-        dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
-        dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
-        dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
-        dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker};
+    return {initV_data, basic_data, known_data, all_data, millis_taken};
 }
 
 int main(int argc, char** argv) {
@@ -689,50 +408,20 @@ int main(int argc, char** argv) {
     cin.tie(0);
 
 
-    vector<string> instances_e;
-    vector<string> instances_h;
+    vector<string> instances_all;
     for( int i=1; i<=200; i++ ) {
         string id = "";
         if( i < 10 ) id += "0";
         if( i < 100 ) id += "0";
         id += to_string(i);
-
-        string se = "e_" + id;
-        string sh = "h_" + id;
-
-        instances_e.push_back(se);
-        instances_h.push_back(sh);
+        string se = "vc-exact_" + id + ".gr";
+        instances_all.push_back(se);
     }
 
-    // {
-    //     instances_h.clear();
-    //     // instances_e.erase(instances_e.begin(), instances_e.begin() + 100);
-    //     // instances_e.erase(instances_e.begin()+100, instances_e.end());
-    //
-    //     // instances_h = { "h_164", "h_188", "h_189"};
-    //     // instances_h = { "h_177", "h_175", "h_176"};
-    //     // instances_h = {"h_164", "h_177", "h_175", "h_176"};
-    //     // instances_e = {"e_152", "e_154", "e_184", "e_155", "e_157"};
-    //
-    //     // instances_e.clear();
-    // }
-
-
-    // vector<string> instances_all = instances_e;
-    vector<string> instances_all = instances_e + instances_h;
-
-    // clog << "All instances: " << endl;
-    // for( auto s : instances_all ) DEBUG(s);
+    instances_all.resize(60);
 
     auto header = ExpData::getHeader();
 
-    // instances_all.resize(250);
-    // instances_all = StandardUtils::slice(instances_all, 200 + 197, 400);
-
-
-    // omp_set_num_threads(1);
-    // DEBUG(omp_get_max_threads());
-    // exit(1);
 
     constexpr bool compute = true;
     constexpr bool retain_only_absent_csvs = false;
@@ -752,48 +441,27 @@ int main(int argc, char** argv) {
             };
             auto it = partition( ALL(instances_all), fun );
 
-            // for(auto s : instances_all){
-            //     if(!filesystem::exists( "datasets/" + s + ".csv" )){
-            //         DEBUG(s);
-            //     }
-            // }
-
-            // DEBUG(instances_all);
-            // DEBUG( (int)(it - instances_all.begin()) );
             instances_all.resize(it - instances_all.begin());
             DEBUG(instances_all);
-
-
-            // DEBUG(filesystem::exists("datasets/h_175.csv"));
-            // DEBUG(filesystem::exists("datasets/h_176.csv"));
-            // exit(2);
         }
 
-        omp_set_num_threads( min( (int)instances_all.size(), 24 ) );
+        omp_set_num_threads( min( (int)instances_all.size(), 12 ) );
 
         clog << "There are " << instances_all.size() << " instances to consider" << endl << endl;
 
-        constexpr int chunk = 1;
-        // #pragma omp parallel for schedule(dynamic,chunk) num_threads(14)
-        // #pragma omp parallel for num_threads(24) schedule(dynamic,chunk)
-        #pragma omp parallel for schedule(dynamic,chunk)
-        // for( auto s : instances_all ) {
+        #pragma omp parallel for schedule(dynamic,1)
         for( int ind = 0; ind < instances_all.size(); ind++ ) {
             string s = instances_all[ind];
 
             string msg = "Considering instance " + s;
             msg += " in thread id: " + to_string(omp_get_thread_num() );
             clog << msg << endl;
-            s = "datasets/" + s;
+            s = "datasets/eld_vc_instances/" + s;
 
             ifstream cur_str(s);
-            auto V = Utils::readGraph(cur_str);
+            auto V = GraphReader::readGraphDIMACSWunweighed(cur_str);
 
-            auto [initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data, time_dom_millis, time_all_millis,
-                dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
-                dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
-                dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
-                dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker] = createDataForInstance(V);
+            auto [initV_data, basic_data, known_data, all_data, millis_taken] = createDataForInstance(V);
 
             ofstream cur_data_os(s + ".csv");
             cur_data_os.precision(3);
@@ -802,41 +470,23 @@ int main(int argc, char** argv) {
             {
                 int cnt = 0;
                 for( auto h : header ) cur_data_os << (cnt++ ? ", " : "") << h;
+                cur_data_os << ",eld_time_millis";
                 cur_data_os << endl;
             }
 
             auto writeData = [&](auto & str, auto & data, bool end_of_line = false) {
                 const auto & r = data;
-                str << r.N << ", " << r.M << ", " << r.pi_arcs << ", " << r.nonpi_arcs << ", " << r.pi_arcs_fraction;
+                str << r.N << ", " << r.M;
                 if( end_of_line ) str << endl;
                 else str << ", ";
             };
 
             writeData(cur_data_os, initV_data);
             writeData(cur_data_os, basic_data);
-            writeData(cur_data_os, known_red_data);
-            writeData(cur_data_os, dom_data);
-            writeData(cur_data_os, dom_and_liftables);
-            writeData(cur_data_os, all_non6_data);
+            writeData(cur_data_os, known_data);
+            writeData(cur_data_os, all_data);
 
-            writeData(cur_data_os, dom_and_liftables_no_funnel);
-            writeData(cur_data_os, dom_and_liftables_no_desk);
-            writeData(cur_data_os, dom_and_liftables_no_folding);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_folding_twins);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_general_folding);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_cycle_folding);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_rev_triangles);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_edge_blocker);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_bipartite_blocker);
-
-
-            cur_data_os << (1.0 * time_dom_millis / 1000) << ", ";
-            cur_data_os << (1.0 * time_all_millis / 1000) << endl;
-
-            // writeData(res_all_str, initV_data);
-            // writeData(res_all_str, basic_data);
-            // writeData(res_all_str, known_red_data);
-            // writeData(res_all_str, dom_data, true);
+            cur_data_os << (millis_taken / 1000) << endl;
 
             clog << "\tFinished processing instance " << s << endl;
         }
@@ -844,23 +494,36 @@ int main(int argc, char** argv) {
 
 
     if(create_results_all) {
-        ofstream res_all_str("res_all.csv");
+        ofstream res_all_str("eldvc_res_all.csv");
+        ofstream res_all_impr("eldvc_res_impr.csv");
+
         res_all_str.precision(3);
         res_all_str << fixed;
+
+        res_all_impr.precision(3);
+        res_all_impr << fixed;
+
         { // writing header
             res_all_str << "id";
+            res_all_impr << "id";
+
             int cnt = 1;
             for( auto h : header ) res_all_str << (cnt++ ? ", " : "") << h;
-            res_all_str << ", dN / bN, dE / bE, dN / kN, dE / kE";
-            res_all_str << ", dliftN / kN, dliftE / kE, allN / kN, allE / kE";
+            res_all_str << ",eld_time_millis";
             res_all_str << endl;
+
+            cnt = 1;
+            for( auto h : header ) res_all_impr << (cnt++ ? ", " : "") << h;
+            res_all_impr << ",eld_time_sec";
+            res_all_impr << endl;
         }
 
         for(auto s : instances_all) {
             string instance_name = s;
-            s = "datasets/" + s + ".csv";
+            s = "datasets/eld_vc_instances/" + s + ".csv";
             if(!filesystem::exists(s)){
                 res_all_str << instance_name << endl;
+                res_all_impr << instance_name << endl;
                 continue;
             }
 
@@ -869,8 +532,6 @@ int main(int argc, char** argv) {
                 ifstream cur_str(s);
                 getline(cur_str, header_line);
                 getline(cur_str, data_line);
-                // DEBUG(header_line);
-                // DEBUG(data_line);
             }
 
             auto trim = [&](string & e) {
@@ -887,41 +548,19 @@ int main(int argc, char** argv) {
             };
 
             auto entries = StandardUtils::split(data_line, ",");
-            // DEBUG(entries);
-            // for(auto e : entries) clog << e << endl;
             for(auto & e : entries) trim(e);
-            // DEBUG(entries);
-            // for(auto e : entries) clog << e << endl;
-            // exit(1);
 
             res_all_str << instance_name;
             for(auto e : entries) res_all_str << ", " << e;
-
-
-            int basicN = stoi(entries[5]);
-            int knownN = stoi(entries[10]);
-            int domN = stoi(entries[15]);
-            int dliftN = stoi(entries[20]);
-            int allN = stoi(entries[25]);
-            double domN_basicN = (basicN ?  1.0*domN / basicN : 0 );
-            double domN_knownN = (knownN ? 1.0*domN / knownN : 0 );
-            double dliftN_knownN = (knownN ? 1.0*dliftN / knownN : 0 );
-            double allN_knownN = (knownN ? 1.0*allN / knownN : 0 );
-
-            int basicE = stoi(entries[6]);
-            int knownE = stoi(entries[11]);
-            int domE = stoi(entries[16]);
-            int dliftE = stoi(entries[21]);
-            int allE = stoi(entries[26]);
-            double domE_basicE = (basicE ?  1.0*domE / basicE : 0 );
-            double domE_knownE = (knownE ? 1.0*domE / knownE : 0 );
-            double dliftE_knownE = (knownE ? 1.0*dliftE / knownE : 0 );
-            double allE_knownE = (knownE ? 1.0*allE / knownE : 0 );
-
-            res_all_str << ", " << domN_basicN << ", " << domE_basicE << ", " << domN_knownN << ", " << domE_knownE;
-            res_all_str << ", " << dliftN_knownN << ", " << dliftE_knownE << ", " << allN_knownN << ", " << allE_knownE;
-
             res_all_str << endl;
+
+            int core_edges = stoi(entries[6]);
+            bool valid_known_kernel = ( core_edges > 0);
+            if (valid_known_kernel){
+                res_all_impr << instance_name;
+                for(auto e : entries) res_all_impr << ", " << e;
+                res_all_impr << endl;
+            }
         }
     }
 
