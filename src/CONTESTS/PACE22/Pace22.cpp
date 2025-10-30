@@ -301,9 +301,11 @@ struct ExpData {
     }
 };
 
-tuple<ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,int, int,
-ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData,ExpData>
-createDataForInstance(VVI V) {
+using PEI = pair<ExpData,int>;
+
+tuple<ExpData,
+    PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI>
+    createDataForInstance(VVI V) {
 
     auto induceByNonisolated = [&]() {
         InducedGraph g = GraphInducer::induceByNonisolatedNodes(V);
@@ -324,16 +326,20 @@ createDataForInstance(VVI V) {
         red.cnf.reducer_mixed_domination_full_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
     };
 
-    ExpData initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data;
-    ExpData dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
-        dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
-        dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
-        dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker;
+    ExpData initV_data, basic_data, known_red_data;
+    ExpData all_dom, only_fast_dom, dom12, dom3, dom4, dom5,
+        dom_nonsimple_arcs, dom_nonsimple_arcs_full, dom_mixed, dom_mixed_full;
+
+    int time_basic, time_known, time_dom12, time_dom3, time_dom4, time_dom5, time_dom_nonsimple_arcs, time_dom_nonsimple_arcs_full,
+        time_dom_mixed, time_dom_mixed_full, time_only_fast_dom, time_all_dom;
 
     induceByNonisolated();
     initV_data.createData(V);
 
     auto initV = V;
+
+    Stopwatch sw;
+    sw.setLimit("red", time_limit_millis);
 
     { // basic rules
         Config main_cnf;
@@ -343,20 +349,25 @@ createDataForInstance(VVI V) {
         Reducer red(V, main_cnf);
         red.disableAllNonbasicReductions();
         assignTimeLimits(red);
+
+        sw.restart("red");
         auto reductions = red.reduce();
         for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
         basic_data.createData(V);
+
+        time_basic = sw.getTime("red");
     }
 
     VVI basicV = V;
 
-    { // some known rules
+    { // known rules
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
+        V = basicV;
         Reducer red(V, main_cnf);
         // Reducer red(initV, main_cnf);
         red.disableAllNonbasicReductions();
@@ -364,127 +375,47 @@ createDataForInstance(VVI V) {
         red.cnf.reducer_use_dome = true;
         red.cnf.reducer_use_pie = true;
         red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
+        // red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+        // red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
         assignTimeLimits(red);
+
+        sw.restart("red");
         auto reductions = red.reduce();
         for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
         known_red_data.createData(V);
-    }
 
-    { // domination rules
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        Reducer red(V, main_cnf);
-        // Reducer red(initV, main_cnf);
-        red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
-        red.cnf.reducer_use_domination = true;
-        red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = true;
-        red.cnf.reducer_use_domination_5 = true;
-        red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = true;
-        assignTimeLimits(red);
-        auto reductions = red.reduce();
-        for(auto * r : reductions) delete r;
-        V = red.V;
-        induceByNonisolated();
-        dom_data.createData(V);
-    }
-
-    if(true){ // dom + liftables
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        Reducer red(V, main_cnf);
-        // Reducer red(initV, main_cnf);
-        red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = true;
-        red.cnf.reducer_use_domination = true;
-        red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = true;
-        red.cnf.reducer_use_domination_5 = true;
-        red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = true;
-
-        {
-            red.cnf.reducer_use_desk = true;
-            red.cnf.reducer_use_folding = true;
-            red.cnf.reducer_use_folding_twins = true;
-            red.cnf.reducer_use_cycle_folding = true;
-            // red.cnf.reducer_use_unconfined = true;
-            // red.cnf.reducer_use_edge_neighborhood_blocker = true;
-            // red.cnf.reducer_use_full_bipartite_blocker = true;
-            red.cnf.reducer_use_funnel = true;
-            red.cnf.reducer_use_general_folding = true;
-            // red.cnf.reducer_use_twins_merge = true;
-            red.cnf.reducer_use_reverse_triangle_gadgets = true;
-            // red.cnf.reducer_use_bottleneck = true;
-            // red.cnf.reducer_use_bottleneck2 = true;
-        }
-
-        assignTimeLimits(red);
-        auto reductions = red.reduce();
-        for(auto * r : reductions) delete r;
-        V = red.V;
-        induceByNonisolated();
-        dom_and_liftables.createData(V);
+        time_known = sw.getTime("red");
     }
 
 
-    constexpr bool include_single = false; // if true, then only single rule will be included, otherwise excluded
-    auto setAllForRed = [&](auto & red, const bool use_v2, // #TEST - here use_v2 should be set by default to include_single_variable - ugly nonm,aintainable code
-        bool use_dom45 = false, bool use_nonsimple_cycle_arcs_full = false,
+
+    bool include_single = false; // if true, then only single rule will be included, otherwise excluded
+    auto setAllForRed = [&](auto & red,
+        const bool use_dom4 = false, const bool use_dom5 = false,
+        const bool use_nonsimple_cycle_arcs_full = false,
         bool use_mixed_domination_full = false) {
 
-        // assert(_include_single == include_single);
-
         red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = use_nonsimple_cycle_arcs_full;
-        red.cnf.reducer_use_domination = true;
-        red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = use_dom45;
-        red.cnf.reducer_use_domination_5 = use_dom45;
-        red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = use_mixed_domination_full;
 
-        if(use_v2){
-            red.cnf.reducer_use_desk = true;
-            red.cnf.reducer_use_folding = true;
-            red.cnf.reducer_use_folding_twins = true;
-            red.cnf.reducer_use_cycle_folding = true;
-            red.cnf.reducer_use_unconfined = true;
-            red.cnf.reducer_use_edge_neighborhood_blocker = true;
-            red.cnf.reducer_use_full_bipartite_blocker = true;
-            red.cnf.reducer_use_funnel = true;
-            red.cnf.reducer_use_general_folding = true;
-            red.cnf.reducer_max_general_folding_neighborhood_size = 7;
-            red.cnf.reducer_use_twins_merge = true;
-            red.cnf.reducer_use_reverse_triangle_gadgets = true;
-            // red.cnf.reducer_use_bottleneck = true;
-            // red.cnf.reducer_use_bottleneck2 = true;
-        }
+        red.cnf.reducer_use_core = !include_single;
+        red.cnf.reducer_use_dome = !include_single;
+        red.cnf.reducer_use_pie = !include_single;
+        red.cnf.reducer_use_inoutclique = !include_single;
+        red.cnf.reducer_use_nonsimple_cycle_arcs = !include_single;
+
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = use_nonsimple_cycle_arcs_full;
+
+        red.cnf.reducer_use_domination = !include_single;
+        red.cnf.reducer_use_domination_3 = !include_single;
+
+        red.cnf.reducer_use_domination_4 = use_dom4;
+        red.cnf.reducer_use_domination_5 = use_dom5;
+
+        red.cnf.reducer_use_mixed_domination = !include_single;
+
+        red.cnf.reducer_use_mixed_domination_full = use_mixed_domination_full;
     };
 
     auto createForRed = [&](auto & red, auto & data) {
@@ -497,58 +428,46 @@ createDataForInstance(VVI V) {
     };
 
 
-    if(true){ // all
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = basicV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, true, true, true, true);
-        createForRed(red, all_non6_data);
-    }
-
-
     VVI domV;
 
-    int time_dom_millis = 0;
-    { // basic domination rules - measuring time
+    if(true){ // all_dom
+        auto b = include_single;
+        include_single = false;
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        Stopwatch sw;
-        sw.start("red");
-        V = basicV;
+        V = domV;
         Reducer red(V, main_cnf);
-        // Reducer red(initV, main_cnf);
-        red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs = true;
-        red.cnf.reducer_use_nonsimple_cycle_arcs_full = false;
-        red.cnf.reducer_use_domination = true;
-        red.cnf.reducer_use_domination_3 = true;
-        red.cnf.reducer_use_domination_4 = false;
-        red.cnf.reducer_use_domination_5 = false;
-        red.cnf.reducer_use_mixed_domination = true;
-        red.cnf.reducer_use_mixed_domination_full = false;
-        assignTimeLimits(red);
-        auto reductions = red.reduce();
-        for(auto * r : reductions) delete r;
-        sw.stop("red");
-        V = red.V;
-        induceByNonisolated();
-        dom_data.createData(V);
+        setAllForRed(red, true, true, true, true);
 
-        time_dom_millis = sw.getTime("red");
-        domV = V;
+        sw.restart("red");
+        createForRed(red, all_dom);
+        time_all_dom = sw.getTime("red");
+        include_single = b;
+    }
+
+    if(true){ // fast_dom
+        auto b = include_single;
+        include_single = false;
+
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = domV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red, false,false, false, false);
+
+        sw.restart("red");
+        createForRed(red, all_dom);
+        time_only_fast_dom = sw.getTime("red");
+
+        include_single = b;
     }
 
 
-    if(true){
+    if(true){ // reducer_use_domination
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -556,11 +475,14 @@ createDataForInstance(VVI V) {
         V = domV;
         Reducer red(V, main_cnf);
         setAllForRed(red,!include_single);
-        red.cnf.reducer_use_desk = include_single;
-        createForRed(red, dom_and_liftables_no_desk);
+        red.cnf.reducer_use_domination = include_single;
+
+        sw.restart("red");
+        createForRed(red, dom12);
+        time_dom12 = sw.getTime("red");
     }
 
-    if(true){
+    if(true){ // reducer_use_domination_3
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -568,12 +490,14 @@ createDataForInstance(VVI V) {
         V = domV;
         Reducer red(V, main_cnf);
         setAllForRed(red,!include_single);
-        red.cnf.reducer_use_folding = include_single;
-        red.cnf.reducer_use_general_folding = include_single;
-        createForRed(red, dom_and_liftables_no_folding);
+        red.cnf.reducer_use_domination_3 = include_single;
+
+        sw.restart("red");
+        createForRed(red, dom3);
+        time_dom3 = sw.getTime("red");
     }
 
-    if(true){
+    if(true){ // reducer_use_domination_4
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -581,11 +505,14 @@ createDataForInstance(VVI V) {
         V = domV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single);
-        red.cnf.reducer_use_cycle_folding = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_cycle_folding);
+        red.cnf.reducer_use_domination_4 = include_single;
+
+        sw.restart("red");
+        createForRed(red, dom4);
+        time_dom4 = sw.getTime("red");
     }
 
-    if(true){
+    if(true){ // reducer_use_domination_5
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -593,11 +520,14 @@ createDataForInstance(VVI V) {
         V = domV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single);
-        red.cnf.reducer_use_folding_twins = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_folding_twins);
+        red.cnf.reducer_use_domination_5 = include_single;
+
+        sw.restart("red");
+        createForRed(red, dom5);
+        time_dom5 = sw.getTime("red");
     }
 
-    if(true){
+    if(true){ // nonsimple arcs
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -605,11 +535,14 @@ createDataForInstance(VVI V) {
         V = domV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single);
-        red.cnf.reducer_use_reverse_triangle_gadgets = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_rev_triangles);
+        red.cnf.reducer_use_nonsimple_cycle_arcs = include_single;
+
+        sw.restart("red");
+        createForRed(red, dom_nonsimple_arcs);
+        time_dom_nonsimple_arcs = sw.getTime("red");
     }
 
-    if(true){
+    if(true){ // nonsimple arcs full
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -617,11 +550,14 @@ createDataForInstance(VVI V) {
         V = domV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single);
-        red.cnf.reducer_use_edge_neighborhood_blocker = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_edge_blocker);
+        red.cnf.reducer_use_nonsimple_cycle_arcs_full = include_single;
+
+        sw.restart("red");
+        createForRed(red, dom_nonsimple_arcs_full);
+        time_dom_nonsimple_arcs_full = sw.getTime("red");
     }
 
-    if(true){
+    if(true){ // mixed domination
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -629,11 +565,14 @@ createDataForInstance(VVI V) {
         V = domV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single);
-        red.cnf.reducer_use_full_bipartite_blocker = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_bipartite_blocker);
+        red.cnf.reducer_use_mixed_domination = include_single;
+
+        sw.restart("red");
+        createForRed(red, dom_mixed);
+        time_dom_mixed = sw.getTime("red");
     }
 
-    if(true){
+    if(true){ // mixed full
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -641,46 +580,27 @@ createDataForInstance(VVI V) {
         V = domV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single);
-        red.cnf.reducer_use_funnel = include_single;
-        createForRed(red, dom_and_liftables_no_funnel);
-    }
+        red.cnf.reducer_use_mixed_domination_full = include_single;
 
-    if(true){
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        V = domV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, !include_single);
-        red.cnf.reducer_use_general_folding = include_single;
-        createForRed(red, dom_and_liftables_no_funnel_no_general_folding);
-    }
-
-    int time_all_millis = 0;
-    if(true){ // all - measuring time in milliseconds
-        Config main_cnf;
-        main_cnf.sw.setLimit("main", time_limit_millis);
-        main_cnf.sw.start("main");
-
-        Stopwatch sw;
-        sw.start("red");
-        V = basicV;
-        Reducer red(V, main_cnf);
-        setAllForRed(red, true, false, false, false);
-        ExpData data;
-        createForRed(red, data);
-        sw.stop("red");
-        time_all_millis = sw.getTime("red");
+        sw.restart("red");
+        createForRed(red, dom_mixed_full);
+        time_dom_mixed_full = sw.getTime("red");
     }
 
 
-    // return {initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data};
-    return {initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data,  time_dom_millis, time_all_millis,
-        dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
-        dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
-        dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
-        dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker};
+    return make_tuple(initV_data,
+        make_pair(basic_data,time_basic),
+        make_pair(all_dom, time_all_dom),
+        make_pair(only_fast_dom, time_only_fast_dom),
+        make_pair(dom12, time_dom12),
+        make_pair(dom3, time_dom3),
+        make_pair(dom4, time_dom4),
+        make_pair(dom5, time_dom5),
+        make_pair(dom_nonsimple_arcs, time_dom_nonsimple_arcs),
+        make_pair(dom_nonsimple_arcs_full, time_dom_nonsimple_arcs_full),
+        make_pair(dom_mixed, time_dom_mixed),
+        make_pair(dom_mixed_full, time_dom_mixed_full)
+    );
 }
 
 int main(int argc, char** argv) {
@@ -789,11 +709,37 @@ int main(int argc, char** argv) {
             ifstream cur_str(s);
             auto V = Utils::readGraph(cur_str);
 
-            auto [initV_data, basic_data, known_red_data, dom_data, dom_and_liftables, all_non6_data, time_dom_millis, time_all_millis,
-                dom_and_liftables_no_funnel, dom_and_liftables_no_desk, dom_and_liftables_no_folding,
-                dom_and_liftables_no_funnel_no_folding_twins, dom_and_liftables_no_funnel_no_general_folding,
-                dom_and_liftables_no_funnel_no_cycle_folding, dom_and_liftables_no_funnel_no_rev_triangles,
-                dom_and_liftables_no_funnel_no_edge_blocker, dom_and_liftables_no_funnel_no_bipartite_blocker] = createDataForInstance(V);
+        //     initV_data,
+        // make_pair(basic_data,time_basic),
+        // make_pair(all_dom, time_all_dom),
+        // make_pair(only_fast_dom, time_only_fast_dom),
+        // make_pair(dom12, time_dom12),
+        // make_pair(dom3, time_dom3),
+        // make_pair(dom4, time_dom4),
+        // make_pair(dom5, time_dom5),
+        // make_pair(dom_nonsimple_arcs, time_dom_nonsimple_arcs),
+        // make_pair(dom_nonsimple_arcs_full, time_dom_nonsimple_arcs_full),
+        // make_pair(dom_mixed, time_dom_mixed),
+        // make_pair(dom_mixed_full, time_dom_mixed_full)
+
+            auto [initV,
+                basic, alld, only_fast,
+                d12, d3, d4, d5,
+                nca, nca_full,
+                mixed, mixed_full]
+            = createDataForInstance(V);
+
+            auto [basic_data,time_basic] = basic;
+            auto [all_dom, time_all_dom] = alld;
+            auto [only_fast_dom, time_only_fast_dom] = only_fast;
+            auto [dom12, time_dom12] = d12;
+            auto [dom3, time_dom3] = d3;
+            auto [dom4, time_dom4] = d4;
+            auto [dom5, time_dom5] = d5;
+            auto [dom_nonsimple_arcs, time_dom_nonsimple_arcs] = nca;
+            auto [dom_nonsimple_arcs_full, time_dom_nonsimple_arcs_full] = nca_full;
+            auto [dom_mixed, time_dom_mixex] =  mixed;
+            auto [dom_mixed_full, time_dom_mixed_full] = mixed_full;
 
             ofstream cur_data_os(s + ".csv");
             cur_data_os.precision(3);
@@ -805,43 +751,33 @@ int main(int argc, char** argv) {
                 cur_data_os << endl;
             }
 
-            auto writeData = [&](auto & str, auto & data, bool end_of_line = false) {
+            auto writeData = [&](auto & str, auto & data, int time, bool end_of_line = false) {
                 const auto & r = data;
                 str << r.N << ", " << r.M << ", " << r.pi_arcs << ", " << r.nonpi_arcs << ", " << r.pi_arcs_fraction;
-                if( end_of_line ) str << endl;
+                str << r.N << ", " << r.M << ", " << time;
+                if (end_of_line) str << endl;
                 else str << ", ";
             };
 
-            writeData(cur_data_os, initV_data);
-            writeData(cur_data_os, basic_data);
-            writeData(cur_data_os, known_red_data);
-            writeData(cur_data_os, dom_data);
-            writeData(cur_data_os, dom_and_liftables);
-            writeData(cur_data_os, all_non6_data);
+            writeData(cur_data_os, initV,0);
+            writeData(cur_data_os, basic_data, time_basic);
+            writeData(cur_data_os, all_dom, time_all_dom);
+            writeData(cur_data_os, only_fast_dom, time_only_fast_dom);
 
-            writeData(cur_data_os, dom_and_liftables_no_funnel);
-            writeData(cur_data_os, dom_and_liftables_no_desk);
-            writeData(cur_data_os, dom_and_liftables_no_folding);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_folding_twins);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_general_folding);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_cycle_folding);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_rev_triangles);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_edge_blocker);
-            writeData(cur_data_os, dom_and_liftables_no_funnel_no_bipartite_blocker);
-
-
-            cur_data_os << (1.0 * time_dom_millis / 1000) << ", ";
-            cur_data_os << (1.0 * time_all_millis / 1000) << endl;
-
-            // writeData(res_all_str, initV_data);
-            // writeData(res_all_str, basic_data);
-            // writeData(res_all_str, known_red_data);
-            // writeData(res_all_str, dom_data, true);
+            writeData(cur_data_os, dom12, time_dom12);
+            writeData(cur_data_os, dom3, time_dom3);
+            writeData(cur_data_os, dom4, time_dom4);
+            writeData(cur_data_os, dom5, time_dom5);
+            writeData(cur_data_os, dom_nonsimple_arcs, time_dom_nonsimple_arcs);
+            writeData(cur_data_os, dom_nonsimple_arcs_full, time_dom_nonsimple_arcs_full);
+            writeData(cur_data_os, dom_mixed, time_dom_mixex);
+            writeData(cur_data_os, dom_mixed_full, time_dom_mixed_full);
 
             clog << "\tFinished processing instance " << s << endl;
         }
     }
 
+    exit(1); // convert below !!
 
     if(create_results_all) {
         ofstream res_all_str("res_all.csv");

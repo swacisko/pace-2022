@@ -28,6 +28,12 @@ public:
 
     bool tle(string option = "main");
 
+    void restart(string opt) {
+        stop(opt);
+        times.erase(opt);
+        start(opt);
+    }
+
 private:
 
     map<string,double> limits;
