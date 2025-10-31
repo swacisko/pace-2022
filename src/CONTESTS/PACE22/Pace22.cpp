@@ -439,7 +439,7 @@ tuple<ExpData,
     };
 
 
-    VVI domV;
+
 
     if(true){ // all_dom
         auto b = include_single_reduction;
@@ -448,7 +448,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red, true, true, true, true);
 
@@ -466,7 +466,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red, false,false, false, false);
 
@@ -483,7 +483,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red,!include_single_reduction);
         red.cnf.reducer_use_domination = include_single_reduction;
@@ -498,7 +498,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red,!include_single_reduction);
         red.cnf.reducer_use_domination_3 = include_single_reduction;
@@ -513,7 +513,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single_reduction);
         red.cnf.reducer_use_domination_4 = include_single_reduction;
@@ -528,7 +528,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single_reduction);
         red.cnf.reducer_use_domination_5 = include_single_reduction;
@@ -543,7 +543,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single_reduction);
         red.cnf.reducer_use_nonsimple_cycle_arcs = include_single_reduction;
@@ -558,7 +558,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single_reduction);
         red.cnf.reducer_use_nonsimple_cycle_arcs_full = include_single_reduction;
@@ -573,7 +573,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single_reduction);
         red.cnf.reducer_use_mixed_domination = include_single_reduction;
@@ -588,7 +588,7 @@ tuple<ExpData,
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
 
-        V = domV;
+        V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red, !include_single_reduction);
         red.cnf.reducer_use_mixed_domination_full = include_single_reduction;
