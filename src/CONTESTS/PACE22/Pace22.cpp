@@ -261,7 +261,8 @@ struct ExpData {
 
     static vector<string> getHeader() {
         // vector<string> fields{"N", "M", "pi_arcs", "npi_arcs", "paf"};
-        vector<string> fields{"N", "M", "paf", "time"};
+        // vector<string> fields{"N", "M", "paf", "time"};
+        vector<string> fields{"N", "M", "time"};
         vector<string> res;
 
         // writeData(cur_data_os, initV,0);
@@ -283,10 +284,10 @@ struct ExpData {
         for( string s : { "orig", "basic", "known", "all_dom", "fast_dom", "dom12", "dom3",
             "dom4", "dom5", "dom_nca", "dom_nca_full", "dom_mixed", "dom_mixed_full"} ) {
             for(const auto & f : fields) res.push_back(s + "-" + f);
-            res.push_back(s + "_N / bN" );
-            res.push_back(s + "_M / bM" );
-            res.push_back(s + "_N / kN" );
-            res.push_back(s + "_M / kM" );
+            // res.push_back(s + "_N / bN" );
+            // res.push_back(s + "_M / bM" );
+            // res.push_back(s + "_N / kN" );
+            // res.push_back(s + "_M / kM" );
         }
 
 
@@ -308,11 +309,10 @@ struct ExpData {
 
 using PEI = pair<ExpData,int>;
 
-static bool include_single_reduction = false; // if true, then only single rule will be included, otherwise excluded
 
 tuple<ExpData,
     PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI>
-    createDataForInstance(VVI V) {
+    createDataForInstance(VVI V, bool include_single_reduction) {
 
     auto induceByNonisolated = [&]() {
         InducedGraph g = GraphInducer::induceByNonisolatedNodes(V);
@@ -346,6 +346,7 @@ tuple<ExpData,
 
     Stopwatch sw;
     sw.setLimit("red", time_limit_millis);
+    sw.start("red");
 
     { // basic rules
         Config main_cnf;
@@ -443,7 +444,8 @@ tuple<ExpData,
 
     if(true){ // all_dom
         auto b = include_single_reduction;
-        include_single_reduction = false;
+        include_single_reduction = 0;
+
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -455,12 +457,13 @@ tuple<ExpData,
         sw.restart("red");
         createForRed(red, all_dom);
         time_all_dom = sw.getTime("red");
+
         include_single_reduction = b;
     }
 
     if(true){ // fast_dom
         auto b = include_single_reduction;
-        include_single_reduction = false;
+        include_single_reduction = 0;
 
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
@@ -471,7 +474,7 @@ tuple<ExpData,
         setAllForRed(red, false,false, false, false);
 
         sw.restart("red");
-        createForRed(red, all_dom);
+        createForRed(red, only_fast_dom);
         time_only_fast_dom = sw.getTime("red");
 
         include_single_reduction = b;
@@ -636,15 +639,14 @@ int main(int argc, char** argv) {
         instances_h.push_back(sh);
     }
 
+    // if (false)
     { // #TEST - for running tests
         instances_h.clear();
         // instances_e.erase(instances_e.begin(), instances_e.begin() + 100);
         // instances_e.erase(instances_e.begin()+100, instances_e.end());
 
-        // instances_h = { "h_164", "h_188", "h_189"};
-        // instances_h = { "h_177", "h_175", "h_176"};
-        // instances_h = {"h_164", "h_177", "h_175", "h_176"};
-        instances_e = {"e_152", "e_154", "e_184", "e_155", "e_157"};
+        // instances_h = {"e_012", "e_013"};
+        // instances_e.resize(140);
 
         // instances_e.clear();
     }
@@ -658,11 +660,15 @@ int main(int argc, char** argv) {
 
 
 
-    for ( include_single_reduction = 0; include_single_reduction <= 1; include_single_reduction++ ) {
-        constexpr bool compute = true;
-        constexpr bool retain_only_absent_csvs = false;
+    for ( int include_single_reduction = 0; include_single_reduction <= 1; include_single_reduction++ ) {
 
+        DEBUG(include_single_reduction);
+        string suf =  (include_single_reduction ? "_single_included" : "_single_excluded");
+
+        constexpr bool compute = false;
+        constexpr bool retain_only_absent_csvs = true;
         constexpr bool create_results_all = true;
+
 
         if(compute) {
             reverse(ALL(instances_all));
@@ -677,10 +683,11 @@ int main(int argc, char** argv) {
 
                 instances_all.resize(it - instances_all.begin());
                 DEBUG(instances_all);
-
             }
 
-            omp_set_num_threads( min( (int)instances_all.size(), 8 ) );
+
+
+            omp_set_num_threads( min( (int)instances_all.size(), 10 ) );
 
             clog << "There are " << instances_all.size() << " instances to consider" << endl << endl;
 
@@ -694,6 +701,11 @@ int main(int argc, char** argv) {
                 clog << msg << endl;
                 s = "datasets/" + s;
 
+                if ( !filesystem::exists(s) ) {
+                    clog << "Dataset " << s << " DOES NOT EXIST! skipping this instance...." << endl;
+                    continue;
+                }
+
                 ifstream cur_str(s);
                 auto V = Utils::readGraph(cur_str);
 
@@ -703,7 +715,7 @@ int main(int argc, char** argv) {
                     d12, d3, d4, d5,
                     nca, nca_full,
                     mixed, mixed_full]
-                = createDataForInstance(V);
+                = createDataForInstance(V, include_single_reduction);
 
                 auto [basic_data,time_basic] = basic;
                 auto [known,time_known] = knownd;
@@ -718,8 +730,8 @@ int main(int argc, char** argv) {
                 auto [dom_mixed, time_dom_mixex] =  mixed;
                 auto [dom_mixed_full, time_dom_mixed_full] = mixed_full;
 
-                ofstream cur_data_os(s + ( include_single_reduction ? "_single_included" : "_single_excluded" ) + ".csv");
-                cur_data_os.precision(3);
+                ofstream cur_data_os(s + suf + ".csv");
+                cur_data_os.precision(2);
                 cur_data_os << fixed;
 
                 {
@@ -737,8 +749,9 @@ int main(int argc, char** argv) {
                     double dN_knownN = ( known.N > 0 ?  data.N / known.N : -1);
                     double dM_knownM = ( known.M > 0 ?  data.M / known.M : -1);
 
-                    str << r.N << ", " << r.M << ", " << r.pi_arcs_fraction << ", " << time << ", ";
-                    str << dN_basicN << ", " << dM_basicM << ", " << dN_knownN << ", " << dM_knownM;
+                    str << r.N << ", " << r.M << ", " << 1.0 * time / 1000;
+                    // str << r.N << ", " << r.M << ", " << r.pi_arcs_fraction << ", " << time << ", ";
+                    // str << dN_basicN << ", " << dM_basicM << ", " << dN_knownN << ", " << dM_knownM;
                     if (end_of_line) str << endl;
                     else str << ", ";
                 };
@@ -763,54 +776,75 @@ int main(int argc, char** argv) {
 
 
         if(create_results_all) {
-            ofstream res_all_str("res_all.csv");
-            res_all_str.precision(3);
-            res_all_str << fixed;
-            { // writing header
-                res_all_str << "id";
-                int cnt = 1;
-                for( auto h : header ) res_all_str << (cnt++ ? ", " : "") << h;
-                res_all_str << endl;
-            }
 
-            for(auto s : instances_all) {
-                string instance_name = s;
-                s = "datasets/" + s + ( include_single_reduction ? "_single_included" : "_single_excluded" ) + ".csv";
-                if(!filesystem::exists(s)){
-                    res_all_str << instance_name << endl;
-                    continue;
+            sort(ALL(instances_all));
+
+            auto writeForStream = [&]( auto & str, string skip_trivial ) {
+                str.precision(3);
+                str << fixed;
+
+                { // writing header
+                    str << "id";
+                    int cnt = 1;
+                    for( auto h : header ) str << (cnt++ ? ", " : "") << h;
+                    str << endl;
+
                 }
 
-                string header_line, data_line;
-                {
-                    ifstream cur_str(s);
-                    getline(cur_str, header_line);
-                    getline(cur_str, data_line);
+                for(auto s : instances_all) {
+                    string instance_name = s;
+                    s = "datasets/" + s + suf + ".csv";
+                    if(!filesystem::exists(s)){
+                        // str << instance_name << endl;
+                        continue;
+                    }
 
-                    DEBUG(header_line);
-                    DEBUG(data_line);
+                    string header_line, data_line;
+                    {
+                        ifstream cur_str(s);
+                        getline(cur_str, header_line);
+                        getline(cur_str, data_line);
+
+                        // DEBUG(header_line);
+                        // DEBUG(data_line);
+                    }
+
+                    auto trim = [&](string & e) {
+                        int p = 0, q = (int)e.size()-1;
+                        while(p < e.size()) {
+                            if(e[p] != ' ') break;
+                            p++;
+                        }
+                        while(q >= 0) {
+                            if( e[q] != ' ' ) break;
+                            q--;
+                        }
+                        e = e.substr( p, q-p+1 );
+                    };
+
+                    auto entries = StandardUtils::split(data_line, ",");
+                    for(auto & e : entries) trim(e);
+
+                    int basic_N = stoi(entries[4]);
+                    int known_N = stoi(entries[7]);
+
+                    if ( skip_trivial == "basic" && basic_N == 0 ) continue;
+                    if ( skip_trivial == "known" && known_N == 0 ) continue;
+
+                    str << instance_name;
+                    for(auto e : entries) str << ", " << e;
+                    str << endl;
                 }
+            };
 
-                auto trim = [&](string & e) {
-                    int p = 0, q = (int)e.size()-1;
-                    while(p < e.size()) {
-                        if(e[p] != ' ') break;
-                        p++;
-                    }
-                    while(q >= 0) {
-                        if( e[q] != ' ' ) break;
-                        q--;
-                    }
-                    e = e.substr( p, q-p+1 );
-                };
+            ofstream res_all_str("res_all" + suf + ".csv");
+            writeForStream(res_all_str, "all");
 
-                auto entries = StandardUtils::split(data_line, ",");
-                for(auto & e : entries) trim(e);
+            ofstream res_nontrivial_basic( "res_all_nontrivial_basic" + suf + ".csv" );
+            writeForStream(res_nontrivial_basic, "basic" );
 
-                res_all_str << instance_name;
-                for(auto e : entries) res_all_str << ", " << e;
-                res_all_str << endl;
-            }
+            ofstream res_nontrivial_known( "res_all_nontrivial_known" + suf + ".csv" );
+            writeForStream(res_nontrivial_known, "known");
         }
     }
 
