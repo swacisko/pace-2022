@@ -639,7 +639,7 @@ int main(int argc, char** argv) {
         instances_h.push_back(sh);
     }
 
-    // if (false)
+    if (false)
     { // #TEST - for running tests
         instances_h.clear();
         // instances_e.erase(instances_e.begin(), instances_e.begin() + 100);
@@ -649,6 +649,7 @@ int main(int argc, char** argv) {
         // instances_e.resize(140);
 
         // instances_e.clear();
+        instances_e.resize( min(instances_e.size() / 2.0, 20.0) );
     }
 
 
@@ -657,7 +658,7 @@ int main(int argc, char** argv) {
 
     auto header = ExpData::getHeader();
 
-
+    const string input_files_path = "pace-2022-datasets";
 
 
     for ( int include_single_reduction = 0; include_single_reduction <= 1; include_single_reduction++ ) {
@@ -665,7 +666,7 @@ int main(int argc, char** argv) {
         DEBUG(include_single_reduction);
         string suf =  (include_single_reduction ? "_single_included" : "_single_excluded");
 
-        constexpr bool compute = false;
+        constexpr bool compute = true;
         constexpr bool retain_only_absent_csvs = true;
         constexpr bool create_results_all = true;
 
@@ -675,8 +676,11 @@ int main(int argc, char** argv) {
 
 
             if(retain_only_absent_csvs){
+                clog << "Removing all instances for which result files already exist..." << endl;
+
                 auto fun = [&]( string f ) {
-                    string s = "datasets/" + f + ".csv";
+                    // string s = "datasets/" + f + ".csv";
+                    string s = input_files_path + "/" + f + ".csv";
                     return !filesystem::exists(s);
                 };
                 auto it = stable_partition( ALL(instances_all), fun );
@@ -687,7 +691,7 @@ int main(int argc, char** argv) {
 
 
 
-            omp_set_num_threads( min( (int)instances_all.size(), 10 ) );
+            omp_set_num_threads( min( (int)instances_all.size(), 8 ) );
 
             clog << "There are " << instances_all.size() << " instances to consider" << endl << endl;
 
@@ -699,7 +703,8 @@ int main(int argc, char** argv) {
                 string msg = "Considering instance " + s;
                 msg += " in thread id: " + to_string(omp_get_thread_num() );
                 clog << msg << endl;
-                s = "datasets/" + s;
+                // s = "datasets/" + s;
+                s = input_files_path + "/" + s;
 
                 if ( !filesystem::exists(s) ) {
                     clog << "Dataset " << s << " DOES NOT EXIST! skipping this instance...." << endl;
@@ -793,7 +798,8 @@ int main(int argc, char** argv) {
 
                 for(auto s : instances_all) {
                     string instance_name = s;
-                    s = "datasets/" + s + suf + ".csv";
+                    // s = "datasets/" + s + suf + ".csv";
+                    s = input_files_path + "/" + s + suf + ".csv";
                     if(!filesystem::exists(s)){
                         // str << instance_name << endl;
                         continue;
