@@ -411,10 +411,11 @@ tuple<ExpData,
         red.cnf.reducer_use_pie = true;
         red.cnf.reducer_use_inoutclique = true;
 
-        red.cnf.reducer_use_core = !include_single_reduction;
-        red.cnf.reducer_use_dome = !include_single_reduction;
-        red.cnf.reducer_use_pie = !include_single_reduction;
-        red.cnf.reducer_use_inoutclique = !include_single_reduction;
+        // red.cnf.reducer_use_core = !include_single_reduction;
+        // red.cnf.reducer_use_dome = !include_single_reduction;
+        // red.cnf.reducer_use_pie = !include_single_reduction;
+        // red.cnf.reducer_use_inoutclique = !include_single_reduction;
+
         red.cnf.reducer_use_nonsimple_cycle_arcs = !include_single_reduction;
 
         red.cnf.reducer_use_nonsimple_cycle_arcs_full = use_nonsimple_cycle_arcs_full;
