@@ -53,7 +53,9 @@ public:
     bool reducer_use_unconfined = false;
     bool reducer_use_nonsimple_cycle_arcs = false;
     bool reducer_use_nonsimple_cycle_arcs_full = false;
-    bool reducer_use_domination = false;
+    // bool reducer_use_domination = false;
+    bool reducer_use_domination_1 = false;
+    bool reducer_use_domination_2 = false;
     bool reducer_use_domination_3 = false;
     bool reducer_use_domination_4 = false;
     bool reducer_use_domination_5 = false;
@@ -114,7 +116,9 @@ public:
         reducer_use_desk = true;
         reducer_use_unconfined = true;
         reducer_use_funnel = true;
-        reducer_use_domination = true;
+        // reducer_use_domination = true;
+        reducer_use_domination_1 = true;
+        reducer_use_domination_2 = true;
         reducer_use_domination_3 = true;
         reducer_use_domination_4 = true;
         reducer_use_domination_6 = true;
@@ -144,7 +148,9 @@ public:
         reducer_use_desk = false;
         reducer_use_unconfined = false;
         reducer_use_funnel = false;
-        reducer_use_domination = false;
+        // reducer_use_domination = false;
+        reducer_use_domination_1 = false;
+        reducer_use_domination_2 = false;
         reducer_use_domination_3 = false;
         reducer_use_domination_4 = false;
         reducer_use_domination_5 = false;

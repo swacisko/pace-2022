@@ -262,7 +262,7 @@ struct ExpData {
     static vector<string> getHeader() {
         // vector<string> fields{"N", "M", "pi_arcs", "npi_arcs", "paf"};
         // vector<string> fields{"N", "M", "paf", "time"};
-        vector<string> fields{"N", "M", "time"};
+        vector<string> fields{"N", "E", "time"};
         vector<string> res;
 
         // writeData(cur_data_os, initV,0);
@@ -281,7 +281,7 @@ struct ExpData {
         // writeData(cur_data_os, dom_mixed_full, time_dom_mixed_full);
 
 
-        for( string s : { "orig", "basic", "known", "all_dom", "fast_dom", "dom12", "dom3",
+        for( string s : { "orig", "basic", "known", "all_dom", "fast_dom", "dom1", "dom2", "dom3",
             "dom4", "dom5", "dom_nca", "dom_nca_full", "dom_mixed", "dom_mixed_full"} ) {
             for(const auto & f : fields) res.push_back(s + "-" + f);
             // res.push_back(s + "_N / bN" );
@@ -311,7 +311,7 @@ using PEI = pair<ExpData,int>;
 
 
 tuple<ExpData,
-    PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI>
+    PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI, PEI>
     createDataForInstance(VVI V, bool include_single_reduction) {
 
     auto induceByNonisolated = [&]() {
@@ -333,10 +333,10 @@ tuple<ExpData,
     };
 
     ExpData initV_data, basic_data, known_red_data;
-    ExpData all_dom, only_fast_dom, dom12, dom3, dom4, dom5,
+    ExpData all_dom, only_fast_dom, dom1, dom2, dom3, dom4, dom5,
         dom_nonsimple_arcs, dom_nonsimple_arcs_full, dom_mixed, dom_mixed_full;
 
-    int time_basic, time_known, time_dom12, time_dom3, time_dom4, time_dom5, time_dom_nonsimple_arcs, time_dom_nonsimple_arcs_full,
+    int time_basic, time_known, time_dom1, time_dom2, time_dom3, time_dom4, time_dom5, time_dom_nonsimple_arcs, time_dom_nonsimple_arcs_full,
         time_dom_mixed, time_dom_mixed_full, time_only_fast_dom, time_all_dom;
 
     induceByNonisolated();
@@ -420,7 +420,8 @@ tuple<ExpData,
 
         red.cnf.reducer_use_nonsimple_cycle_arcs_full = use_nonsimple_cycle_arcs_full;
 
-        red.cnf.reducer_use_domination = !include_single_reduction;
+        red.cnf.reducer_use_domination_1 = !include_single_reduction;
+        red.cnf.reducer_use_domination_2 = !include_single_reduction;
         red.cnf.reducer_use_domination_3 = !include_single_reduction;
 
         red.cnf.reducer_use_domination_4 = use_dom4;
@@ -482,7 +483,7 @@ tuple<ExpData,
     }
 
 
-    if(true){ // reducer_use_domination
+    if(true){ // reducer_use_domination_1
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -490,11 +491,26 @@ tuple<ExpData,
         V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red,!include_single_reduction);
-        red.cnf.reducer_use_domination = include_single_reduction;
+        red.cnf.reducer_use_domination_1 = include_single_reduction;
 
         sw.restart("red");
-        createForRed(red, dom12);
-        time_dom12 = sw.getTime("red");
+        createForRed(red, dom1);
+        time_dom1 = sw.getTime("red");
+    }
+
+    if(true){ // reducer_use_domination_2
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = basicV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red,!include_single_reduction);
+        red.cnf.reducer_use_domination_2 = include_single_reduction;
+
+        sw.restart("red");
+        createForRed(red, dom2);
+        time_dom2 = sw.getTime("red");
     }
 
     if(true){ // reducer_use_domination_3
@@ -608,7 +624,8 @@ tuple<ExpData,
         make_pair(known_red_data,time_known),
         make_pair(all_dom, time_all_dom),
         make_pair(only_fast_dom, time_only_fast_dom),
-        make_pair(dom12, time_dom12),
+        make_pair(dom1, time_dom1),
+        make_pair(dom2, time_dom2),
         make_pair(dom3, time_dom3),
         make_pair(dom4, time_dom4),
         make_pair(dom5, time_dom5),
@@ -650,12 +667,13 @@ int main(int argc, char** argv) {
         // instances_e.resize(140);
 
         // instances_e.clear();
-        instances_e.resize( min(instances_e.size() / 2.0, 20.0) );
+        instances_e.resize( min(instances_e.size() / 2.0, 100.0) );
     }
 
 
     // vector<string> instances_all = instances_e;
     vector<string> instances_all = instances_e + instances_h;
+    vector<string> in_all_cp = instances_all;
 
     auto header = ExpData::getHeader();
 
@@ -668,7 +686,7 @@ int main(int argc, char** argv) {
         string suf =  (include_single_reduction ? "_single_included" : "_single_excluded");
 
         constexpr bool compute = true;
-        constexpr bool retain_only_absent_csvs = true;
+        constexpr bool retain_only_absent_csvs = false;
         constexpr bool create_results_all = true;
 
 
@@ -681,10 +699,12 @@ int main(int argc, char** argv) {
 
                 auto fun = [&]( string f ) {
                     // string s = "datasets/" + f + ".csv";
-                    string s = input_files_path + "/" + f + ".csv";
+                    string s = input_files_path + "/" + f + suf + ".csv";
                     return !filesystem::exists(s);
                 };
                 auto it = stable_partition( ALL(instances_all), fun );
+
+                // DEBUG((int)(it - instances_all.begin()));
 
                 instances_all.resize(it - instances_all.begin());
                 DEBUG(instances_all);
@@ -718,7 +738,7 @@ int main(int argc, char** argv) {
 
                 auto [initV,
                     basic, knownd, alld, only_fast,
-                    d12, d3, d4, d5,
+                    d1, d2, d3, d4, d5,
                     nca, nca_full,
                     mixed, mixed_full]
                 = createDataForInstance(V, include_single_reduction);
@@ -727,7 +747,8 @@ int main(int argc, char** argv) {
                 auto [known,time_known] = knownd;
                 auto [all_dom, time_all_dom] = alld;
                 auto [only_fast_dom, time_only_fast_dom] = only_fast;
-                auto [dom12, time_dom12] = d12;
+                auto [dom1, time_dom1] = d1;
+                auto [dom2, time_dom2] = d2;
                 auto [dom3, time_dom3] = d3;
                 auto [dom4, time_dom4] = d4;
                 auto [dom5, time_dom5] = d5;
@@ -767,7 +788,8 @@ int main(int argc, char** argv) {
                 writeData(cur_data_os, known, time_known);
                 writeData(cur_data_os, all_dom, time_all_dom);
                 writeData(cur_data_os, only_fast_dom, time_only_fast_dom);
-                writeData(cur_data_os, dom12, time_dom12);
+                writeData(cur_data_os, dom1, time_dom1);
+                writeData(cur_data_os, dom2, time_dom2);
                 writeData(cur_data_os, dom3, time_dom3);
                 writeData(cur_data_os, dom4, time_dom4);
                 writeData(cur_data_os, dom5, time_dom5);
@@ -782,6 +804,8 @@ int main(int argc, char** argv) {
 
 
         if(create_results_all) {
+
+            instances_all = in_all_cp;
 
             sort(ALL(instances_all));
 
@@ -833,10 +857,16 @@ int main(int argc, char** argv) {
                     for(auto & e : entries) trim(e);
 
                     int basic_N = stoi(entries[4]);
+                    int basic_M = stoi(entries[5]);
                     int known_N = stoi(entries[7]);
+                    int known_M = stoi(entries[8]);
 
                     if ( skip_trivial == "basic" && basic_N == 0 ) continue;
                     if ( skip_trivial == "known" && known_N == 0 ) continue;
+                    if ( skip_trivial == "known_improved_basic"
+                        // && (basic_N > 0 || ( basic_N == 0 && known_N == 0 ) )
+                        && known_N == basic_N && known_M == basic_M ) continue;
+
 
                     str << instance_name;
                     for(auto e : entries) str << ", " << e;
@@ -852,6 +882,9 @@ int main(int argc, char** argv) {
 
             ofstream res_nontrivial_known( "res_all_nontrivial_known" + suf + ".csv" );
             writeForStream(res_nontrivial_known, "known");
+
+            ofstream res_known_improved_basic( "res_all_known_improved_basic" + suf + ".csv" );
+            writeForStream(res_known_improved_basic, "known_improved_basic");
         }
     }
 

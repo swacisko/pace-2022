@@ -542,7 +542,34 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
-        if(cnf.reducer_use_domination){
+        // if(cnf.reducer_use_domination){
+        //     //TimeMeasurer::start("Reducer::domination1");
+        //     VI dominated = domination1();
+        //     addKNR(dominated);
+        //
+        //     if(write_progress_on_the_fly) DEBUG(total_dominated_nodes1);
+        //     total_dominated_nodes1 += dominated.size();
+        //     if(write_progress_on_the_fly) DEBUG(total_dominated_nodes1);
+        //     Utils::removeNodes(V, revV, dominated, helper);
+        //     //TimeMeasurer::stop("Reducer::domination1");
+        //     if(!dominated.empty()) modified = true;
+        //     if(modified) continue;
+        //
+        //
+        //
+        //     //TimeMeasurer::start("Reducer::domination2");
+        //     if(write_progress_on_the_fly) DEBUG(total_dominated_nodes2);
+        //     dominated = domination2();
+        //     if(write_progress_on_the_fly) DEBUG(total_dominated_nodes2);
+        //     addKNR(dominated);
+        //     total_dominated_nodes2 += dominated.size();
+        //     Utils::removeNodes(V, revV, dominated, helper);
+        //     //TimeMeasurer::stop("Reducer::domination2");
+        //     if(!dominated.empty()) modified = true;
+        //     if(modified) continue;
+        // }
+
+        if(cnf.reducer_use_domination_1) {
             //TimeMeasurer::start("Reducer::domination1");
             VI dominated = domination1();
             addKNR(dominated);
@@ -554,12 +581,12 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             //TimeMeasurer::stop("Reducer::domination1");
             if(!dominated.empty()) modified = true;
             if(modified) continue;
+        }
 
-
-
+        if(cnf.reducer_use_domination_2) {
             //TimeMeasurer::start("Reducer::domination2");
             if(write_progress_on_the_fly) DEBUG(total_dominated_nodes2);
-            dominated = domination2();
+            VI dominated = domination2();
             if(write_progress_on_the_fly) DEBUG(total_dominated_nodes2);
             addKNR(dominated);
             total_dominated_nodes2 += dominated.size();
@@ -643,7 +670,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         }
 
         if(cnf.reducer_use_funnel){
-            if(!cnf.reducer_use_domination){
+            if(!cnf.reducer_use_domination_1){
                 clog << "CAUTION! Calling funnel reduction without domination rule before!" << endl;
             }
             //TimeMeasurer::start("Reducer::funnel");
@@ -1996,7 +2023,7 @@ vector<FoldingReduction*> Reducer::folding() {
 
             affected[a] = affected[b] = affected[c] = true;
 
-            if( cnf.reducer_use_domination ) for( int d : piV[b] ) assert( d != c );
+            if( cnf.reducer_use_domination_1 ) for( int d : piV[b] ) assert( d != c );
 
             res.push_back( new FoldingReduction( c,b,a ) );
             Utils::contractNodeToNode(V, revV, b,c, helper);
@@ -3021,10 +3048,10 @@ vector<FunnelReduction *> Reducer::funnel() {
             for( int d : piV[u] ) if(was[d]) common_intersection = true;
             for( int a : A ) was[a] = false;
 
-            if(cnf.reducer_use_domination && common_intersection) continue;
+            if(cnf.reducer_use_domination_1 && common_intersection) continue;
 
             if( isClq(A) ){ // apply funnel reduction
-                if(cnf.reducer_use_domination) assert(!common_intersection);
+                if(cnf.reducer_use_domination_1) assert(!common_intersection);
 
                 if(debug){
                     ENDL(1);
@@ -4563,7 +4590,7 @@ tuple<VI,VPII, vector<ReverseTriangleGadgetReduction*>, VI>
         for( int d : piV[b] ) if( d != a && d != c ) b2 = d;
         for( int d : piV[c] ) if( d != a && d != b ) c2 = d;
 
-        if(cnf.reducer_use_domination) assert( a2 != b2 && a2 != c2 && b2 != c2 );
+        if(cnf.reducer_use_domination_1) assert( a2 != b2 && a2 != c2 && b2 != c2 );
 
         VI nds = {a,b,c,a2,b2,c2};
         bool aff = false;

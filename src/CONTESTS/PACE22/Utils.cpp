@@ -802,7 +802,7 @@ namespace Utils{
             VI vc;
             if(!g.V.empty()) {
                 cnf.disableAllNonbasicReductions();
-                cnf.reducer_use_domination = cnf.reducer_use_folding = true; // we have a VC case
+                cnf.reducer_use_domination_1 = cnf.reducer_use_folding = true; // we have a VC case
 
                 DFVSSolverE solver(&g.V, cnf);
                 vc = solver.solveForInputGraph(g.V);
