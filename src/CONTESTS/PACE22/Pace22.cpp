@@ -24,7 +24,7 @@ constexpr bool lite_track = false;
 bool MUTE_MODE = false;
 
 int threads = 6;
-static int time_limit_millis = 20'000;
+static int time_limit_millis = 60'000;
 
 
 void initializeParams(int argc, char **argv) {
@@ -258,7 +258,7 @@ int main(int argc, char** argv){
 
     sw.start("cpsat-2-N/10");
     auto[status4,res4] = solveCPSAT2(V, V.size()/10);
-    sw.stop("cpsat-2-N/01");
+    sw.stop("cpsat-2-N/10");
 
     DEBUG(status4);
     DEBUG(res4.size());
