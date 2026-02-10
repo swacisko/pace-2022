@@ -83,15 +83,7 @@ ostream& operator<<( ostream& str, const pair<_T,_E> & pair){
 }
 
 template<class _T>
-void writeCollectionToStream(ostream& str, _T& col ){
-    str << "{";
-    int ile = 0;
-    for(auto t : col){
-        if(ile++ > 0) str << ", ";
-        str << t;
-    }
-    str << "}";
-}
+void writeCollectionToStream(ostream& str, _T& col );
 
 template<class _P, class _Q, class _R>
 void writeCollectionToStream(ostream& str, tuple<_P,_Q,_R> col ){
@@ -126,6 +118,17 @@ ostream& operator<<( ostream& str, unordered_map<_T, _E> v ){ writeCollectionToS
 
 template<class _T, class _E, class _H>
 ostream& operator<<( ostream& str, unordered_map<_T, _E, _H> v ){ writeCollectionToStream(str, v); return str; }
+
+template<class _T>
+void writeCollectionToStream(ostream& str, _T& col ){
+    str << "{";
+    int ile = 0;
+    for(auto t : col){
+        if(ile++ > 0) str << ", ";
+        str << t;
+    }
+    str << "}";
+}
 
 template<class _T>
 struct Triple{

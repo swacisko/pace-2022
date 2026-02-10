@@ -1,15 +1,21 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.27)
 project(DiVerSeS)
 
-set(CMAKE_CXX_STANDARD 17)
-
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 #SET(CMAKE_CXX_FLAGS "-std=c++17 -O0") # profiling
 #SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG -std=c++17 -Wreturn-type -O0") # debugging
 
-SET(CMAKE_CXX_FLAGS "-std=c++17 -O3")
+SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O3 -march=native")
 
 
+#include(cmake/DownloadCPSAT.cmake)
+include(cmake/cpsat_minimal.cmake)
+#include(cmake/deps_gtest_benchmark.cmake)
+
+find_package(OpenMP REQUIRED)
 
 include_directories(
         include
@@ -70,4 +76,5 @@ file(GLOB SOURCES
 
 
 add_executable(DiVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES})
-target_link_libraries( DiVerSeS stdc++fs )
+target_link_libraries( DiVerSeS stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX)
+#target_link_libraries( DiVerSeS stdc++fs ortools boost_system OpenMP::OpenMP_CXX)

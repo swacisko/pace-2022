@@ -8,7 +8,7 @@
 #include <utils/StandardUtils.h>
 #include <graphs/cycles/CycleCounter.h>
 #include <graphs/VertexCover/VCUtils.h>
-#include <graphs/VertexCover/approximation/NuMVC/NuMVC.h>
+#include <graphs/VertexCover/approximation/NuMVC/numvc.h>
 #include <graphs/VertexCover/approximation/LibMVC/fastvc.h>
 #include <graphs/GraphWriter.h>
 #include <utils/TimeMeasurer.h>
@@ -22,6 +22,7 @@
 #include <filesystem>
 #include "CONTESTS/PACE22/Utils.h"
 #include "graphs/GraphUtils.h"
+#include "VertexCover/approximation/LibMVC/numvc.h"
 
 namespace Utils{
 

@@ -91,7 +91,7 @@ VI SALS::localSearch(double T0, double alpha, int maxMvt, int maxFail, int max_i
         bool failure = true;
 
 
-        pair<int,pair<int,bool>> invalid_move = {1e9, {-1,-1}};
+        pair<int,pair<int,bool>> invalid_move = {(int)1e9, {-1,-1}};
         pair<int,pair<int,bool>> best_move = invalid_move;
 
         int time_since_change = 0;

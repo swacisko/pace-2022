@@ -23,7 +23,7 @@ void operator+=(unordered_set<_T>& v, _E w){
 }
 
 template<class _T, class _E>
-_T operator+(_T v, _E w){
+vector<_T> operator+(vector<_T> v, vector<_E> w){
     v += w;
     return v;
 }
