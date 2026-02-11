@@ -3,6 +3,7 @@
 //
 
 #include <filesystem>
+#include <utility>
 #include "MemoryUtils.h"
 #include "getopt.h"
 #include "GraphReader.h"
@@ -91,7 +92,10 @@ pair<string,VI> solveCPSAT1(VVI V, int max_l, bool find_optimal = false) {
             model.AddAtLeastOne(cyc_vars);
         }
 
-        for (int d : prev_res) model.AddHint(nodes[d],1);
+        // VB in_res = StandardUtils::toVB(N,prev_res);
+        // for(int i=0; i<N; i++) model.AddHint(nodes[i],in_res[i]);
+        for(int d : prev_res) model.AddHint(nodes[d],1);
+
         if ( find_optimal ) model.AddGreaterOrEqual(LinearExpr::Sum(nodes), (int)prev_res.size());
 
         model.Minimize(LinearExpr::Sum(nodes));
@@ -174,7 +178,8 @@ pair<string,VI> solveCPSAT2(VVI V, int MAX_RANK_VALUE = 1e9, VI init_sol = {}, b
     }
 
     if(!init_sol.empty()) {
-        for( int i=0; i<N; i++ ) model.AddHint(nodes[i], in_init_sol[i]);
+        // for( int i=0; i<N; i++ ) model.AddHint(nodes[i], in_init_sol[i]);
+        for( int d : init_sol ) model.AddHint(nodes[d], 1);
 
         // now toposort to create initial ranks values
         VI topo, deg(N,0);
@@ -203,6 +208,7 @@ pair<string,VI> solveCPSAT2(VVI V, int MAX_RANK_VALUE = 1e9, VI init_sol = {}, b
 
     string status;
     if ( response.status() == OPTIMAL ) status = "OPTIMAL";
+    if ( response.status() == UNKNOWN ) status = "UNKNOWN";
     if ( response.status() == FEASIBLE ) status = "FEASIBLE";
     if ( response.status() == INFEASIBLE ) {
         status = "INFEASIBLE";
@@ -218,6 +224,146 @@ pair<string,VI> solveCPSAT2(VVI V, int MAX_RANK_VALUE = 1e9, VI init_sol = {}, b
 
     return {status,res};
 }
+
+
+pair<string,VI> solveCPSAT3(VVI V, int total_time_seconds, int max_time_seconds_per_iter, bool find_optimal) {
+    clog << "Solving using CPSAT, model v3" << endl;
+
+    int N = V.size();
+
+    VVI cycles; // = Utils::getAllSimpleCycles3(V,2);
+    VI prev_res;
+
+    VI best_fvs;
+
+    auto updateCyclesAndHit = [&](VVI new_cycles) -> VI {
+        cycles += std::move(new_cycles);
+
+        SatParameters params;
+        if (!find_optimal) {
+            params.set_max_time_in_seconds(max_time_seconds_per_iter);
+            clog << "\t running cpsat solver with time limit of " << max_time_seconds_per_iter << " sec." << endl;
+        }
+        params.set_num_search_workers(threads);   // deterministic runs
+        // if( !find_optimal && !prev_res.empty() ) params.set_use_lns_only(true);
+        params.set_log_search_progress(false);
+        Model solver_model;
+        solver_model.Add(NewSatParameters(params));
+
+        CpModelBuilder model;
+        vector<BoolVar> nodes;
+        for (int i=0; i<N; i++) nodes.push_back(model.NewBoolVar());
+        for ( auto & c : cycles ) {
+            vector<BoolVar> cyc_vars;
+            for ( int d : c ) cyc_vars.push_back(nodes[d]);
+            model.AddAtLeastOne(cyc_vars);
+        }
+
+        // VB in_res = StandardUtils::toVB(N,prev_res);
+        // for(int i=0; i<N; i++) model.AddHint(nodes[i],in_res[i]);
+        for(int d : prev_res) model.AddHint(nodes[d], 1);
+
+        if(find_optimal && !prev_res.empty()) model.AddGreaterOrEqual(LinearExpr::Sum(nodes), (int)prev_res.size());
+
+        model.Minimize(LinearExpr::Sum(nodes));
+        CpSolverResponse response = SolveCpModel(model.Build(), &solver_model);
+        int F = 2;
+        while(response.status() == UNKNOWN) {
+            clog << "Response status unknown, increasing max_time_per_iter to " << F*max_time_seconds_per_iter << endl;
+
+            params.set_max_time_in_seconds(F*max_time_seconds_per_iter);
+            Model solver_model;
+            solver_model.Add(NewSatParameters(params));
+            F *= 2;
+            response = SolveCpModel(model.Build(), &solver_model);
+        }
+
+
+        VI res;
+        for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
+        return res;
+    };
+
+
+    // VI res;
+    Stopwatch timer;
+    timer.setLimit("all_iters", find_optimal ? inf : total_time_seconds * 1000);
+    timer.start("all_iters");
+
+
+    int L = 2;
+    while(true) {
+        if(timer.tle("all_iters")) break;
+
+        VVI H = V;
+        VVI revH = GraphUtils::reverseGraph(H);
+        VB helper(N);
+        Utils::removeNodes(H, revH, prev_res, helper);
+        VVI nonpiH = Utils::getNonPIGraph(H);
+        VVI revnonpiH = GraphUtils::reverseGraph(nonpiH);
+
+        clog << endl << "Looking for new cycles, cycles.size(): " << cycles.size() << ", prev_res.size(): "
+             << prev_res.size() << ", time: " << (int)timer.getTime("all_iters") / 1000 << endl;
+
+        int all_arcs = GraphUtils::countEdges(V,true);
+        set<PII> zb;
+        for( auto & cyc : cycles ) for( int j=cyc.size()-1, i=0; i < cyc.size(); j = i++ ) zb.insert( {cyc[j], cyc[i]} );
+        int arcs = zb.size();
+        clog << "\t arcs in constraints: " << arcs << " / " << all_arcs << endl;
+
+        VVI new_cycles = Utils::getAllSimpleCycles3(H, L);
+
+        // we cannot add more than MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size() new cycles in each iteration
+        // this is here, because when increasing the length size, we might get an awful lot of new cycles of
+        // that length, we do not want that, we want to keep number of cycles used for constraints as small as possible
+        constexpr double MAX_NEW_CYCLES_PER_ITERATION_PERC = 0.1;
+        if( L >= 5 && cycles.size() >= 100 && new_cycles.size() > MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size() ) {
+            StandardUtils::shuffle(new_cycles);
+            new_cycles.resize( MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size() );
+        }
+
+        if( new_cycles.empty() && !Utils::isFVS(V,prev_res) ) {
+            L++;
+            clog << endl << "---> INCREASING LENGTH, L: " << L << endl << endl;
+            continue;
+        }
+
+        clog << "\t there are " << new_cycles.size() << " new cycles found, all cycles: " << cycles.size() << endl;
+
+
+        VI sol = updateCyclesAndHit(new_cycles);
+        if ( Utils::isFVS(V,sol) ) {
+            if( best_fvs.empty() || sol.size() < best_fvs.size() ) best_fvs = sol;
+
+            if(find_optimal) {
+                // res = sol;
+                assert( best_fvs.size() == sol.size() );
+                break;
+            }else {
+                max_time_seconds_per_iter++;
+                clog << endl << "--> Found a valid FVS, increasing max_time_seconds_per_iter to "
+                     << max_time_seconds_per_iter << " secc." << endl << endl;
+            }
+        }
+
+        prev_res = sol;
+
+        clog << "\t found sol.size(): " << sol.size() << ", best_fvs.size(): " << best_fvs.size() << endl;
+    }
+
+    timer.stop("all_iters");
+    timer.write("all_iters");
+
+    string status;
+    if( Utils::isFVS(V,best_fvs) ) {
+        if( find_optimal ) status = "OPTIMAL";
+        else status = "FEASIBLE";
+    }
+    else status = "INCORRECT";
+
+    return {status, best_fvs};
+}
+
 
 VVI readDirectedExample() {
     int N,M,c;
@@ -261,82 +407,153 @@ int main(int argc, char** argv){
     DEBUG(V.size());
     DEBUG(GraphUtils::countEdges(V,true));
 
-    Stopwatch sw;
+
+    constexpr bool check_heuristic_algorithms = true;
+    constexpr bool check_exact_algorithms = true;
+
+    if(check_heuristic_algorithms) {
+        Stopwatch sw;
+
+        //******************************
+
+        sw.start("cpsat-3");
+        // auto[status0,res0] = solveCPSAT3(V, inf, inf, true); // exact solution
+        auto[status0,res0] = solveCPSAT3(V, 30, 1, false); // heuristic approach
+        sw.stop("cpsat-3");
+
+        DEBUG(status0);
+        DEBUG(res0.size());
+
+        //******************************
 
 
-    //******************************
+        sw.start("cpsat-2-N");
+        auto[status2,res2] = solveCPSAT2(V, N);
+        sw.stop("cpsat-2-N");
+
+        DEBUG(status2);
+        DEBUG(res2.size());
+        // DEBUG(res2);
 
 
-    sw.start("cpsat-2-N");
-    auto[status2,res2] = solveCPSAT2(V, N);
-    sw.stop("cpsat-2-N");
+        //******************************
 
-    DEBUG(status2);
-    DEBUG(res2.size());
-    // DEBUG(res2);
+        sw.start("cpsat-2-inf");
+        auto[status3,res3] = solveCPSAT2(V, inf);
+        sw.stop("cpsat-2-inf");
 
-    //******************************
+        DEBUG(status3);
+        DEBUG(res3.size());
+        // DEBUG(res3);
 
-    sw.start("cpsat-2-inf");
-    auto[status3,res3] = solveCPSAT2(V, inf);
-    sw.stop("cpsat-2-inf");
+        //******************************
 
-    DEBUG(status3);
-    DEBUG(res3.size());
-    // DEBUG(res3);
+        sw.start("cpsat-2-N/10");
+        auto[status4,res4] = solveCPSAT2(V, V.size()/10);
+        sw.stop("cpsat-2-N/10");
 
-    //******************************
+        DEBUG(status4);
+        DEBUG(res4.size());
+        // DEBUG(res4);
 
-    sw.start("cpsat-2-N/10");
-    auto[status4,res4] = solveCPSAT2(V, V.size()/10);
-    sw.stop("cpsat-2-N/10");
+        //******************************
 
-    DEBUG(status4);
-    DEBUG(res4.size());
-    // DEBUG(res4);
+        sw.start("cpsat-2-only-lns-from-res4");
+        auto[status5,res5] = solveCPSAT2(V, N, res4, true);
+        sw.stop("cpsat-2-only-lns-from-res4");
 
-    //******************************
+        DEBUG(status5);
+        DEBUG(res5.size());
+        // DEBUG(res4);
 
-    sw.start("cpsat-2-only-lns-from-res4");
-    auto[status5,res5] = solveCPSAT2(V, N, res4, true);
-    sw.stop("cpsat-2-only-lns-from-res4");
+        //******************************
 
-    DEBUG(status5);
-    DEBUG(res5.size());
-    // DEBUG(res4);
+        sw.start("cpsat-1");
+        auto[status1,res1] = solveCPSAT1(V,25);
+        sw.stop("cpsat-1");
 
-    //******************************
+        DEBUG(status1);
+        DEBUG(res1.size());
+        // DEBUG(res1);
 
-    sw.start("cpsat-1");
-    auto[status1,res1] = solveCPSAT1(V,25);
-    sw.stop("cpsat-1");
 
-    DEBUG(status1);
-    DEBUG(res1.size());
-    // DEBUG(res1);
+        if ( status1 == "OPTIMAL" && status2 == "OPTIMAL" ) assert( res1.size() == res2.size() );
 
-    //******************************
+        ENDL(3);
+        DEBUG(res1.size());
+        DEBUG(res2.size());
+        DEBUG(res3.size());
+        DEBUG(res4.size());
+        DEBUG(res5.size());
 
-    if ( status1 == "OPTIMAL" && status2 == "OPTIMAL" ) assert( res1.size() == res2.size() );
+        if( !res1.empty() && status1 != "INCORRECT" ) assert(Utils::isFVS(V,res1));
+        if( !res2.empty() && status2 != "INCORRECT" ) assert(Utils::isFVS(V,res2));
+        if( !res3.empty() && status3 != "INCORRECT" ) assert(Utils::isFVS(V,res3));
+        if( !res4.empty() && status4 != "INCORRECT" ) assert(Utils::isFVS(V,res4));
+        if( !res5.empty() && status5 != "INCORRECT" ) assert(Utils::isFVS(V,res5));
+        if( !res0.empty() && status0 != "INCORRECT" ) assert(Utils::isFVS(V,res0));
 
-    ENDL(3);
-    DEBUG(res1.size());
-    DEBUG(res2.size());
-    DEBUG(res3.size());
-    DEBUG(res4.size());
-    DEBUG(res5.size());
+        sw.write("cpsat-1");
+        sw.write("cpsat-2-N");
+        sw.write("cpsat-2-inf");
+        sw.write("cpsat-2-N/10");
+        sw.write("cpsat-2-only-lns-from-res4");
+        sw.write("cpsat-3");
+    }
 
-    assert(Utils::isFVS(V,res1));
-    assert(Utils::isFVS(V,res2));
-    assert(Utils::isFVS(V,res3));
-    assert(Utils::isFVS(V,res4));
-    assert(Utils::isFVS(V,res5));
 
-    sw.write("cpsat-1");
-    sw.write("cpsat-2-N");
-    sw.write("cpsat-2-inf");
-    sw.write("cpsat-2-N/10");
-    sw.write("cpsat-2-only-lns-from-res4");
+
+    if(check_exact_algorithms) {
+        time_limit_millis = inf;
+
+        Stopwatch sw;
+
+        //******************************
+
+        sw.start("cpsat-3");
+        auto[status0,res0] = solveCPSAT3(V, inf, inf, true);
+        sw.stop("cpsat-3");
+
+        DEBUG(status0);
+        DEBUG(res0.size());
+
+        //******************************
+
+        // we set time_limit_millis = inf, so this will find optimal result
+        sw.start("cpsat-2-N");
+        auto[status2,res2] = solveCPSAT2(V, N);
+        sw.stop("cpsat-2-N");
+
+        DEBUG(status2);
+        DEBUG(res2.size());
+
+        //******************************
+
+        sw.start("cpsat-1");
+        auto[status1,res1] = solveCPSAT1(V,25,inf);
+        sw.stop("cpsat-1");
+
+        DEBUG(status1);
+        DEBUG(res1.size());
+
+        ENDL(3);
+        DEBUG(res0.size());
+        DEBUG(res1.size());
+        DEBUG(res2.size());
+
+        assert(Utils::isFVS(V,res0));
+        assert(Utils::isFVS(V,res1));
+        assert(Utils::isFVS(V,res2));
+
+        sw.write("cpsat-1");
+        sw.write("cpsat-2-N");
+        sw.write("cpsat-3");
+
+        if( !res1.empty() && status1 != "INCORRECT" ) assert(Utils::isFVS(V,res1));
+        if( !res2.empty() && status2 != "INCORRECT") assert(Utils::isFVS(V,res2));
+        if( !res0.empty() && status0 != "INCORRECT") assert(Utils::isFVS(V,res0));
+    }
+
 
 
     return 0;
