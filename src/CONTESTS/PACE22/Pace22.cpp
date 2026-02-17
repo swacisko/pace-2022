@@ -143,6 +143,8 @@ tuple<ExpData,
         red.cnf.reducer_use_dome = true;
         red.cnf.reducer_use_pie = true;
         red.cnf.reducer_use_inoutclique = true;
+        red.cnf.reducer_use_folding = true;
+        // red.cnf.reducer_use_funnel = true;
 
         red.cnf.reducer_use_domination_1 = !include_single_reduction;
         red.cnf.reducer_use_domination_2 = !include_single_reduction;
