@@ -108,6 +108,15 @@ tuple<ExpData,
 
     VVI basicV = V;
 
+
+    auto setKnownRules = [&]( auto & red) {
+        red.cnf.reducer_use_core = true;
+        red.cnf.reducer_use_dome = true;
+        red.cnf.reducer_use_pie = true;
+        red.cnf.reducer_use_inoutclique = true;
+        red.cnf.reducer_use_folding = true;
+    };
+
     { // known rules
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
@@ -116,10 +125,7 @@ tuple<ExpData,
         V = basicV;
         Reducer red(V, main_cnf);
         red.disableAllNonbasicReductions();
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
+        setKnownRules(red);
         assignTimeLimits(red);
 
         sw.restart("red");
@@ -138,13 +144,7 @@ tuple<ExpData,
     auto setAllForRed = [&](auto & red) {
 
         red.disableAllNonbasicReductions();
-
-        red.cnf.reducer_use_core = true;
-        red.cnf.reducer_use_dome = true;
-        red.cnf.reducer_use_pie = true;
-        red.cnf.reducer_use_inoutclique = true;
-        red.cnf.reducer_use_folding = true;
-        // red.cnf.reducer_use_funnel = true;
+        setKnownRules(red);
 
         red.cnf.reducer_use_domination_1 = !include_single_reduction;
         red.cnf.reducer_use_domination_2 = !include_single_reduction;
