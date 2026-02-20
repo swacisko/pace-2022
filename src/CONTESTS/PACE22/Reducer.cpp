@@ -742,19 +742,6 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if(modified) continue;
         }
 
-        if( cnf.reducer_use_pie && cnf.reducer_use_mixed_domination2 ){
-            //TimeMeasurer::start("Reducer::mixed_domination");
-
-            if (write_progress_on_the_fly) clog << "Running mixed domination2" << endl;
-            bool changes = mixedDomination2();
-            if(changes) modified = true;
-            if (write_progress_on_the_fly) clog << "Mixed domination2 applied: " << changes << endl;
-
-            //TimeMeasurer::stop("Reducer::mixed_domination");
-
-            if(modified) continue;
-        }
-
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if( cnf.reducer_use_pie && cnf.reducer_use_mixed_domination_full ){
@@ -1023,6 +1010,22 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if(!modified) modified = ( pi_edges_added.size() > 0 || nodes_removed.size() > 0 );
             if(modified) continue;
         }
+
+        if( cnf.reducer_use_pie && cnf.reducer_use_mixed_domination2 ){
+            //TimeMeasurer::start("Reducer::mixed_domination");
+
+            if (write_progress_on_the_fly) clog << "Running mixed domination2" << endl;
+            bool changes = mixedDomination2();
+            if(changes) modified = true;
+            if (write_progress_on_the_fly) clog << "Mixed domination2 applied: " << changes << endl;
+
+            //TimeMeasurer::stop("Reducer::mixed_domination");
+
+            if(modified) continue;
+        }
+
+        if(check_correspondings) assert(Utils::isCorresponding(V, revV));
+
 
         if(cnf.reducer_use_bottleneck2){
             //TimeMeasurer::start("Reducer::bottleneck2");
@@ -2031,7 +2034,7 @@ vector<FoldingReduction*> Reducer::folding() {
 
             if( affected[a] || affected[b] || affected[c] ) continue;
             if (cnf.reducer_use_folding_only_for_pi_nodes) if ( !isPiNode(b) || !isPiNode(c) ) {
-                clog << "In folding, node b or c is not a pi node, stopping folding" << endl;
+                // clog << "In folding, node b or c is not a pi node, stopping folding" << endl;
                 continue;
             }
 
@@ -2089,7 +2092,7 @@ vector<FoldingReduction*> Reducer::folding() {
 
 
 VI Reducer::domination0() {
-    clog << "Entering dominiation0 - for pi nodes only" << endl;
+    // clog << "Entering dominiation0 - for pi nodes only" << endl;
 
     int N = V.size();
     VB was1(N,false);
@@ -3062,7 +3065,7 @@ bool Reducer::mixedDomination() {
         if(is_dominated){
 
             if( debug ){
-                clog << "partially-merging node in mixeD_domination" << endl;
+                clog << "partially-merging node in mixed_domination" << endl;
                 DEBUG(u); DEBUG(V[u]); DEBUG(revV[u]);
                 ENDL(1);
                 DEBUG(dominator); DEBUG(V[dominator]); DEBUG(revV[dominator]);
@@ -3087,7 +3090,7 @@ bool Reducer::mixedDomination() {
 
 
 bool Reducer::mixedDomination2() {
-    const bool debug = true;
+    const bool debug = false;
 
     VPII to_remove, to_add;
 
@@ -3101,9 +3104,9 @@ bool Reducer::mixedDomination2() {
     bool changes_done = false;
 
     auto getCycleDominators = [&](int u) -> VI {
-        int N = V.size();
-
-        auto oldV = nonpiV;
+        auto oldV = V;
+        V = nonpiV;
+        int N = V.size()+2;
 
         V.push_back(V[u]); // adding arcs (vs,d)
         V.emplace_back();
@@ -3144,7 +3147,7 @@ bool Reducer::mixedDomination2() {
 
         int vs = V.size()-2, vt = V.size() - 1;
         auto path = findShortestPath( V, vs, vt, was );
-        if( path.empty() ) { nonpiV = oldV; return {}; } /* no path, so no dominators... */
+        if( path.empty() ) { V = oldV; return {}; } /* no path, so no dominators... */
 
         VI ind_on_path(N,-1);
         for(int i=0; i<path.size(); i++) ind_on_path[ path[i] ] = i;
@@ -3162,6 +3165,7 @@ bool Reducer::mixedDomination2() {
             return reach[num];
         };
 
+        constexpr int MAXL = 50;
         VI dominators;
         for( int i=0; i<(int)path.size()-1; i++ ) {
             int v = path[i];
@@ -3170,9 +3174,10 @@ bool Reducer::mixedDomination2() {
             if( reach[v] == i && i > 0 ) dominators.push_back(v);
             reach[v] = max(reach[v],i);
             dfs(v);
+            if(reach[v] > MAXL) break;
         }
 
-        nonpiV = oldV;
+        V = oldV;
 
         return dominators;
     };
@@ -3180,6 +3185,7 @@ bool Reducer::mixedDomination2() {
     for( int u=0; u<N; u++ ){
 
         auto dominators = getCycleDominators(u);
+        if(dominators.empty()) continue;
 
         for (int d : dominators) for ( int dd : piV[d] ) was[dd] = true;
         int cnt = 0;
@@ -3189,7 +3195,7 @@ bool Reducer::mixedDomination2() {
         if(is_dominated){
 
             if( debug ){
-                clog << "partially-merging node in mixed_domination2" << endl;
+                clog << "partially-merging node in mixed_domination" << endl;
                 DEBUG(dominators);
                 DEBUG(u); DEBUG(V[u]); DEBUG(revV[u]);
                 ENDL(1);

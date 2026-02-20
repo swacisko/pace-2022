@@ -18,7 +18,7 @@ static int time_limit_millis = 600'000;
 
 
 struct ExpData {
-    int N, M, pi_arcs, nonpi_arcs;
+    int N=-1, M=-1, pi_arcs, nonpi_arcs;
     double pi_arcs_fraction;
     double nonpi_arcs_fraction;
 
@@ -26,7 +26,15 @@ struct ExpData {
         vector<string> fields{"N", "E", "time"};
         vector<string> res;
 
-        for( string s : { "orig", "basic", "known", "all_dom", "part-dom-1", "part-dom-2", "part-dom-3"} ) {
+        for( string s : { "orig",
+            "basic",
+            "known",
+            "all_dom",
+            "part-dom-1",
+            "part-dom-2",
+            "part-dom-3",
+            "part-dom-13"
+        } ) {
             for(const auto & f : fields) res.push_back(s + "-" + f);
         }
 
@@ -51,7 +59,7 @@ using PEI = pair<ExpData,int>;
 
 
 tuple<ExpData,
-    PEI, PEI, PEI, PEI, PEI, PEI>
+    PEI, PEI, PEI, PEI, PEI, PEI, PEI>
     createDataForInstance(VVI V, bool include_single_reduction) {
 
     auto induceByNonisolated = [&]() {
@@ -60,22 +68,22 @@ tuple<ExpData,
     };
 
 
-    auto assignTimeLimits = [&](auto & red) {
-        red.cnf.reducer_max_time_millis = 3'600'000; // 1 hour max time
-        int MAX_MILLIS_PER_REDUCTION = 100'000;
+    auto assignTimeLimits = [&](Reducer & red) {
+        red.cnf.reducer_max_time_millis = 600'000; // 10 minutes
+        int MAX_MILLIS_PER_REDUCTION = 15'000; // max 15 seconds per reduction
         red.cnf.reducer_nonsimple_cycle_arcs_full_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
-        red.cnf.reducer_domination4_max_time_millis_per_node = 1'000;
+        red.cnf.reducer_domination4_max_time_millis_per_node = 250;
         red.cnf.reducer_domination_3_4_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
-        red.cnf.reducer_domination5_max_time_millis_per_node = 1'000;
+        red.cnf.reducer_domination5_max_time_millis_per_node = 250;
         red.cnf.reducer_domination_5_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
-        red.cnf.reducer_mixed_domination_full_max_time_millis_per_node = 1'000;
+        red.cnf.reducer_mixed_domination_full_max_time_millis_per_node = 250;
         red.cnf.reducer_mixed_domination_full_max_time_millis_total = MAX_MILLIS_PER_REDUCTION;
     };
 
     ExpData initV_data, basic_data, known_red_data;
-    ExpData all_dom, mixed_dom_1, mixed_dom_2, mixed_domination_3, dom4, dom5;
+    ExpData all_dom, mixed_dom_1, mixed_dom_2, mixed_dom_3, mixed_dom13;
 
-    int time_basic, time_known, time_part_dom1, time_part_dom2, time_part_dom_3, time_dom4, time_dom5, time_all_dom;
+    int time_basic, time_known, time_part_dom1, time_part_dom2, time_part_dom_3, time_part_dom_13, time_all_dom;
 
     induceByNonisolated();
     initV_data.createData(V);
@@ -117,12 +125,13 @@ tuple<ExpData,
         red.cnf.reducer_use_domination_0_pinodes = true;
         red.cnf.reducer_use_folding = true;
         red.cnf.reducer_use_folding_only_for_pi_nodes = true;
-        red.cnf.reducer_use_funnel = true;
+        // red.cnf.reducer_use_funnel = true;
         red.cnf.reducer_use_desk = true;
         red.cnf.reducer_use_twins_merge = true;
         red.cnf.reducer_use_folding_twins = true;
     };
 
+    int known_v_size = 0;
     { // known rules
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
@@ -139,6 +148,7 @@ tuple<ExpData,
         for(auto * r : reductions) delete r;
         V = red.V;
         induceByNonisolated();
+        known_v_size = V.size();
         known_red_data.createData(V);
 
         time_known = sw.getTime("red");
@@ -153,6 +163,7 @@ tuple<ExpData,
         setKnownRules(red);
 
         red.cnf.reducer_use_mixed_domination = !include_single_reduction;
+        red.cnf.reducer_use_mixed_domination2 = !include_single_reduction;
         red.cnf.reducer_use_mixed_domination_full = !include_single_reduction;
     };
 
@@ -166,7 +177,7 @@ tuple<ExpData,
     };
 
 
-
+    constexpr int MAX_M2_THR = 5e4;
 
     if(true){ // all_dom
         auto b = include_single_reduction;
@@ -179,6 +190,7 @@ tuple<ExpData,
         V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red);
+        if( known_v_size > MAX_M2_THR ) red.cnf.reducer_use_mixed_domination2 = false;
 
         sw.restart("red");
         createForRed(red, all_dom);
@@ -203,7 +215,9 @@ tuple<ExpData,
         time_part_dom1 = sw.getTime("red");
     }
 
-    if(true){ // mixed_domination_2 - version with dominators
+    // if(true){ // mixed_domination_2 - version with dominators - CAUTION! O(nm) time complexity
+    // if(true) if( 1ll * basicV.size() * GraphUtils::countEdges(basicV) < 1e9 ) { // mixed_domination_2 - version with dominators - CAUTION! O(nm) time complexity
+    if(true) if( known_v_size <= MAX_M2_THR ) { // mixed_domination_2 - version with dominators - CAUTION! O(nm) time complexity
         Config main_cnf;
         main_cnf.sw.setLimit("main", time_limit_millis);
         main_cnf.sw.start("main");
@@ -226,13 +240,28 @@ tuple<ExpData,
         V = basicV;
         Reducer red(V, main_cnf);
         setAllForRed(red);
-        red.cnf.reducer_use_domination_3 = include_single_reduction;
+        red.cnf.reducer_use_mixed_domination_full = include_single_reduction;
 
         sw.restart("red");
-        createForRed(red, mixed_domination_3);
+        createForRed(red, mixed_dom_3);
         time_part_dom_3 = sw.getTime("red");
     }
 
+    if(true){ // // mixed_domination_1+3 - full DFS+backtracking based search
+        Config main_cnf;
+        main_cnf.sw.setLimit("main", time_limit_millis);
+        main_cnf.sw.start("main");
+
+        V = basicV;
+        Reducer red(V, main_cnf);
+        setAllForRed(red);
+        red.cnf.reducer_use_mixed_domination = include_single_reduction;
+        red.cnf.reducer_use_mixed_domination_full = include_single_reduction;
+
+        sw.restart("red");
+        createForRed(red, mixed_dom13);
+        time_part_dom_13 = sw.getTime("red");
+    }
 
 
     return make_tuple(initV_data,
@@ -241,7 +270,8 @@ tuple<ExpData,
         make_pair(all_dom, time_all_dom),
         make_pair(mixed_dom_1, time_part_dom1),
         make_pair(mixed_dom_2, time_part_dom2),
-        make_pair(mixed_domination_3, time_part_dom_3)
+        make_pair(mixed_dom_3, time_part_dom_3),
+        make_pair(mixed_dom13, time_part_dom_13)
     );
 }
 
@@ -276,9 +306,10 @@ int main(int argc, char** argv) {
         // instances_e.resize(140);
 
         // instances_e.clear();
-        instances_e.resize( min(instances_e.size() / 2.0, 100.0) );
+        // instances_e.resize( min(instances_e.size() / 2.0, 100.0) );
     }
 
+    constexpr int threads = 8;
 
     // vector<string> instances_all = instances_e;
     vector<string> instances_all = instances_e + instances_h;
@@ -294,7 +325,7 @@ int main(int argc, char** argv) {
         DEBUG(include_single_reduction);
         string suf =  (include_single_reduction ? "_single_included" : "_single_excluded");
 
-        constexpr bool compute = true;
+        constexpr bool compute = false;
         constexpr bool retain_only_absent_csvs = false;
         constexpr bool create_results_all = true;
 
@@ -321,7 +352,7 @@ int main(int argc, char** argv) {
 
 
 
-            omp_set_num_threads( min( (int)instances_all.size(), 8 ) );
+            omp_set_num_threads( min( (int)instances_all.size(), threads ) );
 
             clog << "There are " << instances_all.size() << " instances to consider" << endl << endl;
 
@@ -345,7 +376,7 @@ int main(int argc, char** argv) {
                 auto V = Utils::readGraph(cur_str);
 
 
-                auto [initV, basic, knownd, alld, pd1,pd2,pd3]
+                auto [initV, basic, knownd, alld, pd1,pd2,pd3,pd13]
                 = createDataForInstance(V, include_single_reduction);
 
                 auto [basic_data,time_basic] = basic;
@@ -354,6 +385,7 @@ int main(int argc, char** argv) {
                 auto [part_dom1, time_part_dom1] = pd1;
                 auto [part_dom2, time_part_dom2] = pd2;
                 auto [part_dom3, time_part_dom3] = pd3;
+                auto [part_dom13, time_part_dom13] = pd13;
 
                 ofstream cur_data_os(s + suf + ".csv");
                 cur_data_os.precision(2);
@@ -380,6 +412,7 @@ int main(int argc, char** argv) {
                 writeData(cur_data_os, part_dom1, time_part_dom1);
                 writeData(cur_data_os, part_dom2, time_part_dom2);
                 writeData(cur_data_os, part_dom3, time_part_dom3);
+                writeData(cur_data_os, part_dom13, time_part_dom13);
 
                 clog << "\tFinished processing instance " << s << endl;
             }
