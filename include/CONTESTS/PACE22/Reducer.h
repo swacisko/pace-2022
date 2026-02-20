@@ -446,6 +446,7 @@ public:
 
     VPII nonSimpleCycleArcFull();
 
+    VI domination0();
     VI domination1();
 
     VI domination2();
@@ -464,6 +465,7 @@ public:
         reverseTriangleGadget(bool use_only_when_mixed_domination_applies = true);
 
     bool mixedDomination();
+    bool mixedDomination2();
 
     bool mixedDominationFull();
 
@@ -532,6 +534,7 @@ public:
     int total_reverse_triangle_gadgets_applied = 0;
     int total_reverse_triangle_gadget_dom6_cases = 0;
     int mixed_domination_nodes_excluded = 0;
+    int mixed_domination2_nodes_excluded = 0;
     int mixed_domination_nodes_full_excluded = 0;
     int total_pie_edges_removed = 0;
     int total_dome_edges_removed = 0;

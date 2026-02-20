@@ -45,6 +45,7 @@ public:
     bool reducer_use_twins_merge = false;
     bool reducer_use_inoutclique = false;
     bool reducer_use_folding = false;
+    bool reducer_use_folding_only_for_pi_nodes = false;
     bool reducer_use_general_folding = false;
     bool reducer_use_folding_twins = false;
     bool reducer_use_full_bipartite_blocker = false;
@@ -54,6 +55,7 @@ public:
     bool reducer_use_nonsimple_cycle_arcs = false;
     bool reducer_use_nonsimple_cycle_arcs_full = false;
     // bool reducer_use_domination = false;
+    bool reducer_use_domination_0_pinodes = false;
     bool reducer_use_domination_1 = false;
     bool reducer_use_domination_2 = false;
     bool reducer_use_domination_3 = false;
@@ -63,6 +65,7 @@ public:
     bool reducer_use_domination_6inserter = false;
     bool reducer_use_reverse_triangle_gadgets = false;
     bool reducer_use_mixed_domination = false;
+    bool reducer_use_mixed_domination2 = false;
     bool reducer_use_mixed_domination_full = false;
     bool reducer_use_funnel = false;
     bool reducer_use_cycle_folding = false;

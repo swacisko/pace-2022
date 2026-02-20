@@ -569,6 +569,18 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         //     if(modified) continue;
         // }
 
+        if(cnf.reducer_use_domination_0_pinodes) {
+            VI dominated = domination0();
+            addKNR(dominated);
+
+            // if(write_progress_on_the_fly) DEBUG(total_dominated_nodes0);
+            // total_dominated_nodes0 += dominated.size();
+            // if(write_progress_on_the_fly) DEBUG(total_dominated_nodes0);
+            Utils::removeNodes(V, revV, dominated, helper);
+            if(!dominated.empty()) modified = true;
+            if(modified) continue;
+        }
+
         if(cnf.reducer_use_domination_1) {
             //TimeMeasurer::start("Reducer::domination1");
             VI dominated = domination1();
@@ -724,6 +736,19 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             bool changes = mixedDomination();
             if(changes) modified = true;
             if (write_progress_on_the_fly) clog << "Mixed domination applied: " << changes << endl;
+
+            //TimeMeasurer::stop("Reducer::mixed_domination");
+
+            if(modified) continue;
+        }
+
+        if( cnf.reducer_use_pie && cnf.reducer_use_mixed_domination2 ){
+            //TimeMeasurer::start("Reducer::mixed_domination");
+
+            if (write_progress_on_the_fly) clog << "Running mixed domination2" << endl;
+            bool changes = mixedDomination2();
+            if(changes) modified = true;
+            if (write_progress_on_the_fly) clog << "Mixed domination2 applied: " << changes << endl;
 
             //TimeMeasurer::stop("Reducer::mixed_domination");
 
@@ -1743,7 +1768,7 @@ bool Reducer::mergeTwins(int max_milliseconds) {
         const bool find_only_vc = false;
         if(find_only_vc){
             VI vc = Utils::getLowerBoundByVCOnPIGraph(g.V, revgV);
-            return vc.size();
+            return (unsigned long)vc.size();
         }else {
 
             assert(g.V == gvcp);
@@ -1766,7 +1791,7 @@ bool Reducer::mergeTwins(int max_milliseconds) {
                 assert(dfvs_e.size() < g.V.size());
             }
 
-            return dfvs_e.size();
+            return (unsigned long)dfvs_e.size();
         }
     };
 
@@ -1992,8 +2017,12 @@ vector<FoldingReduction*> Reducer::folding() {
 
     VVI revUnderPI = underPI;
 
+
+    auto isPiNode = [&](int a){ return Utils::isPiNode(V, revV, piV, a); };
+
     for( int i=0; i<V.size(); i++ ){
         if(underPI[i].size() == 2 && V[i].size() == 2 && revV[i].size() == 2 ){
+            if (cnf.reducer_use_folding_only_for_pi_nodes) if ( !isPiNode(i) ) continue;
 
             int a = i;
             int b = V[a][0];
@@ -2001,6 +2030,10 @@ vector<FoldingReduction*> Reducer::folding() {
             assert(b != c);
 
             if( affected[a] || affected[b] || affected[c] ) continue;
+            if (cnf.reducer_use_folding_only_for_pi_nodes) if ( !isPiNode(b) || !isPiNode(c) ) {
+                clog << "In folding, node b or c is not a pi node, stopping folding" << endl;
+                continue;
+            }
 
             {
                 bool can_be_applied = true;
@@ -2054,6 +2087,79 @@ vector<FoldingReduction*> Reducer::folding() {
     return res;
 }
 
+
+VI Reducer::domination0() {
+    clog << "Entering dominiation0 - for pi nodes only" << endl;
+
+    int N = V.size();
+    VB was1(N,false);
+    VB was2(N,false);
+    VB affected(N,false);
+
+    VI perm(N);
+    iota(ALL(perm),0);
+    sort(ALL(perm),[&](int a, int b){
+        return V[a].size() + revV[a].size() > V[b].size() + revV[b].size();
+    });
+
+    VVI piV = Utils::getUnderlyingPIGraph(V, revV);
+
+    VI res;
+
+    auto isPiNode = [&](int a){ return Utils::isPiNode(V, revV, piV, a); };
+
+    for( int a : perm ) if (isPiNode(a)) {
+        if(affected[a]) continue;
+        if( V[a].empty() || revV[a].empty() ) continue;
+
+        was1[a] = was2[a] = true;
+        for( int d : V[a] ) was1[d] = true;
+        for( int d : revV[a] ) was2[d] = true;
+
+        bool check = true;
+        for( int d : V[a] ) if( affected[d] ) check = false;
+        for( int d : revV[a] ) if( affected[d] ) check = false;
+
+        if(check) {
+            for (int b : piV[a]) if (isPiNode(b)) {
+                if(affected[b]) continue;
+
+                if( V[b].size() > V[a].size() || revV[b].size() > revV[a].size() ) continue;
+
+                bool dominated = true;
+
+                for (int d : V[b]) {
+                    if (!was1[d]) {
+                        dominated = false;
+                        break;
+                    }
+                }
+
+                if (!dominated) continue;
+
+                for (int d : revV[b]) {
+                    if (!was2[d]) {
+                        dominated = false;
+                        break;
+                    }
+                }
+
+                if (dominated) {
+                    res.push_back(a);
+                    for (int d : V[a]) affected[d] = true;
+                    for (int d : revV[a]) affected[d] = true;
+                    break;
+                }
+            }
+        }
+
+        was1[a] = was2[a] = false;
+        for( int d : V[a] ) was1[d] = false;
+        for( int d : revV[a] ) was2[d] = false;
+    }
+
+    return res;
+}
 
 VI Reducer::domination1() {
     int N = V.size();
@@ -2979,6 +3085,134 @@ bool Reducer::mixedDomination() {
     return changes_done;
 }
 
+
+bool Reducer::mixedDomination2() {
+    const bool debug = true;
+
+    VPII to_remove, to_add;
+
+    VVI piV = Utils::getUnderlyingPIGraph(V, revV);
+    VVI nonpiV = Utils::getNonPIGraph(V, revV);
+    VVI revnonpiV = GraphUtils::reverseGraph(nonpiV);
+
+    int N = V.size();
+    VB helper(N,false), was(N,false), was2(N,false);
+
+    bool changes_done = false;
+
+    auto getCycleDominators = [&](int u) -> VI {
+        int N = V.size();
+
+        auto oldV = nonpiV;
+
+        V.push_back(V[u]); // adding arcs (vs,d)
+        V.emplace_back();
+        for (int d : revV[u]) V[d].push_back( V.size()-1 ); // adding arcs (d,vt)
+        VB was(N);
+
+        constexpr int inf = 1e9+1;
+        auto findDistances = [&](VVI & V, int beg, VB & was) {
+            int N = V.size();
+            VI dst(N, inf);
+            VI par(N,inf);
+            dst[beg] = 0; par[beg] = -1;
+            VI neigh; neigh.reserve(N);
+            neigh.push_back(beg);
+            for( int i=0; i<neigh.size(); i++ ) {
+                int v = neigh[i];
+                for( int d : V[v] ) {
+                    if( dst[d] == inf && !was[d] ) {
+                        dst[d] = dst[v] + 1;
+                        par[d] = v;
+                        neigh.push_back(d);
+                    }
+                }
+            }
+
+            return make_pair(dst,par);
+        };
+
+        auto findShortestPath = [&](VVI & V, int beg, int end, VB & was) {
+            auto [dst,par] = findDistances(V,beg,was);
+            int u = end;
+            VI path(1,u);
+            while( u != beg && u != inf ) { u = par[u]; path.push_back(u); }
+            if(u == inf) path.clear();
+            reverse(ALL(path));
+            return path;
+        };
+
+        int vs = V.size()-2, vt = V.size() - 1;
+        auto path = findShortestPath( V, vs, vt, was );
+        if( path.empty() ) { nonpiV = oldV; return {}; } /* no path, so no dominators... */
+
+        VI ind_on_path(N,-1);
+        for(int i=0; i<path.size(); i++) ind_on_path[ path[i] ] = i;
+        for( int d : path ) was[d] = true;
+
+        VI reach(N,-1);
+        function<int(int)> dfs = [&](int num) {
+            was[num] = true;
+            int res = -1;
+            for( int d : V[num] ) {
+                res = max(res, ind_on_path[d]);
+                if(!was[d]) res = max(res, dfs(d));
+            }
+            reach[num] = max(reach[num],res);
+            return reach[num];
+        };
+
+        VI dominators;
+        for( int i=0; i<(int)path.size()-1; i++ ) {
+            int v = path[i];
+            was[v] = false;
+            if( i > 0 ) reach[v] = max( reach[v], reach[path[i-1]] );
+            if( reach[v] == i && i > 0 ) dominators.push_back(v);
+            reach[v] = max(reach[v],i);
+            dfs(v);
+        }
+
+        nonpiV = oldV;
+
+        return dominators;
+    };
+
+    for( int u=0; u<N; u++ ){
+
+        auto dominators = getCycleDominators(u);
+
+        for (int d : dominators) for ( int dd : piV[d] ) was[dd] = true;
+        int cnt = 0;
+        for (int d : piV[u]) if (was[d]) cnt++;
+        bool is_dominated = (cnt == piV[u].size());
+        for (int d : dominators) for ( int dd : piV[d] ) was[dd] = false;
+        if(is_dominated){
+
+            if( debug ){
+                clog << "partially-merging node in mixed_domination2" << endl;
+                DEBUG(dominators);
+                DEBUG(u); DEBUG(V[u]); DEBUG(revV[u]);
+                ENDL(1);
+                ENDLS(10,"*");
+            }
+
+            mixed_domination2_nodes_excluded++;
+
+            for( int x : revnonpiV[u] ) to_remove.emplace_back( x,u );
+            for( int y : nonpiV[u] ) to_remove.emplace_back( u,y );
+
+            VPII temp = StandardUtils::product( revnonpiV[u], nonpiV[u] );
+            to_add += temp;
+
+            Utils::partialMerge(V, revV, nonpiV, revnonpiV, piV, u, helper);
+            changes_done = true;
+        }
+    }
+
+    return changes_done;
+}
+
+
 vector<FunnelReduction *> Reducer::funnel() {
     const bool debug = false;
 
@@ -3409,7 +3643,7 @@ VI Reducer::bottleneck(int max_millis) {
             assert(dfvs_e.size() < g.V.size());
         }
 
-        return dfvs_e.size();
+        return (unsigned long)dfvs_e.size();
     };
 
     VI marker(N,0);
