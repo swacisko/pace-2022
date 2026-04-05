@@ -66,9 +66,12 @@ void initializeParams(int argc, char **argv) {
 }
 
 
-
-
-pair<string,VI> solveCPSAT1(VVI V, int max_l, bool find_optimal = false) {
+/**
+ * Iterative Hitting-Set approach - the most straightforward type.
+ * For each cycle length L, starting from 1, considers all cycles of length <= L, then finds HS of those cycles.
+ * If the found HS is not a FVS of V, then increases L and repeats.
+ */
+pair<string,VI> solveCPSAT1(VVI V, int max_l, int time_limit_millis, bool find_optimal = false) {
     clog << "Solving using CPSAT, model v1" << endl;
 
     int N = V.size();
@@ -142,7 +145,9 @@ pair<string,VI> solveCPSAT1(VVI V, int max_l, bool find_optimal = false) {
     return {status, res};
 }
 
-
+/**
+ * Uses the MTZ formulation augmented with all cycles of length <= 3 to speed up propagation.
+ */
 pair<string,VI> solveCPSAT2(VVI V, int MAX_RANK_VALUE = 1e9, VI init_sol = {}, bool use_only_lns = false) {
     clog << "Solving using CPSAT, model v2" << endl;
 
@@ -225,7 +230,12 @@ pair<string,VI> solveCPSAT2(VVI V, int MAX_RANK_VALUE = 1e9, VI init_sol = {}, b
     return {status,res};
 }
 
-
+/**
+ * Iterative HS.
+ * Starting with L = 2 and res = {}, finds all cycles in the graph G[V \ res] of length <= L.
+ * If there is just a small number of such cycles, increases L and repeats.
+ * Then finds HS of the set of all cycles found so far.
+ */
 pair<string,VI> solveCPSAT3(VVI V, int total_time_seconds, int max_time_seconds_per_iter, bool find_optimal) {
     clog << "Solving using CPSAT, model v3" << endl;
 
@@ -469,7 +479,7 @@ int main(int argc, char** argv){
         //******************************
 
         sw.start("cpsat-1");
-        auto[status1,res1] = solveCPSAT1(V,25);
+        auto[status1,res1] = solveCPSAT1(V,25,time_limit_millis);
         sw.stop("cpsat-1");
 
         DEBUG(status1);
@@ -530,7 +540,7 @@ int main(int argc, char** argv){
         //******************************
 
         sw.start("cpsat-1");
-        auto[status1,res1] = solveCPSAT1(V,25,inf);
+        auto[status1,res1] = solveCPSAT1(V,25,inf, false);
         sw.stop("cpsat-1");
 
         DEBUG(status1);
