@@ -16,15 +16,7 @@ enum Algorithm {
     DIVERSES,
 };
 
-string parseAlgorithm(int alg) {
-    if(alg == HS1) return "HS1";
-    if(alg == IHS1) return "IHS-1";
-    if(alg == IHS2) return "IHS-2";
-    if(alg == MTZ1) return "MTZ-1";
-    if(alg == MTZ2) return "MTZ-2";
-    if(alg == DIVERSES) return "DiVerSeS";
-}
-
+string parseAlgorithm(int alg);
 constexpr int inf = 1e9+1;
 
 class ExpConfig{
@@ -35,10 +27,10 @@ public:
      * Sets proper values of different parameters to run the given algorithms.
      * This uses the standard configuration for some parameters, their values might be changed later if needed.
      */
-    void setParametersForAlgorithm(Algorithm alg);
+    void setParametersForAlgorithm();
 
     int max_time_sec = 10 * 60; // ten minutes default runtime
-    int ihs_single_iteration_sec = 2;
+    int ihs_single_iteration_sec = 3;
 
     /**
      * Value can be 1 or 2, since there are only two options.

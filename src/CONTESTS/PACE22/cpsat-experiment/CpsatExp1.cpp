@@ -32,7 +32,7 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int enumeration
     }
 }
 
-inline ExpData CpsatExp1::solveHS1(VVI V, ExpConfig cnf) {
+ExpData CpsatExp1::solveHS1(VVI V, ExpConfig cnf) {
      clog << "Solving using CPSAT, model v1" << endl;
 
     ExpData exp_data;
@@ -110,7 +110,13 @@ inline ExpData CpsatExp1::solveHS1(VVI V, ExpConfig cnf) {
     return exp_data;
 }
 
-inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res, int cycle_enumeration_type) {
+ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_type) {
+    VVI cycles;
+    VI res;
+    return solveIHS(V,cnf,cycles,res,cycle_enumeration_type);
+}
+
+ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res, int cycle_enumeration_type) {
     clog << "Solving using CPSAT, model v3" << endl;
 
     ExpData exp_data;
@@ -258,7 +264,7 @@ inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res,
     return exp_data;
 }
 
-inline ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
+ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
     clog << "Solving using CPSAT, model v2" << endl;
 
     ExpData exp_data;
@@ -361,5 +367,9 @@ inline ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mo
     return exp_data;
 }
 
-inline ExpData CpsatExp1::solveDiVerSeS(VVI V, ExpConfig cnf) {
+ExpData CpsatExp1::solveDiVerSeS(VVI V, ExpConfig cnf) {
+    ExpData exp_data;
+    assert(false && "not implemented");
+
+    return exp_data;
 }

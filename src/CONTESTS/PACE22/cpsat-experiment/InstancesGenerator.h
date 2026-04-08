@@ -10,13 +10,13 @@
 
 class InstancesGenerator : TestGenerator {
 public:
+    InstancesGenerator(string name, int random_test_count) : TestGenerator(name, random_test_count) {}
 
-    string directory = "instances";
+    void createHardcodedTests() override;
 
-    void generateInstance(string name);
+    void createRandomTest(int test_id, ofstream &out_in) override;
 
-    void generateInstances();
-
+    void createExemplarySolution(ifstream &in, ofstream &out) override;
 };
 
 #endif //DIVERSES_INSTANCESGENERATOR_H

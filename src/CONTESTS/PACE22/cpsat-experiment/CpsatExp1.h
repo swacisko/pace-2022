@@ -70,6 +70,7 @@ public:
    * Then finds HS of the set of all cycles found so far.
    * All cycles found by this function will be stored in [cycles] vector
    */
+    static ExpData solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_type = 0);
     static ExpData solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res, int cycle_enumeration_type = 0);
 
     /**

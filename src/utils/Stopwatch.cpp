@@ -42,6 +42,10 @@ void Stopwatch::write(string option) {
     }
 }
 
+void Stopwatch::writeAll() {
+    for (auto [k,v] : timesTotal) clog << k << " -> " << (v / 1'000.0) << " seconds" << endl;
+}
+
 void Stopwatch::setLimit(string option, double limit) {
     if( limits.count(option) ) clog << "Overriding option " << option << " in Stopwatch::setLimit()" << endl;
     limits[option] = limit;

@@ -19,6 +19,7 @@ public:
     double getTime(string option = "main");
 
     void write(string option);
+    void writeAll();
 
 //    ***************************************************************** TLE options
 

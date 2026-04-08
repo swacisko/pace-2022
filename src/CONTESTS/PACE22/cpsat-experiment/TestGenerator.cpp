@@ -2,8 +2,9 @@
 // Created by sylwester on 12/9/20.
 //
 
+#include "TestGenerator.h"
+
 #include <filesystem>
-#include "custom-problems/TestGenerator.h"
 #include "omp.h"
 #include "Stopwatch.h"
 
@@ -38,25 +39,37 @@ void TestGenerator::generate() {
     fs::create_directory(test_dir + sep + "input" );
     fs::create_directory(test_dir + sep + "output" );
 
+    input_files_to_rename.resize(hardcoded_test_count + random_test_count, "");
+    for ( auto &[i,v] : views::enumerate(input_files_to_rename) ) filename_mapper[i] = v;
+
     saveHardcodedTests();
     generateRandomTests();
     generateExemplarySolutions();
 }
 
+string TestGenerator::convert_test_id(int id) {
+    if (filename_mapper.contains(id)) {
+        return filename_mapper[id];
+    }else {
+        if( id < 10 ) return "0" + to_string(id);
+        else return to_string(id);
+    }
+}
+
 string TestGenerator::getInputFileName(int test_id) {
     string sep = "";
     sep.append( 1, filesystem::path::preferred_separator );
-//    return test_dir + sep + "input" + sep + "input" + convert_test_id(test_id) + ".txt";
-    if(generate_for_optilio) return test_dir + sep + "test" + convert_test_id(test_id) + ".in";
-    else return test_dir + sep + "input" + sep + "input" + convert_test_id(test_id) + input_extension;
+    bool b = filename_mapper.contains(test_id);
+    if(generate_for_optilio) return test_dir + sep + (b ? "" : "test") + convert_test_id(test_id) + ".in";
+    else return test_dir + sep + "input" + sep + (b ? "" : "input") + convert_test_id(test_id) + input_extension;
 }
 
 string TestGenerator::getOutputFileName(int test_id) {
     string sep = "";
     sep.append( 1, filesystem::path::preferred_separator );
-//    return test_dir + sep + "output" + sep + "output" + convert_test_id(test_id) + ".txt";
-    if(generate_for_optilio) return test_dir + sep + "test" + convert_test_id(test_id) + ".out";
-    else return test_dir + sep + "output" + sep + "output" + convert_test_id(test_id) + output_extension;
+    bool b = filename_mapper.contains(test_id);
+    if(generate_for_optilio) return test_dir + sep + (b ? "" : "test") + convert_test_id(test_id) + ".out";
+    else return test_dir + sep + "output" + sep + (b ? "" : "output") + convert_test_id(test_id) + output_extension;
 }
 
 

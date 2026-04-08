@@ -78,6 +78,9 @@ public:
     int threads = 1;
     bool measure_exemplary_solution_time = false;
 
+    vector<string> input_files_to_rename;
+    map<int,string> filename_mapper;
+
     string getTaskName(){return task_name;}
 
 protected:
@@ -88,7 +91,7 @@ protected:
     string input_extension = ".txt";
     string output_extension = ".txt";
 
-    string convert_test_id(int id){ if( id < 10 ) return "0" + to_string(id); else return to_string(id); }
+    string convert_test_id(int id);
 
     string task_name;
     string test_dir;
