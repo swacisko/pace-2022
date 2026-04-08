@@ -78,3 +78,22 @@ file(GLOB SOURCES
 add_executable(DiVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES})
 target_link_libraries( DiVerSeS stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX)
 #target_link_libraries( DiVerSeS stdc++fs ortools boost_system OpenMP::OpenMP_CXX)
+
+
+
+add_executable(CpsatExp1TestGenerator ${SOURCES}
+        src/CONTESTS/PACE22/cpsat-experiment/InstancesGenerator.cpp
+        src/CONTESTS/PACE22/cpsat-experiment/InstancesGenerator.h
+        src/CONTESTS/PACE22/cpsat-experiment/TestGenerator.h
+        src/CONTESTS/PACE22/cpsat-experiment/TestGenerator.cpp
+)
+target_link_libraries( CpsatExp1TestGenerator stdc++fs OpenMP::OpenMP_CXX)
+
+add_executable(CpsatExp1 ${SOURCES}
+        src/CONTESTS/PACE22/cpsat-experiment/ExpConfig.cpp
+        src/CONTESTS/PACE22/cpsat-experiment/ExpConfig.h
+        src/CONTESTS/PACE22/cpsat-experiment/main.cpp
+        src/CONTESTS/PACE22/cpsat-experiment/CpsatExp1.cpp
+        src/CONTESTS/PACE22/cpsat-experiment/CpsatExp1.h
+)
+target_link_libraries( CpsatExp1 stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX)
