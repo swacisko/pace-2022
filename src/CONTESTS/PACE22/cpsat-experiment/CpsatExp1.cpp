@@ -11,19 +11,41 @@
 #include "ortools/sat/cp_model.h"
 using namespace operations_research::sat;
 
+SatParameters getDefaultSatParameters(ExpConfig cnf) {
+    SatParameters params;
+    if (!cnf.find_optimal_result) params.set_max_time_in_seconds(cnf.max_time_sec);
+    if(cnf.use_only_cpsat_lns) params.set_use_lns_only(true);
+    params.set_num_search_workers(cnf.threads);
+    params.set_log_search_progress(cnf.log_cpsat_search_progress);
+    return params;
+}
+
+VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int enumeration_option) {
+    if (enumeration_option == 1) {
+        VVI H = V;
+        VVI revH = GraphUtils::reverseGraph(H);
+        VB helper(V.size());
+        Utils::removeNodes(H, revH, S, helper);
+        return Utils::getAllSimpleCycles3(H,max_l);
+    }else {
+        assert(false && "not implemented yet");
+    }
+}
 
 inline ExpData CpsatExp1::solveHS1(VVI V, ExpConfig cnf) {
      clog << "Solving using CPSAT, model v1" << endl;
 
+    ExpData exp_data;
     int N = V.size();
 
     VI prev_res;
 
     auto solveHS = [&](auto & cycles) -> VI {
-        SatParameters params;
-        if (!cnf.find_optimal_result) params.set_max_time_in_seconds(time_limit_millis / 1000.0);
-        params.set_num_search_workers(threads);   // deterministic runs
-        params.set_log_search_progress(false);
+        // SatParameters params;
+        // if (!cnf.find_optimal_result) params.set_max_time_in_seconds(cnf.max_time_sec);
+        // params.set_num_search_workers(cnf.threads);
+        // params.set_log_search_progress(cnf.log_cpsat_search_progress);
+        SatParameters params = getDefaultSatParameters(cnf);
         Model solver_model;
         solver_model.Add(NewSatParameters(params));
 
@@ -50,11 +72,11 @@ inline ExpData CpsatExp1::solveHS1(VVI V, ExpConfig cnf) {
         return res;
     };
 
-    Stopwatch timer;
-    timer.setLimit("all_iters", max_l * time_limit_millis);
-    timer.start("all_iters");
+    constexpr int max_l = inf;
 
-    if(cnf.find_optimal_result) max_l = inf;
+    Stopwatch timer;
+    timer.setLimit("all_iters", max_l * cnf.max_time_sec*1'000 );
+    timer.start("all_iters");
 
     VI res;
     for (int L=3; L <= max_l ; L++) {
@@ -67,6 +89,7 @@ inline ExpData CpsatExp1::solveHS1(VVI V, ExpConfig cnf) {
         clog << endl << "Considering cycles of length <= " << L << endl;
         auto cycles = Utils::getAllSimpleCycles3(V,L );
         clog << "\t there are " << cycles.size() << " such cycles" << endl;
+        if (cycles.size() > cnf.max_cycles_for_hs) break;
 
         VI sol = solveHS(cycles);
         if ( Utils::isFVS(V,sol) ){ res = sol; break; }
@@ -83,15 +106,18 @@ inline ExpData CpsatExp1::solveHS1(VVI V, ExpConfig cnf) {
     }
     else status = "INCORRECT";
 
-    return {status, res};
+    // return {status, res};
+    return exp_data;
 }
 
-inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_type) {
+inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res, int cycle_enumeration_type) {
     clog << "Solving using CPSAT, model v3" << endl;
+
+    ExpData exp_data;
 
     int N = V.size();
 
-    VVI cycles; // = Utils::getAllSimpleCycles3(V,2);
+    cycles.clear();
     VI prev_res;
 
     VI best_fvs;
@@ -99,14 +125,17 @@ inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_t
     auto updateCyclesAndHit = [&](VVI new_cycles) -> VI {
         cycles += std::move(new_cycles);
 
-        SatParameters params;
-        if (!cnf.find_optimal_result) {
-            params.set_max_time_in_seconds(max_time_seconds_per_iter);
-            clog << "\t running cpsat solver with time limit of " << max_time_seconds_per_iter << " sec." << endl;
-        }
-        params.set_num_search_workers(cnf.threads);   // deterministic runs
-        // if( !find_optimal && !prev_res.empty() ) params.set_use_lns_only(true);
-        params.set_log_search_progress(false);
+        // SatParameters params;
+        // if (!cnf.find_optimal_result) {
+        //     params.set_max_time_in_seconds(cnf.ihs_single_iteration_sec);
+        //     clog << "\t running cpsat solver with time limit of " << cnf.ihs_single_iteration_sec << " sec." << endl;
+        // }
+        // params.set_num_search_workers(cnf.threads);   // deterministic runs
+        // params.set_log_search_progress(cnf.log_cpsat_search_progress);
+        SatParameters params = getDefaultSatParameters(cnf);
+        if (!cnf.find_optimal_result) clog << "\t running cpsat solver with time limit of " << cnf.ihs_single_iteration_sec << " sec." << endl;
+        else clog << "\t running cpsat solver without time limit, looking for optimal result" << endl;
+
         Model solver_model;
         solver_model.Add(NewSatParameters(params));
 
@@ -129,13 +158,13 @@ inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_t
         CpSolverResponse response = SolveCpModel(model.Build(), &solver_model);
         int F = 2;
         while(response.status() == UNKNOWN) {
-            clog << "Response status unknown, increasing max_time_per_iter to " << F*max_time_seconds_per_iter << endl;
+            clog << "Response status unknown, increasing max_time_per_iter to " << F * cnf.ihs_single_iteration_sec << endl;
 
-            params.set_max_time_in_seconds(F*max_time_seconds_per_iter);
-            Model solver_model;
-            solver_model.Add(NewSatParameters(params));
+            params.set_max_time_in_seconds(F * cnf.ihs_single_iteration_sec);
+            Model solv_model;
+            solv_model.Add(NewSatParameters(params));
             F *= 2;
-            response = SolveCpModel(model.Build(), &solver_model);
+            response = SolveCpModel(model.Build(), &solv_model);
         }
 
 
@@ -145,9 +174,8 @@ inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_t
     };
 
 
-    // VI res;
     Stopwatch timer;
-    timer.setLimit("all_iters", cnf.find_optimal_result ? inf : total_time_seconds * 1000);
+    timer.setLimit("all_iters", cnf.find_optimal_result ? inf : cnf.max_time_sec * 1000);
     timer.start("all_iters");
 
 
@@ -155,15 +183,18 @@ inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_t
     while(true) {
         if(timer.tle("all_iters")) break;
 
-        VVI H = V;
-        VVI revH = GraphUtils::reverseGraph(H);
-        VB helper(N);
-        Utils::removeNodes(H, revH, prev_res, helper);
-        VVI nonpiH = Utils::getNonPIGraph(H);
-        VVI revnonpiH = GraphUtils::reverseGraph(nonpiH);
+        // VVI H = V;
+        // VVI revH = GraphUtils::reverseGraph(H);
+        // VB helper(N);
+        // Utils::removeNodes(H, revH, prev_res, helper);
+        // VVI nonpiH = Utils::getNonPIGraph(H);
+        // VVI revnonpiH = GraphUtils::reverseGraph(nonpiH);
 
         clog << endl << "Looking for new cycles, cycles.size(): " << cycles.size() << ", prev_res.size(): "
              << prev_res.size() << ", time: " << (int)timer.getTime("all_iters") / 1000 << endl;
+
+        // VVI new_cycles = Utils::getAllSimpleCycles3(H, L);
+        VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,cycle_enumeration_type);
 
         int all_arcs = GraphUtils::countEdges(V,true);
         set<PII> zb;
@@ -171,7 +202,6 @@ inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_t
         int arcs = zb.size();
         clog << "\t arcs in constraints: " << arcs << " / " << all_arcs << endl;
 
-        VVI new_cycles = Utils::getAllSimpleCycles3(H, L);
 
         // we cannot add more than MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size() new cycles in each iteration
         // this is here, because when increasing the length size, we might get an awful lot of new cycles of
@@ -190,7 +220,7 @@ inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_t
 
         clog << "\t there are " << new_cycles.size() << " new cycles found, all cycles: " << cycles.size() << endl;
 
-
+        int max_time_seconds_per_iter = cnf.ihs_single_iteration_sec;
         VI sol = updateCyclesAndHit(new_cycles);
         if ( Utils::isFVS(V,sol) ) {
             if( best_fvs.empty() || sol.size() < best_fvs.size() ) best_fvs = sol;
@@ -221,15 +251,22 @@ inline ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, int cycle_enumeration_t
     }
     else status = "INCORRECT";
 
-    return {status, best_fvs};
+    // return {status, best_fvs};
+    if (!best_fvs.empty()) res = best_fvs;
+    else res = prev_res;
+
+    return exp_data;
 }
 
 inline ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
     clog << "Solving using CPSAT, model v2" << endl;
 
+    ExpData exp_data;
+
     int N = V.size();
     int MAX_RANK_VALUE = N;
 
+    VI init_sol = {};
     VB in_init_sol = StandardUtils::toVB(N,init_sol);
 
     CpModelBuilder model;
@@ -248,7 +285,7 @@ inline ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mo
         model.AddBoolOr( {nodes[a], nodes[b], cond_var} );
     }
 
-    { // here we add all pi-edges or triangles to make the propagation faster
+    if (auxiliary_cycles_mode == 1){ // here we add all pi-edges or triangles to make the propagation faster
         int L0 = 3;
         auto cyc = Utils::getAllSimpleCycles3(V,L0);
         clog << "\t adding " << cyc.size() << " constraints for all simple cycles of length <= " << L0 << endl;
@@ -256,6 +293,22 @@ inline ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mo
             if( v.size() == 2 ) model.AddBoolOr({nodes[v[0]], nodes[v[1]]});
             if( v.size() == 3 ) model.AddBoolOr({nodes[v[0]], nodes[v[1]], nodes[v[2]]});
         }
+    }else if (auxiliary_cycles_mode == 2) {
+        auto new_cnf = cnf;
+        new_cnf.max_time_sec *= new_cnf.max_time_fraction_for_ihs_cycles_in_mtz;
+        if ( new_cnf.ihs_single_iteration_sec > 2 ) {
+            new_cnf.ihs_single_iteration_sec *= new_cnf.max_time_fraction_for_ihs_cycles_in_mtz;
+            new_cnf.ihs_single_iteration_sec = max(new_cnf.ihs_single_iteration_sec,2);
+        }
+        VVI cycles;
+        VI res;
+        auto r = solveIHS(V,new_cnf,cycles, res, cnf.unhit_cycle_enumeration_type);
+        for(auto & v : cycles) {
+            vector<BoolVar> cyc_vars;
+            for (int d : v) cyc_vars.push_back(nodes[d]);
+            model.AddBoolOr(cyc_vars);
+        }
+        init_sol = res;
     }
 
     if(!init_sol.empty()) {
@@ -276,11 +329,12 @@ inline ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mo
         for(int i=0; i<topo.size(); i++) model.AddHint( ranks[topo[i]], i );
     }
 
-    SatParameters params;
-    params.set_max_time_in_seconds(time_limit_millis / 1000.0);
-    params.set_num_search_workers(cnf.threads);   // deterministic runs
-    if(cnf.use_only_cpsat_lns) params.set_use_lns_only(true);
-    params.set_log_search_progress(false);
+    // SatParameters params;
+    // params.set_max_time_in_seconds(cnf.max_time_sec);
+    // params.set_num_search_workers(cnf.threads);   // deterministic runs
+    // if(cnf.use_only_cpsat_lns) params.set_use_lns_only(true);
+    // params.set_log_search_progress(cnf.log_cpsat_search_progress);
+    SatParameters params = getDefaultSatParameters(cnf);
     Model solver_model;
     solver_model.Add(NewSatParameters(params));
 
@@ -303,7 +357,8 @@ inline ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mo
 
 
 
-    return {status,res};
+    // return {status,res};
+    return exp_data;
 }
 
 inline ExpData CpsatExp1::solveDiVerSeS(VVI V, ExpConfig cnf) {

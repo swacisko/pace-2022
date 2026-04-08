@@ -25,6 +25,8 @@ string parseAlgorithm(int alg) {
     if(alg == DIVERSES) return "DiVerSeS";
 }
 
+constexpr int inf = 1e9+1;
+
 class ExpConfig{
 public:
 
@@ -56,12 +58,14 @@ public:
 
     int threads = 4;
 
+    bool log_cpsat_search_progress = false;
+
     /**
      * if true, then only LNS will be used from cpsat #CAUTION! This might not work as intended, unless carefully taken care of
      */
     bool use_only_cpsat_lns = false;
 
-    string metadata_filepatg = "";
+    string metadata_filepath = "";
 
     /**
      * The fraction of [max_time_sec] which will be spent on finding chordless cycles that will be used to augment
@@ -77,9 +81,7 @@ public:
 
 
 
-    vector<pair<string, string>> getConfigEntries() {
-        vector<pair<string, string>> entries;
-    }
+    vector<pair<string, string>> getConfigEntries();
 
 
 
