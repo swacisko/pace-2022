@@ -8,12 +8,10 @@
 #include "Makros.h"
 
 enum Algorithm {
-    HS1 = 0,
-    IHS1,
-    IHS2,
-    MTZ1,
-    MTZ2,
-    DIVERSES,
+    HS = 0,
+    IHS = 1, // IHS with cycle_enumeration_type=1
+    MTZ = 2,
+    DIVERSES = 3,
 };
 
 string parseAlgorithm(int alg);
@@ -22,7 +20,7 @@ constexpr int inf = 1e9+1;
 class ExpConfig{
 public:
 
-    Algorithm alg = IHS1;
+    Algorithm alg = IHS;
     /**
      * Sets proper values of different parameters to run the given algorithms.
      * This uses the standard configuration for some parameters, their values might be changed later if needed.
@@ -57,7 +55,7 @@ public:
      */
     bool use_only_cpsat_lns = false;
 
-    string metadata_filepath = "";
+    string metadata_filepath;
 
     /**
      * The fraction of [max_time_sec] which will be spent on finding chordless cycles that will be used to augment

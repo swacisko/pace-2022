@@ -159,20 +159,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     return cnf;
 }
 
-
-int main(int argc, char** argv){
-    MemoryUtils::increaseStack();
-
-    auto cnf = parseArguments(argc, argv);
-
-
-    VVI V = GraphReader::readGraphStandardEdges(cin,true);
-    int N = V.size();
-
-
-    DEBUG(V.size());
-    DEBUG(GraphUtils::countEdges(V,true));
-
+void testAlgorithms(VVI & V, ExpConfig cnf) {
 
     constexpr bool check_heuristic_algorithms = true;
     constexpr bool check_exact_algorithms = false;
@@ -246,7 +233,28 @@ int main(int argc, char** argv){
         //******************************
 
     }
+}
 
+
+int main(int argc, char** argv){
+    MemoryUtils::increaseStack();
+
+    auto cnf = parseArguments(argc, argv);
+
+
+    VVI V = GraphReader::readGraphStandardEdges(cin,true);
+    int N = V.size();
+
+
+    DEBUG(V.size());
+    DEBUG(GraphUtils::countEdges(V,true));
+
+    testAlgorithms(V,cnf);
+
+
+
+    ofstream f(cnf.metadata_filepath);
+    exp_data.write(f);
 
 
     return 0;
