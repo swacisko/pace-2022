@@ -31,6 +31,12 @@ public:
     int ihs_single_iteration_sec = 3;
 
     /**
+     * This number of iterations will be done in IHS, until it terminates.
+     * Valid result might not be found if this value is too small. This parameter enables finding some subset of cycles.
+     */
+    int ihs_max_iterations = inf;
+
+    /**
      * Value can be 1 or 2, since there are only two options.
      * 1 - standard version used in DiVerSeS
      * 2 - takes random directed tree, then for each arc that would close a cycles, considers this cycle and makes it
@@ -58,11 +64,10 @@ public:
     string metadata_filepath;
 
     /**
-     * The fraction of [max_time_sec] which will be spent on finding chordless cycles that will be used to augment
-     * the MTZ formulation.
-     * #CAUTION! Parameters like ihs_single_iteration_sec must be set manually to make it work reasonably.
+     * This number of iterations will be done in IHS to find cycles.
+     * The expected time is roughly  ihs_single_iteration_sec * ihs_iterations_in_mtz   plus time required to list cycles.
      */
-    double max_time_fraction_for_ihs_cycles_in_mtz = 0.2;
+    int ihs_iterations_in_mtz = inf;
 
     /**
      *  Maximum number of cycles to create in HS method, so that we can terminate without exceeding memory limit.
@@ -73,7 +78,7 @@ public:
 
     vector<pair<string, string>> getConfigEntries();
 
-
+    void writeConfig();
 
 };
 

@@ -44,6 +44,7 @@ public:
 
         int distinct_arcs_in_all_cycles = -1;
         int unhit_cycle_enumeration_time_millis = -1;
+        int hs_greedy_time = -1;
         PII unhit_graph_sizes = {-1,-1};
         int unhit_graph_dfvs_size = -1;
         map<int,int> cycles_of_length;
@@ -69,7 +70,7 @@ public:
      *  If enumeration_option == 1, then Utils::getAllSimpleCycles3 is used.
      *  If 2, then w new method is used, based on dfs tree traversal.
      */
-    static VVI getUnhitChordlessCycles(VVI &V, VI & S, int max_l, int enumeration_option = 1);
+    static VVI getUnhitChordlessCycles(VVI &V, VI & S, int max_l, int max_millis, int enumeration_option = 1);
 
     /**
      * Creates a graph H = G[V\S], then removes from it all arcs that belong to different strongly connected components.

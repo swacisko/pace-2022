@@ -127,33 +127,38 @@ ExpConfig parseArguments(int argc, char ** argv) {
 
 
     ArgParser ap;
-    ap.addOption("mtd", true);
-    ap.addOption("time", false);
     ap.addOption("alg", false);
-    ap.addOption("iter_time", false);
-    ap.addOption("find_optimal", false);
+    ap.addOption("mtd", true);
     ap.addOption("threads", false);
-    ap.addOption("ihs_cyc_time_frac", false);
-    ap.addOption("log_cpsat_progress", false);
+    ap.addOption("time", false);
+    ap.addOption("iter_time", false);
     ap.addOption("cycle_enumeration", false);
+    ap.addOption("find_optimal", false);
+    ap.addOption("log_cpsat_progress", false);
+    ap.addOption("ihs_cyc_time_frac", false);
+    ap.addOption("ihs_max_iterations", false);
 
     ap.parse(argc, argv);
-    for ( string opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
+    for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
         clog << "Option " << opt << " is not provided, but is mandatory!" << endl;
     }
-    for ( string opt : ap.required_options ) assert( ap.hasProvidedOption(opt) );
+    for ( const string& opt : ap.required_options ) assert( ap.hasProvidedOption(opt) );
 
-    ap.findAndAssign("alg", "int", (int*)&cnf.alg);
+    string alg;
+    ap.findAndAssign("alg", "string", &alg);
+    if ( alg == "ihs" ) cnf.alg = IHS; if ( alg == "hs" ) cnf.alg = HS;
+    if ( alg == "mtz" ) cnf.alg = MTZ; if (alg == "diverses") cnf.alg = DIVERSES;
     cnf.setParametersForAlgorithm();
 
     ap.findAndAssign("mtd", "string", &cnf.metadata_filepath);
     ap.findAndAssign("threads", "int", &cnf.threads);
-    ap.findAndAssign("time", "int", &cnf.metadata_filepath);
+    ap.findAndAssign("time", "int", &cnf.max_time_sec);
     ap.findAndAssign("iter_time", "int", &cnf.ihs_single_iteration_sec);
     ap.findAndAssign("cycle_enumeration", "int", &cnf.unhit_cycle_enumeration_type);
     ap.findAndAssign("find_optimal", "bool", &cnf.find_optimal_result);
     ap.findAndAssign("log_cpsat_progress", "bool", &cnf.log_cpsat_search_progress);
-    ap.findAndAssign("ihs_cyc_time_frac", "double", &cnf.max_time_fraction_for_ihs_cycles_in_mtz);
+    ap.findAndAssign("ihs_cyc_time_frac", "int", &cnf.ihs_iterations_in_mtz);
+    ap.findAndAssign("ihs_max_iterations", "int", &cnf.ihs_max_iterations);
 
 
     return cnf;
@@ -169,39 +174,46 @@ void testAlgorithms(VVI & V, ExpConfig cnf) {
 
         //******************************
 
-        sw.start("IHS-1");
-        auto exp_data_ihs1 = CpsatExp1::solveIHS(V, cnf, 1);
-        sw.stop("IHS-1");
-
-        //******************************
-
-        sw.start("IHS-2");
-        auto exp_data_ihs2 = CpsatExp1::solveIHS(V, cnf, 2);
-        sw.stop("IHS-2");
-
-        //******************************
-
         sw.start("HS1");
         auto exp_data_hs1 = CpsatExp1::solveHS1(V, cnf);
         sw.stop("HS1");
+        ENDL(5); ENDLS(50,"*");
 
         //******************************
 
-        sw.start("mtz-1");
+        sw.start("IHS-1");
+        cnf.unhit_cycle_enumeration_type = 1;
+        auto exp_data_ihs1 = CpsatExp1::solveIHS(V, cnf);
+        sw.stop("IHS-1");
+        ENDL(5); ENDLS(50,"*");
+
+        //******************************
+
+        // sw.start("IHS-2");
+        // cnf.unhit_cycle_enumeration_type = 2;
+        // auto exp_data_ihs2 = CpsatExp1::solveIHS(V, cnf);
+        // sw.stop("IHS-2");
+
+        //******************************
+
+        sw.start("mtz-0");
         auto exp_data_mtz_0 = CpsatExp1::solveMTZ(V, cnf, 0);
-        sw.stop("mtz-1");
+        sw.stop("mtz-0");
+        ENDL(5); ENDLS(50,"*");
 
         //******************************
 
         sw.start("mtz-1");
         auto exp_data_mtz_1 = CpsatExp1::solveMTZ(V, cnf, 1);
         sw.stop("mtz-1");
+        ENDL(5); ENDLS(50,"*");
 
         //******************************
 
         sw.start("mtz-2");
         auto exp_data_mtz_2 = CpsatExp1::solveMTZ(V, cnf, 2);
         sw.stop("mtz-2");
+        ENDL(5); ENDLS(50,"*");
 
         //******************************
 
@@ -221,14 +233,29 @@ void testAlgorithms(VVI & V, ExpConfig cnf) {
         sw.start("ex-hs");
         auto exp_data_exhs = CpsatExp1::solveHS1(V,cnf);
         sw.stop("ex-hs");
+        ENDL(5); ENDLS(50,"*");
 
         sw.start("ex-ihs-1");
-        auto exp_data_exihs1 = CpsatExp1::solveIHS(V,cnf,1);
+        cnf.unhit_cycle_enumeration_type = 1;
+        auto exp_data_exihs1 = CpsatExp1::solveIHS(V,cnf);
         sw.stop("ex-ihs-1");
+        ENDL(5); ENDLS(50,"*");
 
-        sw.start("ex-ihs-1");
-        auto exp_data_exihs2 = CpsatExp1::solveIHS(V,cnf,2);
-        sw.stop("ex-ihs-1");
+        // sw.start("ex-ihs-2");
+        // cnf.unhit_cycle_enumeration_type = 2;
+        // auto exp_data_exihs2 = CpsatExp1::solveIHS(V,cnf);
+        // sw.stop("ex-ihs-2");
+        // ENDL(5); ENDLS(50,"*");
+
+        sw.start("ex-mtz-1");
+        auto exp_data_mtz1 = CpsatExp1::solveMTZ(V,cnf);
+        sw.stop("ex-mtz-1");
+        ENDL(5); ENDLS(50,"*");
+
+        sw.start("ex-mtz-2");
+        auto exp_data_mtz2 = CpsatExp1::solveMTZ(V,cnf);
+        sw.stop("ex-mtz-2");
+        ENDL(5); ENDLS(50,"*");
 
         //******************************
 
@@ -240,11 +267,9 @@ int main(int argc, char** argv){
     MemoryUtils::increaseStack();
 
     auto cnf = parseArguments(argc, argv);
-
+    cnf.writeConfig();
 
     VVI V = GraphReader::readGraphStandardEdges(cin,true);
-    int N = V.size();
-
 
     DEBUG(V.size());
     DEBUG(GraphUtils::countEdges(V,true));
@@ -253,8 +278,8 @@ int main(int argc, char** argv){
 
 
 
-    ofstream f(cnf.metadata_filepath);
-    exp_data.write(f);
+    // ofstream f(cnf.metadata_filepath);
+    // exp_data.write(f);
 
 
     return 0;

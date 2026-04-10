@@ -12,12 +12,12 @@ namespace GraphReader{
         int N,M;
         cin >> N >> M;
         VVI V(N);
+        clog << "Reading graph edges as 0-indexed" << endl;
         for(int i=0; i<M; i++){
             int a,b;
             cin >> a >> b;
 
-            clog << "CATUION - changed readGraphStandardEdges()" << endl;
-            a++, b++; // #TEST!!
+            a++, b++;
 
             V[a-1].push_back(b-1);
             if( !directed ) V[b-1].push_back(a-1);
