@@ -34,6 +34,7 @@ string parseAlgorithm(int alg)  {
 vector<pair<string, string>> ExpConfig::getConfigEntries() {
     vector<pair<string, string>> entries;
     entries.emplace_back("metadata_filepath",metadata_filepath);
+    entries.emplace_back("alg",parseAlgorithm(alg));
     entries.emplace_back("threads",to_string(threads));
     entries.emplace_back("max_time_sec",to_string(max_time_sec));
     entries.emplace_back("ihs_single_iteration_sec",to_string(ihs_single_iteration_sec));

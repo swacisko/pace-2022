@@ -140,9 +140,12 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
 
     auto solveHS = [&](auto & cycles, VI unhit_cycles_hs) -> VI {
         int F = ( Utils::isFVS(V,prev_res) ? 5 : 1 );
-        int time = min( 1000.0 * F * cnf.ihs_single_iteration_sec, timer.getLimit(timer_option) - timer.getTime(timer_option) );
+        int time = ceil(min( 1000.0 * F * cnf.ihs_single_iteration_sec, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
         time = max(time,1);
         SatParameters params = getDefaultSatParameters(cnf, time);
+        if (!cnf.find_optimal_result) clog << "\t running cpsat solver with time limit of " << time << " sec." << endl;
+        else clog << "\t running cpsat solver without time limit, looking for optimal result" << endl;
+
         Model solver_model;
         solver_model.Add(NewSatParameters(params));
 
@@ -264,10 +267,10 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         cycles += new_cycles;
 
         int F = ( Utils::isFVS(V,prev_res) ? 5 : 1 );
-        int time = min( 1000.0 * F * cnf.ihs_single_iteration_sec, timer.getLimit(timer_option) - timer.getTime(timer_option) );
+        int time = ceil(min( 1000.0 * F * cnf.ihs_single_iteration_sec, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
         time = max(time,1);
         SatParameters params = getDefaultSatParameters(cnf, time);
-        if (!cnf.find_optimal_result) clog << "\t running cpsat solver with time limit of " << cnf.ihs_single_iteration_sec << " sec." << endl;
+        if (!cnf.find_optimal_result) clog << "\t running cpsat solver with time limit of " << time << " sec." << endl;
         else clog << "\t running cpsat solver without time limit, looking for optimal result" << endl;
 
         Model solver_model;

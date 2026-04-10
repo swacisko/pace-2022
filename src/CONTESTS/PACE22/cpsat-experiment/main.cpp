@@ -8,6 +8,9 @@
 #include "GraphUtils.h"
 #include "MemoryUtils.h"
 #include "Stopwatch.h"
+#include "ortools/base/version.h"
+
+
 
 ExpConfig parseArguments(int argc, char ** argv) {
     ExpConfig cnf{};
@@ -146,6 +149,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
 
     string alg;
     ap.findAndAssign("alg", "string", &alg);
+    std::transform(alg.begin(), alg.end(), alg.begin(), [](unsigned char c){ return std::tolower(c); });
     if ( alg == "ihs" ) cnf.alg = IHS; if ( alg == "hs" ) cnf.alg = HS;
     if ( alg == "mtz" ) cnf.alg = MTZ; if (alg == "diverses") cnf.alg = DIVERSES;
     cnf.setParametersForAlgorithm();
@@ -262,9 +266,16 @@ void testAlgorithms(VVI & V, ExpConfig cnf) {
     }
 }
 
+void checkORToolsAndCpsatVersion() {
+    // clog << "operations_research::OrToolsMajorVersion(): " << operations_research::OrToolsMajorVersion() << endl;
+    // clog << "operations_research::OrToolsMinorVersion(): " << operations_research::OrToolsMinorVersion() << endl;
+    // clog << "operations_research::OrToolsPatchVersion(): " << operations_research::OrToolsPatchVersion() << endl;
+    clog << "operations_research::OrToolsVersionString(): " << operations_research::OrToolsVersionString() << endl;
+}
 
 int main(int argc, char** argv){
     MemoryUtils::increaseStack();
+    checkORToolsAndCpsatVersion();
 
     auto cnf = parseArguments(argc, argv);
     cnf.writeConfig();
@@ -274,7 +285,9 @@ int main(int argc, char** argv){
     DEBUG(V.size());
     DEBUG(GraphUtils::countEdges(V,true));
 
-    testAlgorithms(V,cnf);
+    auto exp_data = CpsatExp1::solveHS(V,cnf);
+
+    // testAlgorithms(V,cnf);
 
 
 

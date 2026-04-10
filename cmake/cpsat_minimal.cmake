@@ -7,13 +7,27 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ---- Download prebuilt OR-Tools (C++ package) ----
+#if(WIN32)
+#  set(ORTOOLS_URL
+#    "https://github.com/google/or-tools/releases/download/v9.12/or-tools_x64_VisualStudio2022_cpp_v9.12.4544.zip"
+#  )
+#elseif(UNIX AND NOT APPLE)
+#  set(ORTOOLS_URL
+#    "https://github.com/google/or-tools/releases/download/v9.12/or-tools_amd64_ubuntu-22.04_cpp_v9.12.4544.tar.gz"
+#  )
+#else()
+#  message(FATAL_ERROR "Unsupported platform")
+#endif()
+set(ORTOOLS_VERSION "v9.15")
+set(ORTOOLS_BUILD   "v9.15.6755")
+
 if(WIN32)
   set(ORTOOLS_URL
-    "https://github.com/google/or-tools/releases/download/v9.12/or-tools_x64_VisualStudio2022_cpp_v9.12.4544.zip"
+    "https://github.com/google/or-tools/releases/download/${ORTOOLS_VERSION}/or-tools_x64_VisualStudio2022_cpp_${ORTOOLS_BUILD}.zip"
   )
 elseif(UNIX AND NOT APPLE)
   set(ORTOOLS_URL
-    "https://github.com/google/or-tools/releases/download/v9.12/or-tools_amd64_ubuntu-22.04_cpp_v9.12.4544.tar.gz"
+    "https://github.com/google/or-tools/releases/download/${ORTOOLS_VERSION}/or-tools_amd64_ubuntu-22.04_cpp_${ORTOOLS_BUILD}.tar.gz"
   )
 else()
   message(FATAL_ERROR "Unsupported platform")
