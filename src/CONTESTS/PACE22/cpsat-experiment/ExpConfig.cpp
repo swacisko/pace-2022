@@ -45,6 +45,8 @@ vector<pair<string, string>> ExpConfig::getConfigEntries() {
     entries.emplace_back("max_cycles_for_hs",to_string(max_cycles_for_hs));
     entries.emplace_back("log_cpsat_search_progress",to_string(log_cpsat_search_progress));
     entries.emplace_back("ihs_max_iterations",to_string(ihs_max_iterations));
+    entries.emplace_back("next_sol_max_dst_from_init_sol",to_string(next_sol_max_dst_from_init_sol));
+    entries.emplace_back("use_init_sol_as_hint_mode",to_string(use_init_sol_as_hint_mode));
 
     return entries;
 }

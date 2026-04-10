@@ -140,6 +140,8 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("log_cpsat_progress", false);
     ap.addOption("ihs_cyc_time_frac", false);
     ap.addOption("ihs_max_iterations", false);
+    ap.addOption("next_sol_max_dst_from_init_sol", false);
+    ap.addOption("use_init_sol_as_hint_mode", false);
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -163,6 +165,8 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("log_cpsat_progress", "bool", &cnf.log_cpsat_search_progress);
     ap.findAndAssign("ihs_cyc_time_frac", "int", &cnf.ihs_iterations_in_mtz);
     ap.findAndAssign("ihs_max_iterations", "int", &cnf.ihs_max_iterations);
+    ap.findAndAssign("next_sol_max_dst_from_init_sol", "int", &cnf.next_sol_max_dst_from_init_sol);
+    ap.findAndAssign("use_init_sol_as_hint_mode", "int", &cnf.use_init_sol_as_hint_mode);
 
 
     return cnf;
@@ -281,11 +285,13 @@ int main(int argc, char** argv){
     cnf.writeConfig();
 
     VVI V = GraphReader::readGraphStandardEdges(cin,true);
+    assert(GraphUtils::isSimple(V));
 
     DEBUG(V.size());
     DEBUG(GraphUtils::countEdges(V,true));
 
     auto exp_data = CpsatExp1::solveHS(V,cnf);
+    // auto exp_data = CpsatExp1::solve(V,cnf);
 
     // testAlgorithms(V,cnf);
 

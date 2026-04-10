@@ -21,6 +21,7 @@ SatParameters getDefaultSatParameters(ExpConfig cnf, int time_in_sec) {
     return params;
 }
 
+
 VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis, int enumeration_option) {
     if (enumeration_option == 1) {
         VVI H = V;
@@ -65,6 +66,82 @@ void CpsatExp1::addCycleConstraints(CpModelBuilder &model, VVI & cycles, vector<
         for ( int d : c ) cyc_vars.push_back(nodes[d]);
         model.AddAtLeastOne(cyc_vars);
     }
+}
+
+void CpsatExp1::addInitialSolutionHint(CpModelBuilder &model, vector<BoolVar> &nodes, VI &init_sol, VI &prev_res, ExpConfig cnf) {
+    int N = nodes.size();
+    VB in_init_sol = StandardUtils::toVB(N,init_sol);
+    if (cnf.use_init_sol_as_hint_mode == 0) for(int i=0; i<N; i++) model.AddHint(nodes[i],in_init_sol[i]);
+    if (cnf.use_init_sol_as_hint_mode == 1) for(int i=0; i<N; i++) if (in_init_sol[i]) model.AddHint(nodes[i],1);
+    if (cnf.use_init_sol_as_hint_mode == 2) for(int d : prev_res) model.AddHint(nodes[d],1);
+}
+
+void CpsatExp1::addMaxHammingDstConstraint(CpModelBuilder &model, vector<BoolVar> &nodes, VI &init_sol, ExpConfig cnf) {
+    int N = nodes.size();
+    VB in_init_sol = StandardUtils::toVB(N,init_sol);
+    if (cnf.find_optimal_result) {
+        clog << endl << "#CAUTION!!! Using next_sol_max_dst_from_init_sol, but trying to find optimal solution!"
+             << " Optimality might not be preserved!" << endl;
+    }
+    LinearExpr hamming_dist;
+    for (int i = 0; i < N; ++i) {
+        hamming_dist += in_init_sol[i] ? (1 - nodes[i]) : nodes[i];
+    }
+    model.AddLessOrEqual(hamming_dist, cnf.next_sol_max_dst_from_init_sol);
+}
+
+VI CpsatExp1::rerunModelUntilFeasibleOrTle(CpModelProto &model_proto, vector<BoolVar> &nodes,
+    CpSolverResponse & response, Stopwatch & timer, string timer_option, int init_time, ExpConfig cnf) {
+
+    while(response.status() == CpSolverStatus::UNKNOWN && !timer.tle(timer_option)) {
+        init_time = ceil(min( 3000.0 * init_time, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
+        clog << "Response status unknown, increasing max_time_per_iter to " << init_time << endl;
+
+        SatParameters params = getDefaultSatParameters(cnf, init_time);
+        Model solv_model;
+        solv_model.Add(NewSatParameters(params));
+        response = SolveCpModel(model_proto, &solv_model);
+    }
+
+    int N = nodes.size();
+    if (response.status() == CpSolverStatus::OPTIMAL || response.status() == CpSolverStatus::FEASIBLE) {
+        VI res;
+        for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
+        return res;
+    }
+
+    return {};
+}
+
+VI CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &prev_res, VI &init_sol, Stopwatch &timer,
+    string timer_option, ExpConfig cnf) {
+
+    int N = V.size();
+    int F = ( Utils::isFVS(V,prev_res) ? 5 : 1 );
+    int time = ceil(min( 1000.0 * F * cnf.ihs_single_iteration_sec, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
+    time = max(time,1);
+    SatParameters params = getDefaultSatParameters(cnf, time);
+    if (!cnf.find_optimal_result) clog << "\t running cpsat solver with time limit of " << time << " sec." << endl;
+    else clog << "\t running cpsat solver without time limit, looking for optimal result" << endl;
+
+    Model solver_model;
+    solver_model.Add(NewSatParameters(params));
+
+    CpModelBuilder model;
+    vector<BoolVar> nodes;
+    for (int i=0; i<N; i++) nodes.push_back(model.NewBoolVar());
+    addCycleConstraints(model,cycles,nodes);
+
+    addInitialSolutionHint(model,nodes,init_sol,prev_res, cnf);
+    assert( isHS(cycles, init_sol) );
+
+    if (cnf.next_sol_max_dst_from_init_sol != inf && !prev_res.empty()) addMaxHammingDstConstraint(model,nodes,init_sol,cnf);
+
+    model.Minimize(LinearExpr::Sum(nodes));
+    auto model_proto = model.Build();
+    CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
+
+    return rerunModelUntilFeasibleOrTle( model_proto,nodes, response,timer, timer_option,time,cnf );
 }
 
 VI CpsatExp1::getUnhitCyclesHSGreedy(VVI &cycles) {
@@ -125,7 +202,7 @@ bool CpsatExp1::isHS(VVI &cycles, VI &S) {
 }
 
 ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
-     clog << "Solving using CpsatExp1::solveHS1" << endl;
+     clog << "Solving using CpsatExp1::solveHS" << endl;
     cnf.writeConfig();
 
     ExpData exp_data;
@@ -155,16 +232,34 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
         addCycleConstraints(model,cycles,nodes);
 
         VI init_sol = prev_res +  unhit_cycles_hs;
-        VB in_init_sol = StandardUtils::toVB(N,init_sol);
-        for(int i=0; i<N; i++) model.AddHint(nodes[i],in_init_sol[i]);
+        addInitialSolutionHint(model,nodes,init_sol,prev_res, cnf);
         assert( isHS(cycles, init_sol) );
 
-        model.Minimize(LinearExpr::Sum(nodes));
-        CpSolverResponse response = SolveCpModel(model.Build(), &solver_model);
+        if (cnf.next_sol_max_dst_from_init_sol != inf && !prev_res.empty()) addMaxHammingDstConstraint(model,nodes,init_sol,cnf);
 
-        VI res;
-        for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
-        return res;
+        model.Minimize(LinearExpr::Sum(nodes));
+        auto model_proto = model.Build();
+        // CpSolverResponse response = SolveCpModel(model.Build(), &solver_model);
+        CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
+
+        // while(response.status() == CpSolverStatus::UNKNOWN && !timer.tle(timer_option)) {
+        //     time = ceil(min( 3000.0 * time, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
+        //     clog << "Response status unknown, increasing max_time_per_iter to " << time << endl;
+        //
+        //     params.set_max_time_in_seconds(time);
+        //     Model solv_model;
+        //     solv_model.Add(NewSatParameters(params));
+        //     response = SolveCpModel(model_proto, &solv_model);
+        // }
+        //
+        // if (response.status() == CpSolverStatus::OPTIMAL || response.status() == CpSolverStatus::FEASIBLE) {
+        //     VI res;
+        //     for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
+        //     return res;
+        // }
+        // return {};
+
+        return rerunModelUntilFeasibleOrTle( model_proto,nodes, response,timer, timer_option,time,cnf );
     };
 
     constexpr int max_l = inf;
@@ -190,10 +285,17 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
         clog << "\t there are " << cycles.size() << " such cycles, found in time: " << s.getTime("cycles") / 1000 << endl;
         if (cycles.size() > cnf.max_cycles_for_hs) break;
 
+        {
+            int all_arcs = GraphUtils::countEdges(V,true);
+            set<PII> zb;
+            for( auto & cyc : cycles ) for( int j=cyc.size()-1, i=0; i < cyc.size(); j = i++ ) zb.insert( {cyc[j], cyc[i]} );
+            int arcs = zb.size();
+            clog << "\t arcs in constraints: " << arcs << " / " << all_arcs << endl;
+        }
 
         s.start("hs_greedy");
         VVI new_cycles;
-        for (auto & cyc : cycles) if (cyc.size() == L) new_cycles.push_back(cyc);
+        for (auto & cyc : cycles) if ( L <= 3 || cyc.size() == L) new_cycles.push_back(cyc);
         VI unhit_cycles_hs = getUnhitCyclesHSGreedy(new_cycles);
         assert( isHS(new_cycles, unhit_cycles_hs) );
         s.stop("hs_greedy");
@@ -285,31 +387,38 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
             model.AddAtLeastOne(cyc_vars);
         }
 
-        VI init_sol = prev_res +  unhit_cycles_hs;
-        assert( isHS(cycles, init_sol) );
-        VB in_init_sol = StandardUtils::toVB(N,init_sol);
-        for(int i=0; i<N; i++) model.AddHint(nodes[i],in_init_sol[i]);
+        // this theoretically is bounding the solution from below, but it apparently can hurt performance...
+        // if(cnf.find_optimal_result && !prev_res.empty()) model.AddGreaterOrEqual(LinearExpr::Sum(nodes), (int)prev_res.size());
 
-        if(cnf.find_optimal_result && !prev_res.empty()) model.AddGreaterOrEqual(LinearExpr::Sum(nodes), (int)prev_res.size());
+        VI init_sol = prev_res +  unhit_cycles_hs;
+        addInitialSolutionHint(model,nodes,init_sol,prev_res, cnf);
+        assert( isHS(cycles, init_sol) );
+
+        if (cnf.next_sol_max_dst_from_init_sol != inf && !prev_res.empty()) addMaxHammingDstConstraint(model,nodes,init_sol,cnf);
 
         model.Minimize(LinearExpr::Sum(nodes));
-        CpSolverResponse response = SolveCpModel(model.Build(), &solver_model);
+        auto model_proto = model.Build();
+        CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
 
-        F = 2;
-        while(response.status() == UNKNOWN) {
-            clog << "Response status unknown, increasing max_time_per_iter to " << F * cnf.ihs_single_iteration_sec << endl;
+        // while(response.status() == UNKNOWN && !timer.tle(timer_option)) {
+        //     time = ceil(min( 3000.0 * time, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
+        //     clog << "Response status unknown, increasing max_time_per_iter to " << time << endl;
+        //
+        //     params.set_max_time_in_seconds(time);
+        //     Model solv_model;
+        //     solv_model.Add(NewSatParameters(params));
+        //     response = SolveCpModel(model_proto, &solv_model);
+        // }
+        //
+        // if (response.status() == CpSolverStatus::OPTIMAL || response.status() == CpSolverStatus::FEASIBLE) {
+        //     VI res;
+        //     for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
+        //     return res;
+        // }
+        //
+        // return {};
 
-            params.set_max_time_in_seconds(F * cnf.ihs_single_iteration_sec);
-            Model solv_model;
-            solv_model.Add(NewSatParameters(params));
-            F *= 2;
-            response = SolveCpModel(model.Build(), &solv_model);
-        }
-
-
-        VI res;
-        for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
-        return res;
+        return rerunModelUntilFeasibleOrTle( model_proto,nodes, response,timer, timer_option,time,cnf );
     };
 
 
@@ -334,11 +443,13 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,500*cnf.ihs_single_iteration_sec, cycle_enumeration_type );
         s.stop("cycles");
 
-        int all_arcs = GraphUtils::countEdges(V,true);
-        set<PII> zb;
-        for( auto & cyc : cycles ) for( int j=cyc.size()-1, i=0; i < cyc.size(); j = i++ ) zb.insert( {cyc[j], cyc[i]} );
-        int arcs = zb.size();
-        clog << "\t arcs in constraints: " << arcs << " / " << all_arcs << endl;
+        {
+            int all_arcs = GraphUtils::countEdges(V,true);
+            set<PII> zb;
+            for( auto & cyc : cycles ) for( int j=cyc.size()-1, i=0; i < cyc.size(); j = i++ ) zb.insert( {cyc[j], cyc[i]} );
+            int arcs = zb.size();
+            clog << "\t arcs in constraints: " << arcs << " / " << all_arcs << endl;
+        }
 
 
         // we cannot add more than MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size() new cycles in each iteration
@@ -474,7 +585,7 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
 
     if(!init_sol.empty()) {
         in_init_sol = StandardUtils::toVB(N,init_sol);
-        for( int i=0; i<N; i++ ) model.AddHint(nodes[i], in_init_sol[i]);
+        addInitialSolutionHint(model,nodes,init_sol,init_sol,cnf); // here we intentionally add init_sol instead of prev_res
 
         // now toposort to create initial ranks values
         VI topo, deg(N,0);
@@ -534,3 +645,5 @@ ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
 
     return ExpData{};
 }
+
+

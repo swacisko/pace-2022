@@ -37,6 +37,20 @@ public:
     int ihs_max_iterations = inf;
 
     /**
+     * If set to some value ofther than inf, then an additional constraint will be added to the solvers.
+     * For an initial solution, the next, improved solution can differ at most by [next_sol_max_dst_from_init_sol]
+     * from the initial one. This might help speed up search by making it more local.
+     */
+    int next_sol_max_dst_from_init_sol = inf;
+
+    /**
+     * 0 - hint values for all N variables
+     * 1 - hint values only for variables of nodes that are in init_sol
+     * 2 - hint values only for variables of nodes that are in prev_res
+     */
+    int use_init_sol_as_hint_mode = 1;
+
+    /**
      * Value can be 1 or 2, since there are only two options.
      * 1 - standard version used in DiVerSeS
      * 2 - takes random directed tree, then for each arc that would close a cycles, considers this cycle and makes it
