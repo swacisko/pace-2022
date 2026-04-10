@@ -7,6 +7,7 @@
 #include <filesystem>
 #include "omp.h"
 #include "Stopwatch.h"
+#include <ranges>
 
 TestGenerator::TestGenerator(string name, int random_test_count) {
     task_name =  name;
@@ -39,12 +40,20 @@ void TestGenerator::generate() {
     fs::create_directory(test_dir + sep + "input" );
     fs::create_directory(test_dir + sep + "output" );
 
-    input_files_to_rename.resize(hardcoded_test_count + random_test_count, "");
-    for ( auto &[i,v] : views::enumerate(input_files_to_rename) ) filename_mapper[i] = v;
 
     saveHardcodedTests();
+    input_files_to_rename.resize(hardcoded_test_count + random_test_count, "");
     generateRandomTests();
     generateExemplarySolutions();
+
+    for( int id=hardcoded_test_count; id<hardcoded_test_count+random_test_count; id++ ) {
+        string old_input_filename = getInputFileName(id);
+        string old_output_filename = getOutputFileName(id);
+        filename_mapper[id] = input_files_to_rename[id];
+        string new_input_filename = getInputFileName(id);
+        string new_output_filename = getOutputFileName(id);
+        fs::rename(old_input_filename, new_input_filename);
+    }
 }
 
 string TestGenerator::convert_test_id(int id) {

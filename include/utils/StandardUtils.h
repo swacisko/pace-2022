@@ -7,6 +7,9 @@
 
 #include "Makros.h"
 #include "RandomNumberGenerators.h"
+#include "../../src/CONTESTS/PACE22/cpsat-experiment/IntGenerator.h"
+
+class IntGenerator;
 
 namespace StandardUtils{
 
@@ -56,6 +59,14 @@ namespace StandardUtils{
 
         for( int i=(int)V.size()-1; i>=0; i-- ){
             int ind = unif(rnd) % (i+1);
+            if( ind != i ) swap( V[i], V[ind] );
+        }
+    }
+
+    template<class _T>
+    void shuffle( vector<_T> & V, IntGenerator& rnd ){
+        for( int i=(int)V.size()-1; i>=0; i-- ){
+            int ind = rnd.nextInt(i+1);
             if( ind != i ) swap( V[i], V[ind] );
         }
     }

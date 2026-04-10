@@ -1,13 +1,12 @@
 cmake_minimum_required(VERSION 3.27)
 project(DiVerSeS)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 #SET(CMAKE_CXX_FLAGS "-std=c++17 -O0") # profiling
-#SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG -std=c++17 -Wreturn-type -O0") # debugging
-
+#SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG -Wreturn-type -fsanitize=address -O0") # debugging
 SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O3 -march=native")
 
 
@@ -72,6 +71,9 @@ file(GLOB SOURCES
         src/CONTESTS/PACE22/Reducer.cpp
         src/CONTESTS/PACE22/exact/DFVSSolverE.cpp
         src/CONTESTS/PACE22/exact/CliqueCoverLS.cpp
+
+        src/CONTESTS/PACE22/cpsat-experiment/IntGenerator.h
+        src/CONTESTS/PACE22/cpsat-experiment/IntGenerator.cpp
         )
 
 

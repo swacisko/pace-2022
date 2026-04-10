@@ -8,7 +8,7 @@
 #include "Makros.h"
 #include "TestGenerator.h"
 
-class InstancesGenerator : TestGenerator {
+class InstancesGenerator : public TestGenerator {
 public:
     InstancesGenerator(string name, int random_test_count) : TestGenerator(name, random_test_count) {}
 
