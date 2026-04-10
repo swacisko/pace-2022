@@ -175,7 +175,7 @@ void testAlgorithms(VVI & V, ExpConfig cnf) {
         //******************************
 
         sw.start("HS1");
-        auto exp_data_hs1 = CpsatExp1::solveHS1(V, cnf);
+        auto exp_data_hs1 = CpsatExp1::solveHS(V, cnf);
         sw.stop("HS1");
         ENDL(5); ENDLS(50,"*");
 
@@ -231,7 +231,7 @@ void testAlgorithms(VVI & V, ExpConfig cnf) {
         //******************************
 
         sw.start("ex-hs");
-        auto exp_data_exhs = CpsatExp1::solveHS1(V,cnf);
+        auto exp_data_exhs = CpsatExp1::solveHS(V,cnf);
         sw.stop("ex-hs");
         ENDL(5); ENDLS(50,"*");
 

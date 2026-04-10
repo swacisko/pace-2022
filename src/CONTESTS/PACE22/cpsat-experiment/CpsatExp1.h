@@ -85,7 +85,7 @@ public:
      * For each cycle length L, starting from 1, considers all cycles of length <= L, then finds HS of those cycles.
      * If the found HS is not a FVS of V, then increases L and repeats.
      */
-    static ExpData solveHS1(VVI V, ExpConfig cnf);
+    static ExpData solveHS(VVI V, ExpConfig cnf);
 
     /**
    * Iterative HS.
