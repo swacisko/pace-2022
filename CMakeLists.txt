@@ -98,4 +98,5 @@ add_executable(CpsatExp1 ${SOURCES}
         src/CONTESTS/PACE22/cpsat-experiment/CpsatExp1.cpp
         src/CONTESTS/PACE22/cpsat-experiment/CpsatExp1.h
 )
-target_link_libraries( CpsatExp1 stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX ortools::ortools)
+target_link_libraries( CpsatExp1 stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX)
+#target_link_libraries( CpsatExp1 stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX ortools::ortools)

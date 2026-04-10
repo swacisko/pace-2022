@@ -48,7 +48,7 @@ public:
      * 1 - hint values only for variables of nodes that are in init_sol
      * 2 - hint values only for variables of nodes that are in prev_res
      */
-    int use_init_sol_as_hint_mode = 1;
+    int use_init_sol_as_hint_mode = 2;
 
     /**
      * Value can be 1 or 2, since there are only two options.

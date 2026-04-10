@@ -8,7 +8,7 @@
 #include "GraphUtils.h"
 #include "MemoryUtils.h"
 #include "Stopwatch.h"
-#include "ortools/base/version.h"
+// #include "ortools/base/version.h"
 
 
 
@@ -270,16 +270,16 @@ void testAlgorithms(VVI & V, ExpConfig cnf) {
     }
 }
 
-void checkORToolsAndCpsatVersion() {
-    // clog << "operations_research::OrToolsMajorVersion(): " << operations_research::OrToolsMajorVersion() << endl;
-    // clog << "operations_research::OrToolsMinorVersion(): " << operations_research::OrToolsMinorVersion() << endl;
-    // clog << "operations_research::OrToolsPatchVersion(): " << operations_research::OrToolsPatchVersion() << endl;
-    clog << "operations_research::OrToolsVersionString(): " << operations_research::OrToolsVersionString() << endl;
-}
+// void checkORToolsAndCpsatVersion() {
+//     // clog << "operations_research::OrToolsMajorVersion(): " << operations_research::OrToolsMajorVersion() << endl;
+//     // clog << "operations_research::OrToolsMinorVersion(): " << operations_research::OrToolsMinorVersion() << endl;
+//     // clog << "operations_research::OrToolsPatchVersion(): " << operations_research::OrToolsPatchVersion() << endl;
+//     clog << "operations_research::OrToolsVersionString(): " << operations_research::OrToolsVersionString() << endl;
+// }
 
 int main(int argc, char** argv){
     MemoryUtils::increaseStack();
-    checkORToolsAndCpsatVersion();
+    // checkORToolsAndCpsatVersion();
 
     auto cnf = parseArguments(argc, argv);
     cnf.writeConfig();
@@ -290,8 +290,8 @@ int main(int argc, char** argv){
     DEBUG(V.size());
     DEBUG(GraphUtils::countEdges(V,true));
 
-    auto exp_data = CpsatExp1::solveHS(V,cnf);
-    // auto exp_data = CpsatExp1::solve(V,cnf);
+    // auto exp_data = CpsatExp1::solveHS(V,cnf);
+    auto exp_data = CpsatExp1::solve(V,cnf);
 
     // testAlgorithms(V,cnf);
 
