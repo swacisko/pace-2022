@@ -1452,6 +1452,7 @@ namespace Utils{
 
 
         for( int v : A) {
+            if(getMillisFromStart() > millis) break;
             in_V[v] = true;
 
             { // here we check if there exists a cycle of length 2

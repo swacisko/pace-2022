@@ -13,10 +13,11 @@ void InstancesGenerator::createHardcodedTests() {
 }
 
 vector<string> classes = {"er", "torus", "cyclic"};
-VI Ns = {5'000, 10'000, 20'000, 40'000};
-VD avg_outdegs = {2.5, 5, 10, 20};
-// VI Ns = {10'000, 20'000, 40'000};
-// VD avg_outdegs = {2.5,5,10};
+// VI Ns = {5'000, 10'000, 20'000, 40'000};
+// VD avg_outdegs = {2.5, 5, 10, 20};
+VI Ns = {250, 500, 1'000};
+// VD avg_outdegs = {3, 5, 10};
+VD avg_outdegs = {2, 3, 5, 10, 15, 20, 30};
 
 // int A = Ns.size() * avg_outdegs.size(); // 12 instances altogether
 // int B = Ns.size() * avg_outdegs.size(); // 12 instances - no need for the 'super dense' one, neighborhood sizes: 4, 4+8=12, 4+8+12=24, 4+8+12+16=40, 4+8+12+16+20 = 60
@@ -59,7 +60,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
 
     if (class_name == "torus") {
 
-        auto randomNeighborhoodClosure = [&](VVI& V, int D, int K){
+        auto randomNeighborhoodClosure = [&](VVI V, int D, int K){
             int N = V.size();
             VVI W(N);
             VB was(N);
@@ -97,6 +98,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
                 for(int d : neigh) assert(d != i);
                 StandardUtils::shuffle(neigh, rnd);
                 if ( neigh.size() > K ) neigh.resize(K);
+                assert( neigh.size() == K );
                 W[i] += neigh;
             }
 
@@ -147,7 +149,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         int columns = N / rows;
         V = getGridTorus(rows, columns);
         int max_distance = 5;
-        V = randomNeighborhoodClosure(V,max_distance,deg);
+        V = randomNeighborhoodClosure(V,max_distance,ceil(deg));
     }
 
     if (class_name == "cyclic") {
@@ -156,20 +158,31 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         IntGenerator rnd;
         StandardUtils::shuffle(perm,rnd);
         int offset = 0;
-        int window_size = sqrt(N);
+        int window_size = 2 * max(sqrt(N), deg);
         assert(window_size > deg);
         if (window_size < deg) window_size = deg;
 
         unordered_set<int> zb;
         for ( int i=0; i<N; i++ ) {
             zb.clear();
-            while ( zb.size() < deg ) zb.insert(rnd.nextInt(window_size));
+            while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size));
             for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+offset+d) % perm.size() ] );
         }
     }
 
+    N = V.size();
     assert( GraphUtils::isSimple(V) );
     VPII arcs = GraphUtils::getGraphEdges(V,true);
+    if (arcs.size() > deg * N ) {
+        StandardUtils::shuffle(arcs);
+        arcs.resize(deg * N);
+        sort(ALL(arcs));
+    }
+
+
+    // DEBUG(N); DEBUG(deg); DEBUG(arcs.size());
+    assert(arcs.size() == N*deg);
+
     int M = arcs.size();
     out_in << N << " " << M << "\n";
     for (auto [a,b] : arcs) out_in << a << " " << b << "\n";
@@ -184,7 +197,7 @@ int main() {
     cin.tie(0);
 
 
-    InstancesGenerator ig("dfvs-instances", total);
+    InstancesGenerator ig("dfvs-instances-small-full", total);
     ig.threads = 1;
     ig.generate();
 

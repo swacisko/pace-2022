@@ -51,6 +51,7 @@ public:
         map<int,int> cycles_of_length;
         int total_cycles = -1;
         int new_cycles_added = -1;
+        int new_cycles_found = -1;
         int time_since_start_millis = -1;
     };
 

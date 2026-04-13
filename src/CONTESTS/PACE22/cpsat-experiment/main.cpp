@@ -290,8 +290,8 @@ int main(int argc, char** argv){
     DEBUG(V.size());
     DEBUG(GraphUtils::countEdges(V,true));
 
-    auto exp_data = CpsatExp1::solveHS(V,cnf);
-    // auto exp_data = CpsatExp1::solveIHS(V,cnf);
+    // auto exp_data = CpsatExp1::solveHS(V,cnf);
+    auto exp_data = CpsatExp1::solveIHS(V,cnf);
     // auto exp_data = CpsatExp1::solveMTZ(V,cnf);
     // auto exp_data = CpsatExp1::solve(V,cnf);
 

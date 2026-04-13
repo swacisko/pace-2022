@@ -28,9 +28,136 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
         VVI revH = GraphUtils::reverseGraph(H);
         VB helper(V.size());
         Utils::removeNodes(H, revH, S, helper);
+        clog << "\t Looking for cycles for at most " << max_millis << " millis" << endl;
         return Utils::getAllSimpleCycles3(H,max_l, max_millis);
     }else {
-        assert(false && "not implemented yet");
+        auto indg = getUnhitGraph(V,S);
+        VVI H = indg.V;
+        int N = H.size();
+        vector<LL> hashes(N);
+        IntGenerator rnd;
+        for (int i=0; i<N; i++) hashes[i] = rnd.rand();
+        unordered_set<LL> cycle_hashes;
+
+        Stopwatch sw;
+        sw.setLimit("cycles",max_millis);
+        sw.start("cycles");
+
+        auto getCycles = [&](int v) -> VVI {
+            VB was(N);
+            VI par(N,-1);
+            VB on_path(N);
+            for (auto & vec : H) StandardUtils::shuffle(vec,rnd);
+            VVI cycles;
+
+            function<void(int)> dfs = [&](int num) {
+                was[num] = true;
+                on_path[num] = true;
+                for ( int d : H[num] ) {
+                    if ( was[d] && on_path[d] ) { // create a cycle
+                        VI cyc(1,num);
+                        int p = num;
+                        while (p != d) cyc.push_back(p = par[p]);
+                        reverse(ALL(cyc));
+                        cycles.push_back(cyc);
+                    }else if ( !was[d] ) {
+                        par[d] = num;
+                        dfs(d);
+                    }
+                }
+                on_path[num] = false;
+            };
+            dfs(v);
+
+            return cycles;
+        };
+
+        VI ind_on_cycle(N,-1);
+        VB temp(N);
+
+        auto makeChordless = [&](VI cyc)-> VI {
+            for (int i=0; i<cyc.size(); i++) ind_on_cycle[cyc[i]] = i;
+            int v = cyc[0];
+            VI res(1,v);
+            temp[v] = true;
+
+            while (true) {
+                int u = v;
+                for ( int d : H[u] ) if (ind_on_cycle[d] != -1 && ind_on_cycle[d] > ind_on_cycle[v] ) v = d;
+                res.push_back(v);
+                temp[v] = true;
+                int max_ind = -1;
+                u = -1;
+                for ( int d : H[v] ) if ( ind_on_cycle[d] != -1 && temp[d] && ind_on_cycle[d] < ind_on_cycle[v] && ind_on_cycle[d] > max_ind ) {
+                    max_ind = ind_on_cycle[d];
+                    u = d;
+                }
+                if (u != -1) {
+                    reverse(ALL(res));
+                    while (res.back() != u) res.pop_back();
+                    reverse(ALL(res));
+                    break;
+                }
+            }
+
+            for (int d : cyc) temp[d] = false;
+            for (int d : cyc) ind_on_cycle[d] = -1;
+
+            return res;
+        };
+
+        auto getHash = [&](VI cyc)-> LL {
+            LL h = 0;
+            for (int d : cyc) h ^= hashes[d];
+            return h;
+        };
+
+        auto isChordless = [&](VI cyc)-> bool {
+            bool chordless = true;
+            for (int i=0; i<cyc.size()-1; i++) ind_on_cycle[cyc[i]] = i;
+            for ( int v : cyc ) for (int d : H[v]) if (ind_on_cycle[d] != -1) {
+                if ( ind_on_cycle[d] > ind_on_cycle[v]+1 ) chordless = false;
+                if ( ind_on_cycle[d] < ind_on_cycle[v]-1 && (v != cyc.back() || ind_on_cycle[d] != 0) ) chordless = false;
+                if ( ind_on_cycle[d] == ind_on_cycle[v] - 1 && cyc.size() != 2 ) chordless = false;
+            }
+            for (int i=0; i<cyc.size()-1; i++) ind_on_cycle[cyc[i]] = -1;
+            return chordless;
+        };
+
+        VVI cycles;
+        VI perm(N); iota(ALL(perm),0);
+        StandardUtils::shuffle(perm,rnd);
+
+        for (int v : perm) {
+            if ( sw.tle("cycles") ) break;
+            clog << "Getting cycles for node v: " << v << endl;
+            auto new_cycles = getCycles(v);
+            int cycles_added = 0;
+            int new_chordless_cycles = 0;
+            double suml1 = 0, suml2 = 0;
+            for ( auto & cyc : new_cycles ) {
+                suml1 += cyc.size();
+                int l = cyc.size();
+                cyc = makeChordless(cyc);
+                new_chordless_cycles += ( l == cyc.size() );
+                assert(isChordless(cyc));
+                auto h = getHash(cyc);
+                if ( !cycle_hashes.contains(h) ) {
+                    cycle_hashes.insert(h);
+                    cycles.push_back(cyc);
+                    cycles_added++;
+                    suml2 += cyc.size();
+                }
+            }
+            if (!new_cycles.empty()) {
+                clog << "\t found " << new_cycles.size() << " new cycles of avg_length: " << suml1 / new_cycles.size()
+                     << " from which " << new_chordless_cycles << " were already chordless --> only added "
+                     << cycles_added << " new chordless cycles, with avg_length: " << suml2 / cycles_added << endl;
+            }
+        }
+
+        for (auto & cyc : cycles) indg.remapNodes(cyc);
+        return cycles;
     }
 }
 
@@ -121,8 +248,8 @@ VI CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &prev_res, VI &init_so
     int time = ceil(min( 1000.0 * F * cnf.ihs_single_iteration_sec, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
     time = max(time,1);
     SatParameters params = getDefaultSatParameters(cnf, time);
-    if (!cnf.find_optimal_result) clog << "\t running cpsat solver with time limit of " << time << " sec." << endl;
-    else clog << "\t running cpsat solver without time limit, looking for optimal result" << endl;
+    if (cnf.find_optimal_result) clog << "\t running cpsat solver without time limit, looking for optimal result" << endl;
+    else clog << "\t running cpsat solver with time limit of " << time << " sec." << endl;
 
     Model solver_model;
     solver_model.Add(NewSatParameters(params));
@@ -284,7 +411,8 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
         Stopwatch s;
 
         s.start("cycles");
-        auto cycles = Utils::getAllSimpleCycles3(V,L );
+        int millis = max(10.0,timer.getLimit(timer_option) - timer.getTime(timer_option));
+        auto cycles = Utils::getAllSimpleCycles3(V,L, millis );
         sort(ALL(cycles),[&](auto & c1, auto & c2){ return c1.size() < c2.size(); });
         s.stop("cycles");
         clog << "\t there are " << cycles.size() << " such cycles, found in time: " << s.getTime("cycles") / 1000 << endl;
@@ -337,6 +465,7 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
             exp_data.iterations.back().unhit_graph_sizes = getUnhitGraphSizes(V,sol);
             exp_data.iterations.back().cycles_of_length = cycles_of_length;
             exp_data.iterations.back().new_cycles_added = new_cycles.size();
+            exp_data.iterations.back().new_cycles_found = new_cycles.size();
         }
 
         if ( cnf.find_optimal_result && Utils::isFVS(V,sol) ) break;
@@ -458,7 +587,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         Stopwatch s;
 
         s.start("cycles");
-        VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,500*cnf.ihs_single_iteration_sec, cycle_enumeration_type );
+        VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,200*cnf.ihs_single_iteration_sec, cycle_enumeration_type );
         s.stop("cycles");
 
 
@@ -479,13 +608,20 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         // that length, we do not want that, we want to keep number of cycles used for constraints as small as possible
         // constexpr int MIN_NEW_CYCLES = 100;
         int MIN_NEW_CYCLES = sqrt(GraphUtils::countEdges(V,true));
-        if ( new_cycles.size() < MIN_NEW_CYCLES ) new_cycles.clear();
+        int I = exp_data.iterations.size();
+        if ( new_cycles.size() < MIN_NEW_CYCLES &&
+            ( exp_data.iterations.size() <= 3 || exp_data.iterations.back().new_cycles_found != exp_data.iterations[I-3].new_cycles_found )
+            ) new_cycles.clear();
 
-        // constexpr double MAX_NEW_CYCLES_PER_ITERATION_PERC = 0.1;
-        // if( L >= 5 && cycles.size() >= 100 && new_cycles.size() > MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size() ) {
-        //     StandardUtils::shuffle(new_cycles);
-        //     new_cycles.resize( MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size() );
-        // }
+        constexpr double MAX_NEW_CYCLES_PER_ITERATION_PERC = 1;
+        const int MAX_NEW_CYCLES = N * log(N);
+
+        bool cond1 = ( new_cycles.size() > MAX_NEW_CYCLES );
+        // bool cond2 = ( cycles.size() >= N && new_cycles.size() > MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size());
+        if( cond1 ) {
+            StandardUtils::shuffle(new_cycles);
+            new_cycles.resize( MAX_NEW_CYCLES );
+        }
 
         if( new_cycles.empty() && !Utils::isFVS(V,prev_res) ) {
             L++;
@@ -539,6 +675,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
             exp_data.iterations.back().unhit_graph_sizes = getUnhitGraphSizes(V,sol);
             exp_data.iterations.back().cycles_of_length = cycles_of_length;
             exp_data.iterations.back().new_cycles_added = cycles.size() - old_cycles;
+            exp_data.iterations.back().new_cycles_found = new_cycles.size();
         }
 
         prev_res = sol;

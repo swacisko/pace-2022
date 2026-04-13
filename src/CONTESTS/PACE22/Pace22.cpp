@@ -279,7 +279,7 @@ pair<string,VI> solveCPSAT3(VVI V, int total_time_seconds, int max_time_seconds_
         CpSolverResponse response = SolveCpModel(model.Build(), &solver_model);
         int F = 2;
         while(response.status() == UNKNOWN) {
-            clog << "Response status unknown, increasing max_time_per_iter to " << F*max_time_seconds_per_iter << endl;
+            // clog << "Response status unknown, increasing max_time_per_iter to " << F*max_time_seconds_per_iter << endl;
 
             params.set_max_time_in_seconds(F*max_time_seconds_per_iter);
             Model solver_model;
