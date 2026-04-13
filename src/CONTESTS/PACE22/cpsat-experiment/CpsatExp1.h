@@ -53,6 +53,8 @@ public:
         int new_cycles_added = -1;
         int new_cycles_found = -1;
         int time_since_start_millis = -1;
+        int iteration_time = -1;
+        int max_cycle_length = -1;
     };
 
     int N,M;
@@ -61,6 +63,8 @@ public:
 
     vector<IterationEntry> iterations;
     static bool foundValidResult(vector<IterationEntry> & entries);
+
+    vector<map<string,string>> getIterationEntries();
 
 };
 
@@ -118,9 +122,9 @@ public:
     static void addCycleConstraints(CpModelBuilder &model, VVI & cycles, vector<BoolVar> & nodes);
     static void addInitialSolutionHint(CpModelBuilder &model, vector<BoolVar> & nodes, VI & init_sol, VI &prev_res, ExpConfig cnf);
     static void addMaxHammingDstConstraint(CpModelBuilder &model, vector<BoolVar> & nodes, VI & init_sol, ExpConfig cnf);
-    static VI rerunModelUntilFeasibleOrTle(CpModelProto &proto, vector<BoolVar> & nodes, CpSolverResponse & response,
+    static pair<VI,CpSolverStatus> rerunModelUntilFeasibleOrTle(CpModelProto &proto, vector<BoolVar> & nodes, CpSolverResponse & response,
         Stopwatch & timer, string timer_option, int init_time, ExpConfig cnf);
-    static VI solveCpsatForCycles( VVI & V, VVI & cycles, VI &prev_res, VI & init_sol, Stopwatch & timer, string timer_option, ExpConfig cnf );
+    static pair<VI,CpSolverStatus> solveCpsatForCycles( VVI & V, VVI & cycles, VI &prev_res, VI & init_sol, Stopwatch & timer, string timer_option, ExpConfig cnf );
     static VI getUnhitCyclesHSGreedy(VVI & cycles);
     static bool isHS(VVI & cycles, VI & S);
 

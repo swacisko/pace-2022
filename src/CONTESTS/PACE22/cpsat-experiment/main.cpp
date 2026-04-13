@@ -142,6 +142,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("ihs_max_iterations", false);
     ap.addOption("next_sol_max_dst_from_init_sol", false);
     ap.addOption("use_init_sol_as_hint_mode", false);
+    ap.addOption("init_L", false);
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -167,6 +168,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("ihs_max_iterations", "int", &cnf.ihs_max_iterations);
     ap.findAndAssign("next_sol_max_dst_from_init_sol", "int", &cnf.next_sol_max_dst_from_init_sol);
     ap.findAndAssign("use_init_sol_as_hint_mode", "int", &cnf.use_init_sol_as_hint_mode);
+    ap.findAndAssign("init_L", "int", &cnf.init_L_for_all_constraints);
 
 
     return cnf;

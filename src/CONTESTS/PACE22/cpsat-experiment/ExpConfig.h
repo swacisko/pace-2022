@@ -88,6 +88,14 @@ public:
      */
     int max_cycles_for_hs = 1e7;
 
+    /**
+     * This is the value, for which all cycles of at most this length will be created as constraints.
+     */
+    int init_L_for_all_constraints = 3;
+
+    string max_new_cycles_iter_scale = "log";
+    int max_new_cycles_per_iter = inf;
+    int scaleIters(int N);
 
 
     vector<pair<string, string>> getConfigEntries();
