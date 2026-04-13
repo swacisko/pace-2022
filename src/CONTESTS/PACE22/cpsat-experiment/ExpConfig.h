@@ -95,16 +95,30 @@ public:
     /**
      *  Maximum number of cycles to create in HS method, so that we can terminate without exceeding memory limit.
      */
-    int max_cycles_for_hs = 1e7;
+    int max_cycles_for_hs = 5e6;
 
     /**
      * This is the value, for which all cycles of at most this length will be created as constraints.
      */
     int init_L_for_all_constraints = 4;
 
-    string max_new_cycles_iter_scale = "log";
+    string max_new_cycles_iter_scale = "sqrt"; // options: linear, log, sqrt, bounded, unbounded
     int max_new_cycles_per_iter = inf;
     int scaleIters(int N);
+
+
+    /**
+     * This number of pi-arcs will be added.
+     * For |A| * pi_arcs_perc_to_add randomly selected arcs, their reverse counterparts will be added to the graph.
+     */
+    double pi_arcs_perc_to_add = 0.0;
+
+    /**
+     * If true, then a hitting set S for a set of cycles that is not a FVS of the graph V will be filled to a valid FVS
+     * by adding to it a FVS of the graph V \ S, found by the Diverses solver, using basic reductions and
+     * sinkhorn-knopp algorithm.
+     */
+    bool fill_partial_result_using_greedy_fvs = true;
 
 
     vector<pair<string, string>> getConfigEntries();

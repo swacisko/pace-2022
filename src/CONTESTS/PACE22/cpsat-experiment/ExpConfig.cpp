@@ -36,7 +36,7 @@ int ExpConfig::scaleIters(int N) {
     if (max_new_cycles_iter_scale == "log") return N * ceil(log2(N));
     if (max_new_cycles_iter_scale == "sqrt") return N * sqrt(N);
     if ( max_new_cycles_iter_scale == "bounded" ) return max_new_cycles_per_iter;
-    if ( max_new_cycles_iter_scale == "unbounded" ) return inf;
+    if ( max_new_cycles_iter_scale == "unbounded" ) return inf; // take all
     assert(false && "invalid max_new_cycles_per_iter_scale");
     return -1;
 }
@@ -58,6 +58,10 @@ vector<pair<string, string>> ExpConfig::getConfigEntries() {
     entries.emplace_back("next_sol_max_dst_from_init_sol",to_string(next_sol_max_dst_from_init_sol));
     entries.emplace_back("use_init_sol_as_hint_mode",to_string(use_init_sol_as_hint_mode));
     entries.emplace_back("init_L_for_all_constraints",to_string(init_L_for_all_constraints));
+    entries.emplace_back("max_new_cycles_iter_scale",max_new_cycles_iter_scale);
+    entries.emplace_back("max_new_cycles_per_iter",to_string(max_new_cycles_per_iter));
+    entries.emplace_back("pi_arcs_perc_to_add",to_string(pi_arcs_perc_to_add));
+    entries.emplace_back("fill_partial_result_using_greedy_fvs",to_string(fill_partial_result_using_greedy_fvs));
 
     return entries;
 }

@@ -40,6 +40,7 @@ public:
         int res_size_before_impr = -1;
         int res_size_after_impr = -1;
         bool res_valid = false;
+        bool cycle_hs_valid_dfvs = false;
         bool improved_res = false;
         bool res_optimal = false;
 
@@ -47,7 +48,8 @@ public:
         int unhit_cycle_enumeration_time_millis = -1;
         int hs_greedy_time = -1;
         PII unhit_graph_sizes = {-1,-1};
-        int unhit_graph_dfvs_size = -1;
+        int unhit_graph_greedy_dfvs_size = 0;
+        int unhit_graph_greedy_dfvs_time = -1;
         map<int,int> cycles_of_length;
         int total_cycles = -1;
         int new_cycles_added = -1;
@@ -89,6 +91,7 @@ public:
      */
     static InducedGraph getUnhitGraph(VVI & V, VI & S);
     static PII getUnhitGraphSizes(VVI & V, VI & S);
+    static VI getUnhitGraphGreedyFVS(VVI & V, VI & S);
 
     /**
      * Iterative Hitting-Set approach - the most straightforward type.

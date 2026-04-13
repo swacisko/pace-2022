@@ -7,7 +7,9 @@
 #include "GraphReader.h"
 #include "GraphUtils.h"
 #include "MemoryUtils.h"
+#include "StandardUtils.h"
 #include "Stopwatch.h"
+#include "CONTESTS/PACE22/Utils.h"
 // #include "ortools/base/version.h"
 
 
@@ -145,6 +147,8 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("init_L", false);
     ap.addOption("mtz_auxiliary_cycles_mode", false);
     ap.addOption("max_new_cycles_iter_scale", false);
+    ap.addOption("pi_arcs_perc_to_add", false);
+    ap.addOption("fill_partial_result_using_greedy_fvs", false);
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -173,6 +177,8 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("init_L", "int", &cnf.init_L_for_all_constraints);
     ap.findAndAssign("mtz_auxiliary_cycles_mode", "int", &cnf.mtz_auxiliary_cycles_mode);
     ap.findAndAssign("max_new_cycles_iter_scale", "string", &cnf.max_new_cycles_iter_scale);
+    ap.findAndAssign("pi_arcs_perc_to_add", "double", &cnf.pi_arcs_perc_to_add);
+    ap.findAndAssign("fill_partial_result_using_greedy_fvs", "bool", &cnf.fill_partial_result_using_greedy_fvs);
 
 
     return cnf;
@@ -293,13 +299,27 @@ int main(int argc, char** argv){
     VVI V = GraphReader::readGraphStandardEdges(cin,true);
     assert(GraphUtils::isSimple(V));
 
+    if (cnf.pi_arcs_perc_to_add > 0) {
+        auto arcs = GraphUtils::getGraphEdges(V,true);
+        StandardUtils::shuffle(arcs);
+        int P = cnf.pi_arcs_perc_to_add * arcs.size() / 2;
+        int A = arcs.size();
+        for (int i=0; i<P; i++) arcs.emplace_back( arcs[i].second, arcs[i].first );
+        StandardUtils::makeUnique(arcs);
+        arcs.resize(A);
+        V = GraphUtils::getGraphForEdges(arcs, true);
+    }
+
     DEBUG(V.size());
     DEBUG(GraphUtils::countEdges(V,true));
+    DEBUG( Utils::countPiEdges(V) );
+    DEBUG( 1.0 * Utils::countPiEdges(V) / GraphUtils::countEdges(V,true) );
 
     // auto exp_data = CpsatExp1::solveHS(V,cnf);
     // auto exp_data = CpsatExp1::solveIHS(V,cnf);
     // auto exp_data = CpsatExp1::solveMTZ(V,cnf);
     auto exp_data = CpsatExp1::solve(V,cnf);
+    DEBUG(exp_data.iterations.size());
 
     // testAlgorithms(V,cnf);
 

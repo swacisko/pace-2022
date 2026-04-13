@@ -470,7 +470,7 @@ VI DFVSSolverH::solveByAgentFlow(VVI V) {
             res += dfvs_red;
 
             E = GraphUtils::countEdges(V,true);
-            DEBUG(res.size());
+            // DEBUG(res.size());
         }
 
         if(E == 0) break;
