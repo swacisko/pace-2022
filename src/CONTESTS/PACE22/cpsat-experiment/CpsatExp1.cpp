@@ -804,8 +804,11 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         prev_res = sol;
         old_cycles = cycles.size();
+        if (full_sol.size() < best_fvs.size() || best_fvs.empty()) {
+            best_fvs = full_sol;
+        }
 
-        clog << "\t found sol.size(): " << sol.size() << ", best_fvs.size(): " << best_fvs.size()
+        clog << "\t found sol.size(): " << sol.size() << ", full_sol.size(): " << full_sol.size() << ", best_fvs.size(): " << best_fvs.size()
              << ", while best_fvs.size(): " << best_fvs.size() << endl;
 
         if ( response_status == CpSolverStatus::OPTIMAL && Utils::isFVS(V,sol) ) break;
