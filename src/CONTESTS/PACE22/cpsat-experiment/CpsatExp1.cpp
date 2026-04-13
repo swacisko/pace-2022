@@ -286,7 +286,7 @@ pair<VI,CpSolverStatus> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &
     string timer_option, ExpConfig cnf) {
 
     int N = V.size();
-    int F = ( Utils::isFVS(V,prev_res) ? 3 : 1 );
+    int F = ( Utils::isFVS(V,prev_res) ? 2 : 1 );
     int time = ceil(min( 1000.0 * F * cnf.ihs_single_iteration_sec, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
     time = max(time,1);
     SatParameters params = getDefaultSatParameters(cnf, time);
@@ -678,7 +678,9 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
     ExpData exp_data;
 
     Stopwatch timer;
-    timer.start("solveMTZ");
+    string timer_option = "solveMTZ";
+    timer.setLimit(timer_option, cnf.find_optimal_result ? inf : cnf.max_time_sec * 1000);
+    timer.start(timer_option);
 
     int N = V.size();
     int MAX_RANK_VALUE = min(1ll*inf,1ll*(N+2)*(int)sqrt(N));
@@ -702,20 +704,28 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
         model.AddBoolOr( {nodes[a], nodes[b], cond_var} );
     }
 
+    VVI augmented_cycles;
+
     if (auxiliary_cycles_mode == 1){ // here we add all pi-edges or triangles to make the propagation faster
-        int L0 = 3;
+        int L0 = cnf.init_L_for_all_constraints;
         auto cyc = Utils::getAllSimpleCycles3(V,L0);
         sort(ALL(cyc),[&](auto & c1, auto & c2){ return c1.size() < c2.size(); });
         clog << "\t adding " << cyc.size() << " constraints for all simple cycles of length <= " << L0 << endl;
         addCycleConstraints(model,cyc,nodes);
+        augmented_cycles = cyc;
+        clog << "\t augmenting MTZ model with " << augmented_cycles.size() << " cycle constraints" << endl;
     }else if (auxiliary_cycles_mode == 2) {
         auto new_cnf = cnf;
         new_cnf.ihs_max_iterations = cnf.ihs_iterations_in_mtz;
+        new_cnf.max_time_sec = 0.2 * ( timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000;
+        if (cnf.find_optimal_result ) cnf.max_time_sec = 30;
         VVI cycles;
         VI res;
         auto r = solveIHS(V,new_cnf,cycles, res);
         addCycleConstraints(model,cycles,nodes);
         init_sol = res;
+        augmented_cycles = cycles;
+        clog << "\t augmenting MTZ model with " << augmented_cycles.size() << " cycle constraints obtained using IHS" << endl;
     }
 
     if(!init_sol.empty()) {
@@ -736,7 +746,10 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
         for(int i=0; i<topo.size(); i++) model.AddHint( ranks[topo[i]], (i+1)*sqrt(N) );
     }
 
-    SatParameters params = getDefaultSatParameters(cnf, cnf.max_time_sec);
+    clog << "\t Starting to solve MTZ model" << endl;
+
+    int time_sec_left = ( timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000;
+    SatParameters params = getDefaultSatParameters(cnf, time_sec_left);
     Model solver_model;
     solver_model.Add(NewSatParameters(params));
 
@@ -757,9 +770,22 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
         for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
     }
 
+    {
+        map<int,int> cycles_of_length;
+        for (auto & cyc : augmented_cycles) cycles_of_length[cyc.size()]++;
+
+        exp_data.iterations.emplace_back();
+        exp_data.iterations.back().res_size_after_impr = res.size();
+        exp_data.iterations.back().res_valid = Utils::isFVS(V,res);
+        exp_data.iterations.back().res_optimal = (response.status() == OPTIMAL);
+        exp_data.iterations.back().time_since_start_millis = timer.getTime(timer_option);
+        exp_data.iterations.back().total_cycles = augmented_cycles.size();
+        exp_data.iterations.back().cycles_of_length = cycles_of_length;
+    }
+
     clog << "\t final solution size: " << exp_data.iterations.back().res_size_after_impr << endl;
-    timer.stop("solveMTZ");
-    timer.write("solveMTZ");
+    timer.stop(timer_option);
+    timer.write(timer_option);
 
     return exp_data;
 }
@@ -775,7 +801,7 @@ ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
     auto alg = cnf.alg;
     if (alg == Algorithm::HS) return solveHS(V,cnf);
     if (alg == Algorithm::IHS) return solveIHS(V,cnf);
-    if (alg == Algorithm::MTZ) return solveMTZ(V,cnf);
+    if (alg == Algorithm::MTZ) return solveMTZ(V,cnf, cnf.mtz_auxiliary_cycles_mode);
     if (alg == Algorithm::DIVERSES) return solveDiVerSeS(V,cnf);
 
     return ExpData{};

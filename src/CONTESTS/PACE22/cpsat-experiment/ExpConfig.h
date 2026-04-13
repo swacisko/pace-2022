@@ -84,6 +84,14 @@ public:
     int ihs_iterations_in_mtz = inf;
 
     /**
+     * Option used to create auxiliary cycles for MTZ formulation.
+     * 0 - no auxiliary cycles
+     * 1 - all chordless cycles with length up to  [init_L_for_all_constraints]
+     * 2 - cycles found by IHS method run for at most 20% of total time and at most [ihs_max_iterations] iterations.
+     */
+    int mtz_auxiliary_cycles_mode = 2;
+
+    /**
      *  Maximum number of cycles to create in HS method, so that we can terminate without exceeding memory limit.
      */
     int max_cycles_for_hs = 1e7;
@@ -91,7 +99,7 @@ public:
     /**
      * This is the value, for which all cycles of at most this length will be created as constraints.
      */
-    int init_L_for_all_constraints = 3;
+    int init_L_for_all_constraints = 4;
 
     string max_new_cycles_iter_scale = "log";
     int max_new_cycles_per_iter = inf;

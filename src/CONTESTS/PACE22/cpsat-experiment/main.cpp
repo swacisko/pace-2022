@@ -143,6 +143,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("next_sol_max_dst_from_init_sol", false);
     ap.addOption("use_init_sol_as_hint_mode", false);
     ap.addOption("init_L", false);
+    ap.addOption("mtz_auxiliary_cycles_mode", false);
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -169,6 +170,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("next_sol_max_dst_from_init_sol", "int", &cnf.next_sol_max_dst_from_init_sol);
     ap.findAndAssign("use_init_sol_as_hint_mode", "int", &cnf.use_init_sol_as_hint_mode);
     ap.findAndAssign("init_L", "int", &cnf.init_L_for_all_constraints);
+    ap.findAndAssign("mtz_auxiliary_cycles_mode", "int", &cnf.mtz_auxiliary_cycles_mode);
 
 
     return cnf;
@@ -293,9 +295,9 @@ int main(int argc, char** argv){
     DEBUG(GraphUtils::countEdges(V,true));
 
     // auto exp_data = CpsatExp1::solveHS(V,cnf);
-    auto exp_data = CpsatExp1::solveIHS(V,cnf);
+    // auto exp_data = CpsatExp1::solveIHS(V,cnf);
     // auto exp_data = CpsatExp1::solveMTZ(V,cnf);
-    // auto exp_data = CpsatExp1::solve(V,cnf);
+    auto exp_data = CpsatExp1::solve(V,cnf);
 
     // testAlgorithms(V,cnf);
 
