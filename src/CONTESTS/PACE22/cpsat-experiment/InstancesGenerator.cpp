@@ -16,11 +16,11 @@ vector<string> classes = {"er", "torus", "cyclic"};
 // VI Ns = {5'000, 10'000, 20'000, 40'000};
 // VD avg_outdegs = {2.5, 5, 10, 20};
 
-// VI Ns = {250, 500, 1'000, 2'000};
-// VD avg_outdegs = {3, 5, 10, 20};
+VI Ns = {250, 500, 1'000};
+VD avg_outdegs = {3, 5, 10, 20};
 
-VI Ns = {500};
-VD avg_outdegs = {10};
+// VI Ns = {500};
+// VD avg_outdegs = {10};
 
 // int A = Ns.size() * avg_outdegs.size(); // 12 instances altogether
 // int B = Ns.size() * avg_outdegs.size(); // 12 instances - no need for the 'super dense' one, neighborhood sizes: 4, 4+8=12, 4+8+12=24, 4+8+12+16=40, 4+8+12+16+20 = 60
@@ -200,8 +200,8 @@ int main() {
     cin.tie(0);
 
 
-    // InstancesGenerator ig("dfvs-instances-small-334", total);
-    InstancesGenerator ig("dfvs-instances-representatives-small", total);
+    InstancesGenerator ig("dfvs-instances-small-334", total);
+    // InstancesGenerator ig("dfvs-instances-representatives-small", total);
     ig.threads = 1;
     ig.generate();
 

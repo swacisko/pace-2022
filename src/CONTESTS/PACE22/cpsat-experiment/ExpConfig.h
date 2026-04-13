@@ -27,8 +27,8 @@ public:
      */
     void setParametersForAlgorithm();
 
-    int max_time_sec = 10 * 60; // ten minutes default runtime
-    int ihs_single_iteration_sec = 3;
+    int max_time_sec = 15 * 60; // ten minutes default runtime
+    int ihs_single_iteration_sec = 1;
 
     /**
      * This number of iterations will be done in IHS, until it terminates.

@@ -346,7 +346,7 @@ pair<VI,CpSolverStatus> CpsatExp1::rerunModelUntilFeasibleOrTle(CpModelProto &mo
 }
 
 pair<VI,CpSolverStatus> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &prev_res, VI &init_sol, Stopwatch &timer,
-    string timer_option, ExpConfig cnf) {
+    string timer_option, ExpConfig& cnf) {
 
     int N = V.size();
     int F = ( Utils::isFVS(V,prev_res) ? 2 : 1 );
@@ -372,6 +372,7 @@ pair<VI,CpSolverStatus> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &
     model.Minimize(LinearExpr::Sum(nodes));
     auto model_proto = model.Build();
     CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
+    if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
 
     return rerunModelUntilFeasibleOrTle( model_proto,nodes, response,timer, timer_option,time,cnf );
 }
@@ -596,6 +597,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
     int L = cnf.init_L_for_all_constraints;
     int iters_done = 0;
     int old_cycles = 0;
+    int iters_without_new_cycles = 0;
 
     while(true) {
         if(timer.tle(timer_option)) break;
@@ -618,7 +620,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         s.start("cycles");
         int cycle_enumeration_type = cnf.unhit_cycle_enumeration_type;
-        if ( cycle_enumeration_type == 3 && (iters_done % 2 == 0) ) cycle_enumeration_type = 1; // take every second iteration
+        if ( cycle_enumeration_type == 3 && (iters_done % 2 == 0) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time
         VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,200*cnf.ihs_single_iteration_sec, cycle_enumeration_type );
         s.stop("cycles");
 
@@ -641,9 +643,13 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         // constexpr int MIN_NEW_CYCLES = 100;
         int MIN_NEW_CYCLES = sqrt(GraphUtils::countEdges(V,true));
         int I = exp_data.iterations.size();
-        if ( new_cycles.size() < MIN_NEW_CYCLES &&
-            ( exp_data.iterations.size() <= 3 || exp_data.iterations.back().new_cycles_found != exp_data.iterations[I-3].new_cycles_found )
-            ) new_cycles.clear();
+        // if ( new_cycles.size() < MIN_NEW_CYCLES &&
+        //     ( exp_data.iterations.size() <= 3 || exp_data.iterations.back().new_cycles_found != exp_data.iterations[I-3].new_cycles_found )
+        //     ) new_cycles.clear();
+        if (new_cycles.size() < MIN_NEW_CYCLES && iters_without_new_cycles >= 2 ) {
+            new_cycles.clear();
+            iters_without_new_cycles++;
+        }
 
         // constexpr double MAX_NEW_CYCLES_PER_ITERATION_PERC = 1;
         // bool cond2 = ( cycles.size() >= N && new_cycles.size() > MAX_NEW_CYCLES_PER_ITERATION_PERC * cycles.size());
@@ -672,6 +678,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
             exp_data.iterations.pop_back();
             continue;
         }
+
+        iters_without_new_cycles = 0;
 
         clog << "\t adding " << new_cycles.size() << " new cycles to cycles, cycles.size(): " << cycles.size() << endl;
 
