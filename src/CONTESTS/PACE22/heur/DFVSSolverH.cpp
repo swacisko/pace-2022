@@ -398,6 +398,7 @@ VI DFVSSolverH::solveForBiconnectedGraph(VVI V, bool allow_improvements_here, co
             dfvsH = Utils::getUpperBoundByVCOnSuperPIGraph(V, 3'000);
         }else{
             dfvsH = solver.solveByAgentFlowAllWithinDistance(V, 2); // original
+            assert(Utils::isFVS(V, dfvsH));
         }
     }
 
@@ -405,7 +406,11 @@ VI DFVSSolverH::solveForBiconnectedGraph(VVI V, bool allow_improvements_here, co
 
     if(cnf.write_logs) clog << "Main elapsed seconds: " << cnf.sw.getTime() / 1'000 << endl;
 
-    assert(Utils::isFVS(V, dfvsH));
+    if(!Utils::isFVS(V, dfvsH)) {
+        // here we can fill dfvsH to a valid FVS
+        clog << "There is a bug somewhere... complete this to fill dfvsH to a valid FVS if it is not..." << endl;
+        assert(Utils::isFVS(V, dfvsH));
+    }
     if(cnf.write_logs) DEBUG(dfvsH.size());
 
     if( dfvs.empty() || dfvsH.size() < dfvs.size()) dfvs = dfvsH;
