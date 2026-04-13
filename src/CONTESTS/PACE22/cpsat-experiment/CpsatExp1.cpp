@@ -8,6 +8,7 @@
 #include "StandardUtils.h"
 #include "Stopwatch.h"
 #include "CONTESTS/PACE22/Utils.h"
+#include "CONTESTS/PACE22/heur/DFVSSolverH.h"
 #include "ortools/sat/cp_model.h"
 #include "scc/StronglyConnectedComponents.h"
 using namespace operations_research::sat;
@@ -28,34 +29,39 @@ bool ExpData::foundValidResult(vector<IterationEntry> &entries) {
     });
 }
 
-#define ADD_ENTRY(x) entries.back().emplace(#x,to_string(x))
+// #define ADD_ENTRY(x) entries.back().emplace(#x,to_string(x))
+// #define ADD_ENTRY(x) entries.back().emplace(#x,to_string("I".x))
+#define ADD_ENTRY(x,y) entries.back().emplace(#y,to_string(x.y))
 
 vector<map<string, string>> ExpData::getIterationEntries() {
     vector<map<string,string>> entries;
 
     for (int i=1; i<iterations.size(); i++) {
-        const auto & I = iterations[i];
+        entries.emplace_back();
+        const auto & I = iterations[i-1];
+
         entries.back().emplace("iteration_id",to_string(i));
-        ADD_ENTRY(iterations[i].res_size_before_impr);
-        ADD_ENTRY(iterations[i].res_size_after_impr);
-        ADD_ENTRY(iterations[i].res_valid);
-        ADD_ENTRY(iterations[i].improved_res);
-        ADD_ENTRY(iterations[i].res_optimal);
-        ADD_ENTRY(iterations[i].distinct_arcs_in_all_cycles);
-        ADD_ENTRY(iterations[i].unhit_cycle_enumeration_time_millis);
-        ADD_ENTRY(iterations[i].hs_greedy_time);
+        ADD_ENTRY(I,res_size_before_impr);
+        ADD_ENTRY(I,res_size_after_impr);
+        ADD_ENTRY(I,res_valid);
+        ADD_ENTRY(I,improved_res);
+        ADD_ENTRY(I,res_optimal);
+        ADD_ENTRY(I,distinct_arcs_in_all_cycles);
+        ADD_ENTRY(I,unhit_cycle_enumeration_time_millis);
+        ADD_ENTRY(I,hs_greedy_time);
         entries.back().emplace("unhit_graph_sizes", to_string(I.unhit_graph_sizes.first) + " " + to_string(I.unhit_graph_sizes.second));
-        ADD_ENTRY(iterations[i].unhit_graph_dfvs_size);
-        ADD_ENTRY(iterations[i].total_cycles);
-        ADD_ENTRY(iterations[i].new_cycles_added);
-        ADD_ENTRY(iterations[i].new_cycles_found);
-        ADD_ENTRY(iterations[i].time_since_start_millis);
-        ADD_ENTRY(iterations[i].iteration_time);
-        ADD_ENTRY(iterations[i].max_cycle_length);
+        ADD_ENTRY(I,unhit_graph_dfvs_size);
+        ADD_ENTRY(I,total_cycles);
+        ADD_ENTRY(I,new_cycles_added);
+        ADD_ENTRY(I,new_cycles_found);
+        ADD_ENTRY(I,time_since_start_millis);
+        ADD_ENTRY(I,iteration_time);
+        ADD_ENTRY(I,max_cycle_length);
+        ADD_ENTRY(I,best_result_so_far);
 
         string str;
         for (auto [k,v] : I.cycles_of_length) {
-            str += "(" + to_string(k) + "," + to_string(v) + ") ";
+            str += "(" + to_string(k) + "->" + to_string(v) + ") ";
         }
         entries.back().emplace("cycles_of_length", str);
     }
@@ -63,22 +69,76 @@ vector<map<string, string>> ExpData::getIterationEntries() {
     return entries;
 }
 
+void ExpData::updateBestResultSoFar() {
+    iterations[0].best_result_so_far = (iterations[0].res_valid ? iterations[0].res_size_after_impr : 0);
+    for (auto & I : iterations) I.best_result_so_far = inf;
+    for ( int i=1; i<iterations.size(); i++ ) {
+        auto & I0 = iterations[i-1];
+        auto & I1 = iterations[i];
+        if ( I1.res_valid ) I1.best_result_so_far = I1.res_size_after_impr;
+        I1.best_result_so_far = min(I1.best_result_so_far, I0.best_result_so_far);
+    }
+    for ( auto & I : iterations ) if ( I.best_result_so_far == inf ) I.best_result_so_far = 0;
+}
+
+void ExpData::writeToFile(string filename) {
+    ofstream str(filename);
+
+    auto entries = getIterationEntries();
+    using VS = vector<string>;
+    VS header;
+    for ( auto s : views::keys(entries[0]) ) header.push_back(s);
+    for ( int i=0; i<header.size(); i++ ) if ( header[i] == "iteration_id" ) {
+        swap(header[0], header[i]);
+        sort(header.begin()+1, header.end());
+        break;
+    }
+
+    for (auto [i,s] : views::enumerate(header)) str << (i > 0 ? "," : "") << s;
+    str << "\n";
+
+    for ( auto & I : entries ) {
+        for (const auto & [i,key] : header | views::enumerate) {
+            if (i > 0) str << ",";
+            str << I[key];
+        }
+        str << "\n";
+    }
+
+    str.close();
+}
+
 VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis, int enumeration_option) {
     clog << "\t Looking for cycles for at most " << max_millis << " millis" << endl;
+    VVI all_cycles;
 
-    if (enumeration_option == 1) {
+    if (enumeration_option == 3) max_millis /= 2;
+
+    if (enumeration_option == 1 || enumeration_option == 3) {
         VVI H = V;
         VVI revH = GraphUtils::reverseGraph(H);
         VB helper(V.size());
         Utils::removeNodes(H, revH, S, helper);
-        return Utils::getAllSimpleCycles3(H,max_l, max_millis);
-    }else {
+        auto cycles = Utils::getAllSimpleCycles3(H,max_l, max_millis);
+        if (enumeration_option == 1) return cycles;
+        all_cycles += cycles;
+    }
+
+    int N = V.size();
+    vector<LL> hashes(N);
+    IntGenerator rnd;
+    for (int i=0; i<N; i++) hashes[i] = rnd.rand();
+    auto getHash = [&](VI cyc)-> LL {
+        LL h = 0;
+        for (int d : cyc) h ^= hashes[d];
+        return h;
+    };
+
+    if (enumeration_option == 2 || enumeration_option == 3){
         auto indg = getUnhitGraph(V,S);
         VVI H = indg.V;
         int N = H.size();
-        vector<LL> hashes(N);
-        IntGenerator rnd;
-        for (int i=0; i<N; i++) hashes[i] = rnd.rand();
+
         unordered_set<LL> cycle_hashes;
 
         Stopwatch sw;
@@ -148,11 +208,6 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
             return res;
         };
 
-        auto getHash = [&](VI cyc)-> LL {
-            LL h = 0;
-            for (int d : cyc) h ^= hashes[d];
-            return h;
-        };
 
         auto isChordless = [&](VI cyc)-> bool {
             bool chordless = true;
@@ -199,8 +254,16 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
         }
 
         for (auto & cyc : cycles) indg.remapNodes(cyc);
-        return cycles;
+        if ( enumeration_option == 2 ) return cycles;
+        all_cycles += cycles;
     }
+
+    map<LL,VI> unique_cycles;
+    for ( auto cyc : all_cycles ) unique_cycles[getHash(cyc)] = cyc;
+    VVI res;
+    for( auto & cyc : views::values(unique_cycles) ) res.push_back(cyc);
+    clog << "\t\t there are " << res.size() << " unique cycles, out of " << all_cycles.size() << " all cycles" << endl;
+    return res;
 }
 
 InducedGraph CpsatExp1::getUnhitGraph(VVI &V, VI &S) {
@@ -399,9 +462,9 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
             break;
         }
 
-        exp_data.iterations.emplace_back();
-        exp_data.iterations.back().res_size_before_impr = prev_res.size();
-        exp_data.iterations.back().max_cycle_length = L;
+        // exp_data.iterations.emplace_back();
+        // exp_data.iterations.back().res_size_before_impr = prev_res.size();
+        // exp_data.iterations.back().max_cycle_length = L;
 
         clog << endl << "Considering cycles of length <= " << L << ", time: " << timer.getTime(timer_option) / 1000 << endl;
 
@@ -456,6 +519,10 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
         s.stop("iteration");
 
         {
+            exp_data.iterations.emplace_back();
+            exp_data.iterations.back().res_size_before_impr = prev_res.size();
+            exp_data.iterations.back().max_cycle_length = L;
+
             set<PII> arcs;
             for (auto & cyc : cycles) for ( int i=0, j=(int)cyc.size()-1; i < cyc.size(); j = i++ ) arcs.insert( {cyc[j],cyc[i]});
 
@@ -486,7 +553,7 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
         clog << "\t found sol.size(): " << sol.size() << ", but it is not a FVS, increasing cycle length" << endl;
     }
 
-    clog << "\t final solution size: " << exp_data.iterations.back().res_size_after_impr << endl;
+    // clog << "\t final solution size: " << exp_data.iterations.back().res_size_after_impr << endl;
     timer.stop(timer_option);
     timer.write(timer_option);
 
@@ -503,7 +570,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
     clog << "Solving using CpsatExp1::solveIHS" << endl;
     cnf.writeConfig();
 
-    int cycle_enumeration_type = cnf.unhit_cycle_enumeration_type;
+
     ExpData exp_data;
 
     int N = V.size();
@@ -534,6 +601,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         if(timer.tle(timer_option)) break;
         if (iters_done++ > cnf.ihs_max_iterations) break;
 
+        if (cycles.size() > cnf.max_cycles_for_hs) break;
+
         clog << endl << "Looking for new cycles, iter #" << iters_done << ", L: " << L << ", cycles.size(): "
              << cycles.size()
              << ", prev_res.size(): " << prev_res.size() << ", best_fvs.size(): " << best_fvs.size()
@@ -548,6 +617,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         s.start("iteration");
 
         s.start("cycles");
+        int cycle_enumeration_type = cnf.unhit_cycle_enumeration_type;
+        if ( cycle_enumeration_type == 3 && (iters_done % 2 == 0) ) cycle_enumeration_type = 1; // take every second iteration
         VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,200*cnf.ihs_single_iteration_sec, cycle_enumeration_type );
         s.stop("cycles");
 
@@ -581,16 +652,24 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         const int MAX_NEW_CYCLES = cnf.scaleIters(N);
 
         bool cond1 = ( new_cycles.size() > MAX_NEW_CYCLES );
-        if( ( cnf.unhit_cycle_enumeration_type == 2 || L > cnf.init_L_for_all_constraints) &&
+        if( ( cnf.unhit_cycle_enumeration_type >= 2 || L > cnf.init_L_for_all_constraints) &&
             cond1
             ) {
             StandardUtils::shuffle(new_cycles);
-            new_cycles.resize( MAX_NEW_CYCLES );
+            sort(ALL(new_cycles),[&](auto & c1, auto & c2){ return c1.size() < c2.size(); });
+            if ( L == cnf.init_L_for_all_constraints ) {
+                int p = 0;
+                while ( p < new_cycles.size() && new_cycles[p].size() <= L ) p++;
+                new_cycles.resize( max(p,MAX_NEW_CYCLES) );
+            }else {
+                new_cycles.resize( MAX_NEW_CYCLES );
+            }
         }
 
         if( new_cycles.empty() && !Utils::isFVS(V,prev_res) ) {
             L++;
             clog << endl << "---> INCREASING LENGTH, L: " << L << endl << endl;
+            exp_data.iterations.pop_back();
             continue;
         }
 
@@ -618,15 +697,14 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
                 assert( best_fvs.size() == sol.size() );
                 break;
             }else {
-                cnf.ihs_single_iteration_sec *= 2;
+                cnf.ihs_single_iteration_sec++;
                 clog << endl << "--> Found a valid FVS, increasing max_time_seconds_per_iter to " << cnf.ihs_single_iteration_sec << " sec." << endl << endl;
             }
         }
 
         s.stop("iteration");
 
-
-        {
+        auto addStats = [&]() {
             set<PII> arcs;
             for (auto & cyc : cycles) for ( int i=0, j=(int)cyc.size()-1; i < cyc.size(); j = i++ ) arcs.insert( {cyc[j],cyc[i]});
 
@@ -648,7 +726,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
             exp_data.iterations.back().new_cycles_added = cycles.size() - old_cycles;
             exp_data.iterations.back().new_cycles_found = new_cycles.size();
             exp_data.iterations.back().iteration_time = s.getTime("iteration");
-        }
+        };
+        addStats();
 
         prev_res = sol;
         old_cycles = cycles.size();
@@ -666,7 +745,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
     if (!best_fvs.empty()) res = best_fvs;
     else res = prev_res;
 
-    clog << "\t final solution size: " << exp_data.iterations.back().res_size_after_impr << endl;
+    // clog << "\t final solution size: " << exp_data.iterations.back().res_size_after_impr << endl;
 
     return exp_data;
 }
@@ -783,7 +862,7 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
         exp_data.iterations.back().cycles_of_length = cycles_of_length;
     }
 
-    clog << "\t final solution size: " << exp_data.iterations.back().res_size_after_impr << endl;
+    // clog << "\t final solution size: " << exp_data.iterations.back().res_size_after_impr << endl;
     timer.stop(timer_option);
     timer.write(timer_option);
 
@@ -792,7 +871,16 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
 
 ExpData CpsatExp1::solveDiVerSeS(VVI V, ExpConfig cnf) {
     ExpData exp_data;
-    assert(false && "not implemented");
+    Config diverses_cnf;
+    diverses_cnf.sw.setLimit("main", cnf.max_time_sec * 1000);
+    diverses_cnf.sw.start("main");
+    diverses_cnf.disableAllNonbasicReductions();
+    DFVSSolverH sh(diverses_cnf);
+    auto res = sh.solveForGraph(V);
+
+    exp_data.iterations.emplace_back();
+    exp_data.iterations.back().res_size_after_impr = res.size();
+    exp_data.iterations.back().res_valid = Utils::isFVS(V,res);
 
     return exp_data;
 }

@@ -57,6 +57,7 @@ public:
      * chordless if neccessary. This should be (in theory) better for graphs that do not contain short cycles or
      * contain very few of them and the rest is long, since enumeration of long induced cycles using the standard
      * method might be slow...
+     * 3 - both 1 and 2
     */
     int unhit_cycle_enumeration_type = 1;
 

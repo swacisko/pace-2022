@@ -55,6 +55,7 @@ public:
         int time_since_start_millis = -1;
         int iteration_time = -1;
         int max_cycle_length = -1;
+        int best_result_so_far = -1;
     };
 
     int N,M;
@@ -65,6 +66,9 @@ public:
     static bool foundValidResult(vector<IterationEntry> & entries);
 
     vector<map<string,string>> getIterationEntries();
+    void updateBestResultSoFar();
+
+    void writeToFile(string filename);
 
 };
 

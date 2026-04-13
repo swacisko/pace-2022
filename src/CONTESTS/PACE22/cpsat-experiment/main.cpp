@@ -138,12 +138,13 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("cycle_enumeration", false);
     ap.addOption("find_optimal", false);
     ap.addOption("log_cpsat_progress", false);
-    ap.addOption("ihs_cyc_time_frac", false);
+    ap.addOption("ihs_iterations_in_mtz", false);
     ap.addOption("ihs_max_iterations", false);
     ap.addOption("next_sol_max_dst_from_init_sol", false);
     ap.addOption("use_init_sol_as_hint_mode", false);
     ap.addOption("init_L", false);
     ap.addOption("mtz_auxiliary_cycles_mode", false);
+    ap.addOption("max_new_cycles_iter_scale", false);
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -165,12 +166,13 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("cycle_enumeration", "int", &cnf.unhit_cycle_enumeration_type);
     ap.findAndAssign("find_optimal", "bool", &cnf.find_optimal_result);
     ap.findAndAssign("log_cpsat_progress", "bool", &cnf.log_cpsat_search_progress);
-    ap.findAndAssign("ihs_cyc_time_frac", "int", &cnf.ihs_iterations_in_mtz);
+    ap.findAndAssign("ihs_iterations_in_mtz", "int", &cnf.ihs_iterations_in_mtz);
     ap.findAndAssign("ihs_max_iterations", "int", &cnf.ihs_max_iterations);
     ap.findAndAssign("next_sol_max_dst_from_init_sol", "int", &cnf.next_sol_max_dst_from_init_sol);
     ap.findAndAssign("use_init_sol_as_hint_mode", "int", &cnf.use_init_sol_as_hint_mode);
     ap.findAndAssign("init_L", "int", &cnf.init_L_for_all_constraints);
     ap.findAndAssign("mtz_auxiliary_cycles_mode", "int", &cnf.mtz_auxiliary_cycles_mode);
+    ap.findAndAssign("max_new_cycles_iter_scale", "string", &cnf.max_new_cycles_iter_scale);
 
 
     return cnf;
@@ -301,11 +303,9 @@ int main(int argc, char** argv){
 
     // testAlgorithms(V,cnf);
 
-
-
-    // ofstream f(cnf.metadata_filepath);
-    // exp_data.write(f);
-
+    exp_data.updateBestResultSoFar();
+    clog << endl << endl << "FINAL RESULT: " << exp_data.iterations.back().best_result_so_far << endl;
+    exp_data.writeToFile(cnf.metadata_filepath);
 
     return 0;
 }
