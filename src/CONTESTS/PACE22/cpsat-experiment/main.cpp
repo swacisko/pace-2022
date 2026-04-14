@@ -162,7 +162,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     std::transform(alg.begin(), alg.end(), alg.begin(), [](unsigned char c){ return std::tolower(c); });
     if ( alg == "ihs" ) cnf.alg = IHS; if ( alg == "hs" ) cnf.alg = HS;
     if ( alg == "mtz" ) cnf.alg = MTZ; if (alg == "diverses") cnf.alg = DIVERSES;
-    cnf.setParametersForAlgorithm();
+    // cnf.setParametersForAlgorithm();
 
     ap.findAndAssign("mtd", "string", &cnf.metadata_filepath);
     ap.findAndAssign("threads", "int", &cnf.threads);
