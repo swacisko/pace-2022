@@ -12,7 +12,7 @@
 #include "CONTESTS/PACE22/Utils.h"
 // #include "ortools/base/version.h"
 
-
+static bool run_experiment = false;
 
 ExpConfig parseArguments(int argc, char ** argv) {
     ExpConfig cnf{};
@@ -148,6 +148,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("mtz_auxiliary_cycles_mode", false);
     ap.addOption("max_new_cycles_iter_scale", false);
     ap.addOption("pi_arcs_perc_to_add", false);
+    ap.addOption("run_experiment", false);
     // ap.addOption("fill_partial_result_using_greedy_fvs", false);
 
     ap.parse(argc, argv);
@@ -178,6 +179,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("mtz_auxiliary_cycles_mode", "int", &cnf.mtz_auxiliary_cycles_mode);
     ap.findAndAssign("max_new_cycles_iter_scale", "string", &cnf.max_new_cycles_iter_scale);
     ap.findAndAssign("pi_arcs_perc_to_add", "double", &cnf.pi_arcs_perc_to_add);
+    ap.findAndAssign("run_experiment", "bool", &run_experiment);
     // ap.findAndAssign("fill_partial_result_using_greedy_fvs", "bool", &cnf.fill_partial_result_using_greedy_fvs);
 
 
@@ -301,7 +303,8 @@ int main(int argc, char** argv){
 
     if (cnf.pi_arcs_perc_to_add > 0) {
         auto arcs = GraphUtils::getGraphEdges(V,true);
-        StandardUtils::shuffle(arcs);
+        IntGenerator rnd(894238492);
+        StandardUtils::shuffle(arcs, rnd);
         int P = cnf.pi_arcs_perc_to_add * arcs.size() / 2;
         int A = arcs.size();
         for (int i=0; i<P; i++) arcs.emplace_back( arcs[i].second, arcs[i].first );
@@ -315,17 +318,31 @@ int main(int argc, char** argv){
     DEBUG( Utils::countPiEdges(V) );
     DEBUG( 1.0 * Utils::countPiEdges(V) / GraphUtils::countEdges(V,true) );
 
-    // auto exp_data = CpsatExp1::solveHS(V,cnf);
-    // auto exp_data = CpsatExp1::solveIHS(V,cnf);
-    // auto exp_data = CpsatExp1::solveMTZ(V,cnf);
-    auto exp_data = CpsatExp1::solve(V,cnf);
-    DEBUG(exp_data.iterations.size());
+
+
 
     // testAlgorithms(V,cnf);
 
-    exp_data.updateBestResultSoFar();
-    clog << endl << endl << "FINAL RESULT: " << exp_data.iterations.back().best_result_so_far << endl;
-    exp_data.writeToFile(cnf.metadata_filepath);
+
+    ExpData exp_data;
+    // if (run_experiment) exp_data = CpsatExp1::solveHS(V,cnf);
+    // if (run_experiment) exp_data = CpsatExp1::solveIHS(V,cnf);
+    // if (run_experiment) exp_data = CpsatExp1::solveMTZ(V,cnf);
+    if (run_experiment) exp_data = CpsatExp1::solve(V,cnf);
+    DEBUG(exp_data.iterations.size());
+
+
+    if (run_experiment) {
+        exp_data.updateBestResultSoFar();
+        clog << endl << endl << "FINAL RESULT: " << exp_data.iterations.back().best_result_so_far << endl;
+        exp_data.writeToFile(cnf.metadata_filepath);
+    }
+    else {
+        clog << "Experiment not run, creating dummy metadata file" << endl;
+        ofstream str(cnf.metadata_filepath);
+        str << "dummy_metadata_file" << endl;
+        str.close();
+    }
 
     return 0;
 }
