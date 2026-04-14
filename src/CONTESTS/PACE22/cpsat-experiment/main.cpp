@@ -12,7 +12,7 @@
 #include "CONTESTS/PACE22/Utils.h"
 // #include "ortools/base/version.h"
 
-static bool run_experiment = false;
+static bool run_experiment = true;
 
 ExpConfig parseArguments(int argc, char ** argv) {
     ExpConfig cnf{};
@@ -340,7 +340,8 @@ int main(int argc, char** argv){
     else {
         clog << "Experiment not run, creating dummy metadata file" << endl;
         ofstream str(cnf.metadata_filepath);
-        str << "dummy_metadata_file" << endl;
+        str << "dummy_header" << endl;
+        str << "dummy_data" << endl;
         str.close();
     }
 
