@@ -26,6 +26,7 @@ public:
         // bool cycle_hs_valid_dfvs = false;
         bool improved_best_res = false;
         bool res_optimal = false;
+        int res_lower_bound = -1; // for mtz only
 
         int distinct_arcs_in_all_cycles = -1;
         int unhit_cycle_enumeration_time_millis = -1;

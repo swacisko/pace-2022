@@ -47,8 +47,10 @@ public:
      * 0 - hint values for all N variables
      * 1 - hint values only for variables of nodes that are in init_sol
      * 2 - hint values only for variables of nodes that are in prev_res
+     * 3 - hint values for variables that are in best_fvs - this will reduce variability,
+     * but should enable to find better HS in iterations
      */
-    int use_init_sol_as_hint_mode = 2;
+    int use_init_sol_as_hint_mode = 3;
 
     /**
      * Value can be 1 or 2, since there are only two options.
@@ -102,7 +104,7 @@ public:
      */
     int init_L_for_all_constraints = 4;
 
-    string max_new_cycles_iter_scale = "sqrt"; // options: linear, log, sqrt, bounded, unbounded
+    string max_new_cycles_iter_scale = "log"; // options: linear, log, sqrt, bounded, unbounded
     int max_new_cycles_per_iter = inf;
     int scaleIters(int N);
 
