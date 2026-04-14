@@ -90,7 +90,9 @@ public:
      * Option used to create auxiliary cycles for MTZ formulation.
      * 0 - no auxiliary cycles
      * 1 - all chordless cycles with length up to  [init_L_for_all_constraints]
-     * 2 - cycles found by IHS method run for at most 20% of total time and at most [ihs_max_iterations] iterations.
+     * 2 - cycles found by IHS method run for at most 20% of total time and at most [ihs_max_iterations] iterations, or
+     * for 30 seconds if find_optimal_result is set.
+     * Remember that the bound on the number of iterations (at most ihs_iterations_in_mtz) still holds.
      */
     int mtz_auxiliary_cycles_mode = 2;
 
