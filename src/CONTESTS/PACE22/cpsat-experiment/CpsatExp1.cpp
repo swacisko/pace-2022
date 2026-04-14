@@ -365,7 +365,7 @@ void CpsatExp1::addMaxHammingDstConstraint(CpModelBuilder &model, vector<BoolVar
 }
 
 tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpModelProto &model_proto, vector<BoolVar> &nodes,
-    CpSolverResponse & response, Stopwatch & timer, string timer_option, int init_time, ExpConfig cnf) {
+    CpSolverResponse & response, Stopwatch & timer, string timer_option, VI & init_sol, int init_time, ExpConfig cnf) {
 
     VI inter_fvs;
 
@@ -380,6 +380,10 @@ tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpM
             mutex log_mutex;
             solv_model.Add(NewFeasibleSolutionObserver(
                 [&](const CpSolverResponse& r) {
+                    int cnt = 0;
+                    for (int i = 0; i < nodes.size(); ++i) cnt += SolutionBooleanValue(r, nodes[i]);
+                    if ( !init_sol.empty() && cnt >= init_sol.size() ) return;
+
                     VI temp; temp.reserve(nodes.size());
                     for (int i = 0; i < nodes.size(); ++i) if (SolutionBooleanValue(r, nodes[i])) temp.push_back(i);
                     if ( Utils::isFVS(V,temp) ) {
@@ -433,7 +437,11 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
         mutex log_mutex;
         solver_model.Add(NewFeasibleSolutionObserver(
             [&](const CpSolverResponse& r) {
-                VI temp; temp.reserve(nodes.size());
+                int cnt = 0;
+                for (int i = 0; i < nodes.size(); ++i) cnt += SolutionBooleanValue(r, nodes[i]);
+                if ( !init_sol.empty() && cnt >= init_sol.size() ) return;
+
+                VI temp; temp.reserve(cnt);
                 for (int i = 0; i < nodes.size(); ++i) if (SolutionBooleanValue(r, nodes[i])) temp.push_back(i);
                 if ( Utils::isFVS(V,temp) ) {
                     std::lock_guard<std::mutex> lk(log_mutex);
@@ -451,7 +459,8 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
     if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
 
     // return rerunModelUntilFeasibleOrTle( V, model_proto,nodes, response,timer, timer_option,time,cnf );
-    auto [sol,resp,fvs] = rerunModelUntilFeasibleOrTle( V, model_proto,nodes, response,timer, timer_option,time,cnf );
+    auto [sol,resp,fvs] = rerunModelUntilFeasibleOrTle( V, model_proto,nodes,
+        response,timer, timer_option, init_sol, time,cnf );
     if ( !inter_fvs.empty() && (fvs.empty() || inter_fvs.size() < fvs.size()) ) fvs = inter_fvs;
     return {sol,resp,fvs};
 }
@@ -857,7 +866,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         prev_res = sol;
         old_cycles = cycles.size();
-        if (full_sol.size() < best_fvs.size() || best_fvs.empty()) {
+        if (full_sol.size() <= best_fvs.size() || best_fvs.empty()) {
             best_fvs = full_sol;
         }
 
