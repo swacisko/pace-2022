@@ -18,30 +18,13 @@ public:
     class IterationEntry {
     public:
         IterationEntry() {}
-        // IterationEntry( int _res_size_before_impr, int _res_size_after_impr, bool _res_valid, bool _res_optimal,
-        //     int _distinct_arcs_in_all_cycles, int _unhit_cycle_enumeration_time_millis,
-        //     PII _unhit_graph_sizes, int _unhit_graph_dfvs_size, map<int,int> _cycles_of_length,
-        //     int _total_cycles, int _time_since_start_millis, bool _improved_res, int _new_cycles_added) {
-        //     res_size_before_impr = _res_size_before_impr;
-        //     res_size_after_impr = _res_size_after_impr;
-        //     res_valid = _res_valid;
-        //     res_optimal = _res_optimal;
-        //     distinct_arcs_in_all_cycles = _distinct_arcs_in_all_cycles;
-        //     unhit_cycle_enumeration_time_millis = _unhit_cycle_enumeration_time_millis;
-        //     unhit_graph_sizes = _unhit_graph_sizes;
-        //     unhit_graph_dfvs_size = _unhit_graph_dfvs_size;
-        //     cycles_of_length = _cycles_of_length;
-        //     total_cycles = _total_cycles;
-        //     time_since_start_millis = _time_since_start_millis;
-        //     improved_res = _improved_res;
-        //     new_cycles_added = _new_cycles_added;
-        // }
 
-        int res_size_before_impr = -1;
-        int res_size_after_impr = -1;
-        bool res_valid = false;
-        bool cycle_hs_valid_dfvs = false;
-        bool improved_res = false;
+        int full_sol_size = -1;
+        int hs_size_before_impr = -1;
+        int hs_size_after_impr = -1;
+        bool hs_valid_fvs = false;
+        // bool cycle_hs_valid_dfvs = false;
+        bool improved_best_res = false;
         bool res_optimal = false;
 
         int distinct_arcs_in_all_cycles = -1;
@@ -65,7 +48,7 @@ public:
     VI cyc_of_length, ind_cyc_of_length;
 
     vector<IterationEntry> iterations;
-    static bool foundValidResult(vector<IterationEntry> & entries);
+    static bool foundValidHSResult(vector<IterationEntry> & entries);
 
     vector<map<string,string>> getIterationEntries();
     void updateBestResultSoFar();
