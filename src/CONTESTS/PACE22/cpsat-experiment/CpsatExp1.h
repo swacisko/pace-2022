@@ -113,9 +113,9 @@ public:
     static void addCycleConstraints(CpModelBuilder &model, VVI & cycles, vector<BoolVar> & nodes);
     static void addInitialSolutionHint(CpModelBuilder &model, vector<BoolVar> & nodes, VI & init_sol, VI &prev_res, ExpConfig cnf);
     static void addMaxHammingDstConstraint(CpModelBuilder &model, vector<BoolVar> & nodes, VI & init_sol, ExpConfig cnf);
-    static pair<VI,CpSolverStatus> rerunModelUntilFeasibleOrTle(CpModelProto &proto, vector<BoolVar> & nodes, CpSolverResponse & response,
+    static tuple<VI,CpSolverStatus,VI> rerunModelUntilFeasibleOrTle(VVI & V, CpModelProto &proto, vector<BoolVar> & nodes, CpSolverResponse & response,
         Stopwatch & timer, string timer_option, int init_time, ExpConfig cnf);
-    static pair<VI,CpSolverStatus> solveCpsatForCycles( VVI & V, VVI & cycles, VI &prev_res, VI & init_sol, Stopwatch & timer, string timer_option, ExpConfig& cnf );
+    static tuple<VI,CpSolverStatus, VI> solveCpsatForCycles( VVI & V, VVI & cycles, VI &prev_res, VI & init_sol, Stopwatch & timer, string timer_option, ExpConfig& cnf );
     static VI getUnhitCyclesHSGreedy(VVI & cycles);
     static bool isHS(VVI & cycles, VI & S);
 

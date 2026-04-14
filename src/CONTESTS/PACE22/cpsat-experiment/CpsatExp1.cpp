@@ -364,8 +364,10 @@ void CpsatExp1::addMaxHammingDstConstraint(CpModelBuilder &model, vector<BoolVar
     model.AddLessOrEqual(hamming_dist, cnf.next_sol_max_dst_from_init_sol);
 }
 
-pair<VI,CpSolverStatus> CpsatExp1::rerunModelUntilFeasibleOrTle(CpModelProto &model_proto, vector<BoolVar> &nodes,
+tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpModelProto &model_proto, vector<BoolVar> &nodes,
     CpSolverResponse & response, Stopwatch & timer, string timer_option, int init_time, ExpConfig cnf) {
+
+    VI inter_fvs;
 
     while(response.status() == CpSolverStatus::UNKNOWN && !timer.tle(timer_option)) {
         init_time = ceil(min( 3000.0 * init_time, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
@@ -374,6 +376,21 @@ pair<VI,CpSolverStatus> CpsatExp1::rerunModelUntilFeasibleOrTle(CpModelProto &mo
         SatParameters params = getDefaultSatParameters(cnf, init_time);
         Model solv_model;
         solv_model.Add(NewSatParameters(params));
+        if ( cnf.check_incumbent_cpsat_solutions ) {
+            mutex log_mutex;
+            solv_model.Add(NewFeasibleSolutionObserver(
+                [&](const CpSolverResponse& r) {
+                    VI temp; temp.reserve(nodes.size());
+                    for (int i = 0; i < nodes.size(); ++i) if (SolutionBooleanValue(r, nodes[i])) temp.push_back(i);
+                    if ( Utils::isFVS(V,temp) ) {
+                        std::lock_guard<std::mutex> lk(log_mutex);
+                        inter_fvs = temp;
+                        clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size() << endl;
+                    }
+
+                }
+            ));
+        }
         response = SolveCpModel(model_proto, &solv_model);
     }
 
@@ -381,13 +398,13 @@ pair<VI,CpSolverStatus> CpsatExp1::rerunModelUntilFeasibleOrTle(CpModelProto &mo
     if (response.status() == CpSolverStatus::OPTIMAL || response.status() == CpSolverStatus::FEASIBLE) {
         VI res;
         for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
-        return {res,response.status()};
+        return {res,response.status(), inter_fvs};
     }
 
-    return {{}, CpSolverStatus::UNKNOWN };
+    return { {}, CpSolverStatus::UNKNOWN, VI{} };
 }
 
-pair<VI,CpSolverStatus> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &prev_res, VI &init_sol, Stopwatch &timer,
+tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &prev_res, VI &init_sol, Stopwatch &timer,
     string timer_option, ExpConfig& cnf) {
 
     int N = V.size();
@@ -411,12 +428,32 @@ pair<VI,CpSolverStatus> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &
 
     if (cnf.next_sol_max_dst_from_init_sol != inf && !prev_res.empty()) addMaxHammingDstConstraint(model,nodes,init_sol,cnf);
 
+    VI inter_fvs;
+    if ( cnf.check_incumbent_cpsat_solutions ) {
+        mutex log_mutex;
+        solver_model.Add(NewFeasibleSolutionObserver(
+            [&](const CpSolverResponse& r) {
+                VI temp; temp.reserve(nodes.size());
+                for (int i = 0; i < nodes.size(); ++i) if (SolutionBooleanValue(r, nodes[i])) temp.push_back(i);
+                if ( Utils::isFVS(V,temp) ) {
+                    std::lock_guard<std::mutex> lk(log_mutex);
+                    inter_fvs = temp;
+                    clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size() << endl;
+                }
+
+            }
+        ));
+    }
+
     model.Minimize(LinearExpr::Sum(nodes));
     auto model_proto = model.Build();
     CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
     if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
 
-    return rerunModelUntilFeasibleOrTle( model_proto,nodes, response,timer, timer_option,time,cnf );
+    // return rerunModelUntilFeasibleOrTle( V, model_proto,nodes, response,timer, timer_option,time,cnf );
+    auto [sol,resp,fvs] = rerunModelUntilFeasibleOrTle( V, model_proto,nodes, response,timer, timer_option,time,cnf );
+    if ( !inter_fvs.empty() && (fvs.empty() || inter_fvs.size() < fvs.size()) ) fvs = inter_fvs;
+    return {sol,resp,fvs};
 }
 
 VI CpsatExp1::getUnhitCyclesHSGreedy(VVI &cycles) {
@@ -527,7 +564,7 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
 
         s.start("hs_greedy");
         VVI new_cycles;
-        for (auto & cyc : cycles) if ( L <= 3 || cyc.size() == L) new_cycles.push_back(cyc);
+        for (auto & cyc : cycles) if ( L <= cnf.init_L_for_all_constraints || cyc.size() == L) new_cycles.push_back(cyc);
         VI unhit_cycles_hs = getUnhitCyclesHSGreedy(new_cycles);
         assert( isHS(new_cycles, unhit_cycles_hs) );
         s.stop("hs_greedy");
@@ -535,7 +572,7 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
 
         if (timer.tle(timer_option)) break;
 
-        auto [sol,response_status] = solveHSLocal(cycles, unhit_cycles_hs);
+        auto [sol,response_status, inter_fvs] = solveHSLocal(cycles, unhit_cycles_hs);
         clog << "\t found hs of size sol.size(): " << sol.size() << endl;
         clog << "\t "; DEBUG(Utils::isFVS(V,sol));
 
@@ -544,7 +581,7 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
 
         if ( !cnf.find_optimal_result && Utils::isFVS(V,sol) && !timer.tle(timer_option) ) {
             cnf.ihs_single_iteration_sec *= 3;
-            tie(sol,response_status) = solveHSLocal(cycles, unhit_cycles_hs);
+            tie(sol,response_status, inter_fvs) = solveHSLocal(cycles, unhit_cycles_hs);
             clog << "\t found hs of size sol.size(): " << sol.size() << endl;
             clog << "\t "; DEBUG(Utils::isFVS(V,sol));
         }
@@ -563,6 +600,8 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
             DEBUG(full_sol.size());
             DEBUG(s.getTime("unhit_graph_greedy_dfvs_time"));
         }
+
+        if ( !inter_fvs.empty() && inter_fvs.size() < full_sol.size() ) full_sol = inter_fvs;
 
         {
             exp_data.iterations.emplace_back();
@@ -745,7 +784,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         exp_data.iterations.back().hs_size_before_impr = prev_res.size() + unhit_cycles_hs.size();
 
         cycles += new_cycles;
-        auto [sol,response_status] = solveHSLocal(cycles, unhit_cycles_hs);
+        auto [sol,response_status, inter_fvs] = solveHSLocal(cycles, unhit_cycles_hs);
         clog << "\t found hs of size sol.size(): " << sol.size() << endl;
         clog << "\t "; DEBUG(Utils::isFVS(V,sol));
         if (cnf.find_optimal_result) assert(response_status == CpSolverStatus::OPTIMAL);
@@ -778,6 +817,11 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
             // DEBUG(unhit_graph_dfvs.size());
             // DEBUG(full_sol.size());
             // DEBUG(s.getTime("unhit_graph_greedy_dfvs_time"));
+        }
+
+        if ( !inter_fvs.empty() && inter_fvs.size() < full_sol.size() ) {
+            clog << "\t\t\t inter_fvs improves full_sol!" << endl;
+            full_sol = inter_fvs;
         }
 
         s.stop("iteration");

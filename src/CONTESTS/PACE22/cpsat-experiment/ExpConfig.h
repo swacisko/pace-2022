@@ -106,10 +106,16 @@ public:
      */
     int init_L_for_all_constraints = 4;
 
-    string max_new_cycles_iter_scale = "log"; // options: linear, log, sqrt, bounded, unbounded
+    string max_new_cycles_iter_scale = "linear"; // options: linear, log, sqrt, bounded, unbounded
     int max_new_cycles_per_iter = inf;
     int scaleIters(int N);
 
+    /**
+     * If true, then any time the CPSAT improves a solution, it is checked, whether it is a valid FVS of the graph V.
+     * If so, it is returned. This way it might be possible to check many hitting sets, not just the best one
+     * returned at the end.
+     */
+    bool check_incumbent_cpsat_solutions = true;
 
     /**
      * This number of pi-arcs will be added.
@@ -122,7 +128,7 @@ public:
      * by adding to it a FVS of the graph V \ S, found by the Diverses solver, using basic reductions and
      * sinkhorn-knopp algorithm.
      */
-    bool fill_partial_result_using_greedy_fvs = true;
+    static constexpr bool fill_partial_result_using_greedy_fvs = true;
 
 
     vector<pair<string, string>> getConfigEntries();
