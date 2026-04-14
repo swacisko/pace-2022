@@ -15,8 +15,8 @@ from pathlib import Path
 
 RUN_TESTS = False
 
-inst_dir = 'testing_inputs' if RUN_TESTS else 'dfvs-instances-representatives-minimal'
-output_root_dir = 'testing_results' if RUN_TESTS else 'results-minimal'
+inst_dir = 'testing_inputs' if RUN_TESTS else 'input_minimal'
+output_root_dir = 'testing_results' if RUN_TESTS else 'results_minimal'
 
 input_minimal_dir, results_minimal_dir = 'input_minimal', 'results_minimal'
 input_large_dir, results_large_dir = 'input_large', 'results_large'
@@ -98,9 +98,9 @@ def createCycleEnumerationCommands():
             cmd = getDefaultCommand()
             cmd += ' --run_name=cycle_enumeration__' + alg + '_' + str(cet)
             solver_params = ' --time=' + str(large_time_sec) + \
-                            '--threads=' + str(cpsat_threads) + \
-                            '--alg=' + alg + \
-                            '--cycle_enumeration_type=' + str(cet)
+                            ' --threads=' + str(cpsat_threads) + \
+                            ' --alg=' + alg + \
+                            ' --cycle_enumeration=' + str(cet)
             cmd += ' --solver_params=\'' + solver_params + '\''
             all_tests_commands.append(cmd)
 
@@ -112,9 +112,9 @@ def createMTZCycleAugmentationCommands():
         cmd = getDefaultCommand()
         cmd += ' --run_name=mtz_cycle_augmentation__mtz_' + str(ca)
         solver_params = ' --time=' + str(large_time_sec) + \
-                        '--threads=' + str(cpsat_threads) + \
-                        '--alg=mtz' + \
-                        '--mtz_auxiliary_cycles_mode=' + str(ca)
+                        ' --threads=' + str(cpsat_threads) + \
+                        ' --alg=mtz' + \
+                        ' --mtz_auxiliary_cycles_mode=' + str(ca)
         cmd += ' --solver_params=\'' + solver_params + '\''
         all_tests_commands.append(cmd)
 
@@ -127,9 +127,9 @@ def createCycleScalingCommands():
             cmd = getDefaultCommand()
             cmd += ' --run_name=cycle_scaling__' + alg + '_' + cs
             solver_params = ' --time=' + str(large_time_sec) + \
-                            '--threads=' + str(cpsat_threads) + \
-                            '--alg=' + alg + \
-                            '--max_new_cycles_iter_scale=' + cs
+                            ' --threads=' + str(cpsat_threads) + \
+                            ' --alg=' + alg + \
+                            ' --max_new_cycles_iter_scale=' + cs
             cmd += ' --solver_params=\'' + solver_params + '\''
             all_tests_commands.append(cmd)
 
@@ -142,9 +142,9 @@ def createPiArcsPercentageCommands():
             cmd = getDefaultCommand()
             cmd += ' --run_name=pi_arcs_percentage__' + alg + '_' + str(pap)
             solver_params = ' --time=' + str(large_time_sec) + \
-                            '--threads=' + str(cpsat_threads) + \
-                            '--alg=' + alg + \
-                            '--pi_arcs_perc_to_add=' + str(pap)
+                            ' --threads=' + str(cpsat_threads) + \
+                            ' --alg=' + alg + \
+                            ' --pi_arcs_perc_to_add=' + str(pap)
             cmd += ' --solver_params=\'' + solver_params + '\''
             all_tests_commands.append(cmd)
 
@@ -157,9 +157,9 @@ def createInitialSingleIterationTimeCommands():
             cmd = getDefaultCommand()
             cmd += ' --run_name=init_single_iter_time__' + alg + '_' + str(sit)
             solver_params = ' --time=' + str(large_time_sec) + \
-                            '--threads=' + str(cpsat_threads) + \
-                            '--alg=' + alg + \
-                            '--iter_time=' + str(sit)
+                            ' --threads=' + str(cpsat_threads) + \
+                            ' --alg=' + alg + \
+                            ' --iter_time=' + str(sit)
             cmd += ' --solver_params=\'' + solver_params + '\''
             all_tests_commands.append(cmd)
 
@@ -172,8 +172,8 @@ def createAllGraphCommands():
         cmd = getDefaultCommand()
         cmd += ' --run_name=all_graphs__' + alg
         solver_params = ' --time=' + str(large_time_sec) + \
-                        '--threads=' + str(cpsat_threads) + \
-                        '--alg=' + alg
+                        ' --threads=' + str(cpsat_threads) + \
+                        ' --alg=' + alg
         cmd += ' --solver_params=\'' + solver_params + '\''
         all_tests_commands.append(cmd)
 

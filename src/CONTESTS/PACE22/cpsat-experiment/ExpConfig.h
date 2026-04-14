@@ -99,7 +99,7 @@ public:
     /**
      *  Maximum number of cycles to create in HS method, so that we can terminate without exceeding memory limit.
      */
-    int max_cycles_for_hs = 5e6;
+    int max_cycles_for_hs = 2e6;
 
     /**
      * This is the value, for which all cycles of at most this length will be created as constraints.
