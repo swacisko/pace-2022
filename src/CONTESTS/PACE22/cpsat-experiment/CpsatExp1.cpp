@@ -44,9 +44,9 @@ SatParameters getDefaultSatParameters(ExpConfig cnf, int time_in_sec) {
         // variables try to reach feasibility and then improve objective
         params.set_use_feasibility_jump(true);
         params.set_random_branches_ratio(0.1); // controls how often CP-SAT ignores its heuristics and makes a random branching decision.
-        params.set_random_polarity_ratio(0.01); // controls how often CP-SAT assigns a variable, not based on heuristics but randomly to true or false
+        params.set_random_polarity_ratio(0.015); // controls how often CP-SAT assigns a variable, not based on heuristics but randomly to true or false
 
-        params.set_max_number_of_conflicts(10000);
+        params.set_max_number_of_conflicts(100'000);
         // params.set_max_deterministic_time(0.1);
     }
 
@@ -143,8 +143,8 @@ void ExpData::writeToFile(ExpConfig cnf) {
         auto cnf_entries = cnf.getConfigEntries();
         for(auto [a,b] : cnf_entries) config_entries.emplace(a,b);
         for(const auto & s : views::keys(cnf_entries)) config_header.push_back(s);
+        // DEBUG(cnf_entries); DEBUG(config_header); DEBUG(config_entries);
     }
-    header += config_header;
 
     for (auto [i,s] : views::enumerate(header)) str << (i > 0 ? "," : "") << s;
     for (const auto& s : config_header ) str << "," << s;

@@ -71,10 +71,10 @@ cycle_enumeration_types = [1,2,3]
 mtz_cycle_augmentation = [0,1,2]
 pi_arcs_percentage = np.arange(0.05, 0.51, 0.05)
 init_single_iter_time = [1,2,3]
-cycle_scales = ['linear', 'log', 'sqrt', 'unbounded']
+cycle_scales = ['linear_h', 'linear', 'log', 'sqrt', 'unbounded']
 cpsat_threads = 8
 
-large_time_sec = 1200
+large_time_sec = 900
 small_time_sec = 300
 
 # --threads=6

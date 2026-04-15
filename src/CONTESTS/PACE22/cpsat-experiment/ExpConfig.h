@@ -28,7 +28,7 @@ public:
      */
     void setParametersForAlgorithm();
 
-    int max_time_sec = 15 * 60; // ten minutes default runtime
+    int max_time_sec = 15 * 60; // 15 minutes default runtime
     int ihs_single_iteration_sec = 1;
 
     /**
@@ -62,7 +62,7 @@ public:
      * method might be slow...
      * 3 - both 1 and 2
     */
-    int unhit_cycle_enumeration_type = 1;
+    int unhit_cycle_enumeration_type = 3;
 
     /**
      * If true, then optimal result will be found. In such a case all running time bounds set by parameters are ignored,
