@@ -149,6 +149,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("max_new_cycles_iter_scale", false);
     ap.addOption("pi_arcs_perc_to_add", false);
     ap.addOption("run_experiment", false);
+    ap.addOption("focus_mostly_onh_heuristics", false);
     // ap.addOption("fill_partial_result_using_greedy_fvs", false);
 
     ap.parse(argc, argv);
@@ -180,6 +181,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("max_new_cycles_iter_scale", "string", &cnf.max_new_cycles_iter_scale);
     ap.findAndAssign("pi_arcs_perc_to_add", "double", &cnf.pi_arcs_perc_to_add);
     ap.findAndAssign("run_experiment", "bool", &run_experiment);
+    ap.findAndAssign("focus_mostly_onh_heuristics", "bool", &cnf.focus_mostly_onh_heuristics);
     // ap.findAndAssign("fill_partial_result_using_greedy_fvs", "bool", &cnf.fill_partial_result_using_greedy_fvs);
 
 

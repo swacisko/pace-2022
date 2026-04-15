@@ -29,8 +29,8 @@ SatParameters getDefaultSatParameters(ExpConfig cnf, int time_in_sec) {
         params.set_random_seed(rnd.nextInt(inf));
 
         params.set_use_lns(true);
-        // params.set_symmetry_level(0);
-        // params.set_use_sat_inprocessing(false);
+        params.set_symmetry_level(0); // disables detecting symmetries - often costs more than it helps, especially in hard instances
+        params.set_use_sat_inprocessing(false);
 
         params.set_linearization_level(0);
         params.set_cut_level(0);
@@ -39,10 +39,12 @@ SatParameters getDefaultSatParameters(ExpConfig cnf, int time_in_sec) {
         // params.set_optimize_with_core(false); // without this it seems to work better
         params.set_use_exact_lp_reason(false);
 
+        // The [set_use_feasibility_jump] enables a local search / repair heuristic inside CP-SAT. Instead of only doing: systematic branching +
+        // propagation the solver also does: start from a (possibly infeasible) assignment iteratively “repair” it by flipping
+        // variables try to reach feasibility and then improve objective
         params.set_use_feasibility_jump(true);
-
-        params.set_random_branches_ratio(0.1);
-        params.set_random_polarity_ratio(0.01);
+        params.set_random_branches_ratio(0.1); // controls how often CP-SAT ignores its heuristics and makes a random branching decision.
+        params.set_random_polarity_ratio(0.01); // controls how often CP-SAT assigns a variable, not based on heuristics but randomly to true or false
 
         params.set_max_number_of_conflicts(10000);
         // params.set_max_deterministic_time(0.1);

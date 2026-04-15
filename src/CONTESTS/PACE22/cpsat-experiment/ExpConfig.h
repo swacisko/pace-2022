@@ -78,6 +78,10 @@ public:
      */
     bool use_only_cpsat_lns = false;
 
+    /**
+     * If true, some CPSAT's parameters will be set to run it much more heurtistically. This will severely impact
+     * proving optimality, but should increase the quality/speed of used heuristics.
+     */
     bool focus_mostly_onh_heuristics = true;
 
     string metadata_filepath;
