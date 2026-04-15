@@ -54,7 +54,7 @@ public:
     vector<map<string,string>> getIterationEntries();
     void updateBestResultSoFar();
 
-    void writeToFile(string filename);
+    void writeToFile(ExpConfig cnf);
 
 };
 
@@ -92,6 +92,11 @@ public:
    * All cycles found by this function will be stored in [cycles] vector
    */
     static ExpData solveIHS(VVI V, ExpConfig cnf);
+
+    /**
+     * Auxiliary arrays [cycles] and [res] are used to store the set of cycles and found result.
+     * They are cleared by the function.
+     */
     static ExpData solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res);
 
     /**
@@ -107,11 +112,13 @@ public:
      */
     static ExpData solveDiVerSeS(VVI V, ExpConfig cnf);
 
+    static VI createInitialSolution(VVI & V, ExpConfig cnf);
 
     static ExpData solve(VVI V, ExpConfig cnf);
 
     static void addCycleConstraints(CpModelBuilder &model, VVI & cycles, vector<BoolVar> & nodes);
     static void addInitialSolutionHint(CpModelBuilder &model, vector<BoolVar> & nodes, VI & init_sol, VI &prev_res, ExpConfig cnf);
+    static void addInitialSolutionSizeConstraint(CpModelBuilder &model, vector<BoolVar> & nodes, VI & init_sol);
     static void addMaxHammingDstConstraint(CpModelBuilder &model, vector<BoolVar> & nodes, VI & init_sol, ExpConfig cnf);
     static tuple<VI,CpSolverStatus,VI> rerunModelUntilFeasibleOrTle(VVI & V, CpModelProto &proto, vector<BoolVar> & nodes, CpSolverResponse & response,
         Stopwatch & timer, string timer_option, VI & init_sol, int init_time, ExpConfig& cnf);

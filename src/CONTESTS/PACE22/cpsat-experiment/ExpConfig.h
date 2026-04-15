@@ -12,6 +12,7 @@ enum Algorithm {
     IHS = 1, // IHS with cycle_enumeration_type=1
     MTZ = 2,
     DIVERSES = 3,
+    DIV_IHS = 4,
 };
 
 string parseAlgorithm(int alg);
@@ -44,9 +45,9 @@ public:
     int next_sol_max_dst_from_init_sol = inf;
 
     /**
-     * 0 - hint values for all N variables
-     * 1 - hint values only for variables of nodes that are in init_sol
-     * 2 - hint values only for variables of nodes that are in prev_res
+     * 0 - hint values for all N variables in init_sol
+     * 1 - hint values only for variables of nodes that are set in init_sol
+     * 2 - hint values only for variables of nodes that are set in prev_res
      * 3 - hint values for variables that are in best_fvs - this will reduce variability,
      * but should enable to find better HS in iterations
      */
@@ -112,7 +113,7 @@ public:
      */
     int init_L_for_all_constraints = 4;
 
-    string max_new_cycles_iter_scale = "linear"; // options: linear, log, sqrt, bounded, unbounded
+    string max_new_cycles_iter_scale = "linear"; // options: linear_h, linear, log, sqrt, bounded, unbounded
     int max_new_cycles_per_iter = inf;
     int scaleIters(int N);
 
@@ -136,6 +137,14 @@ public:
      */
     static constexpr bool fill_partial_result_using_greedy_fvs = true;
 
+
+    /**
+     * This steers how the initial solution is created in IHS.
+     * 0 - no initial solution
+     * 1 - uses getUnhitGraphGreedyFVS(V, emptyset) function to create the solution
+     * 2 - uses diverses solver - this can be used to check how much the solution returned by diverses can be improved
+     */
+    int ihs_init_sol_creation_mode = 1;
 
     vector<pair<string, string>> getConfigEntries();
 

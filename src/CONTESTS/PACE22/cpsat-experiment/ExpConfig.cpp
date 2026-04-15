@@ -27,11 +27,13 @@ string parseAlgorithm(int alg)  {
     if(alg == IHS) return "IHS";
     if(alg == MTZ) return "MTZ";
     if(alg == DIVERSES) return "DiVerSeS";
+    if(alg == DIV_IHS) return "DiVerSeS+IHS";
     return "unknown algorithm";
 }
 
 
 int ExpConfig::scaleIters(int N) {
+    if (max_new_cycles_iter_scale == "linear_h") return N/2;
     if (max_new_cycles_iter_scale == "linear") return N;
     if (max_new_cycles_iter_scale == "log") return N * ceil(log2(N));
     if (max_new_cycles_iter_scale == "sqrt") return N * sqrt(N);
@@ -62,6 +64,8 @@ vector<pair<string, string>> ExpConfig::getConfigEntries() {
     entries.emplace_back("max_new_cycles_per_iter",to_string(max_new_cycles_per_iter));
     entries.emplace_back("pi_arcs_perc_to_add",to_string(pi_arcs_perc_to_add));
     entries.emplace_back("fill_partial_result_using_greedy_fvs",to_string(fill_partial_result_using_greedy_fvs));
+    entries.emplace_back("focus_mostly_onh_heuristics",to_string(focus_mostly_onh_heuristics));
+    entries.emplace_back("ihs_init_sol_creation_mode",to_string(ihs_init_sol_creation_mode));
 
     return entries;
 }

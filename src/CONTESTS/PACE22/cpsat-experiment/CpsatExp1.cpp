@@ -124,8 +124,8 @@ void ExpData::updateBestResultSoFar() {
 
 }
 
-void ExpData::writeToFile(string filename) {
-    ofstream str(filename);
+void ExpData::writeToFile(ExpConfig cnf) {
+    ofstream str(cnf.metadata_filepath);
 
     auto entries = getIterationEntries();
     using VS = vector<string>;
@@ -137,7 +137,17 @@ void ExpData::writeToFile(string filename) {
         break;
     }
 
+    map<string,string> config_entries;
+    vector<string> config_header;
+    {
+        auto cnf_entries = cnf.getConfigEntries();
+        for(auto [a,b] : cnf_entries) config_entries.emplace(a,b);
+        for(const auto & s : views::keys(cnf_entries)) config_header.push_back(s);
+    }
+    header += config_header;
+
     for (auto [i,s] : views::enumerate(header)) str << (i > 0 ? "," : "") << s;
+    for (const auto& s : config_header ) str << "," << s;
     str << "\n";
 
     for ( auto & I : entries ) {
@@ -145,6 +155,7 @@ void ExpData::writeToFile(string filename) {
             if (i > 0) str << ",";
             str << I[key];
         }
+        for (const auto & key : config_header) str << "," << config_entries[key];
         str << "\n";
     }
 
@@ -340,7 +351,14 @@ VI CpsatExp1::getUnhitGraphGreedyFVS(VVI &V, VI &S) {
 
     Config diverses_cnf;
     diverses_cnf.write_logs = false;
-    diverses_cnf.agent_flow_method = diverses_cnf.agent_flow_sinkhorn;
+    diverses_cnf.agent_flow_min_distance = 3;
+    // diverses_cnf.agent_flow_node_update_frequency = 1;
+    // diverses_cnf.agent_flow_max_distance_from_best = 1;
+    diverses_cnf.agent_flow_max_distance_from_best = 1 + sqrt(V.size());
+    diverses_cnf.agent_flow_method = Config::agent_flow_sinkhorn;
+    diverses_cnf.agent_flow_node_selection_type = Config::agent_flow_remove_largest_flow_node;
+    diverses_cnf.agent_flow_alternate_selection_type = diverses_cnf.solver_improve_alternate_selection_type = true;
+
     diverses_cnf.disableAllNonbasicReductions();
     // diverses_cnf.reducer_use_pie = diverses_cnf.reducer_use_dome = diverses_cnf.reducer_use_folding = true;
     diverses_cnf.reducer_use_pie = diverses_cnf.reducer_use_dome = true;
@@ -376,6 +394,10 @@ void CpsatExp1::addInitialSolutionHint(CpModelBuilder &model, vector<BoolVar> &n
     if (cnf.use_init_sol_as_hint_mode == 0) for(int i=0; i<N; i++) model.AddHint(nodes[i],in_init_sol[i]);
     if (cnf.use_init_sol_as_hint_mode == 1 || cnf.use_init_sol_as_hint_mode == 3) for(int i=0; i<N; i++) if (in_init_sol[i]) model.AddHint(nodes[i],1);
     if (cnf.use_init_sol_as_hint_mode == 2) for(int d : prev_res) model.AddHint(nodes[d],1);
+}
+
+void CpsatExp1::addInitialSolutionSizeConstraint(CpModelBuilder &model, vector<BoolVar> &nodes, VI &init_sol) {
+    model.AddLessOrEqual(LinearExpr::Sum(nodes), init_sol.size());
 }
 
 void CpsatExp1::addMaxHammingDstConstraint(CpModelBuilder &model, vector<BoolVar> &nodes, VI &init_sol, ExpConfig cnf) {
@@ -458,6 +480,7 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
     addCycleConstraints(model,cycles,nodes);
 
     addInitialSolutionHint(model,nodes,init_sol,prev_res, cnf);
+    // addInitialSolutionSizeConstraint(model, nodes, init_sol); // #TEST
     assert( isHS(cycles, init_sol) );
 
     if (cnf.next_sol_max_dst_from_init_sol != inf && !prev_res.empty()) addMaxHammingDstConstraint(model,nodes,init_sol,cnf);
@@ -705,7 +728,6 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
     cycles.clear();
     VI prev_res;
 
-    VI best_fvs;
 
     Stopwatch timer;
     string timer_option = "solveIHS";
@@ -713,6 +735,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
     timer.start(timer_option);
 
 
+    VI best_fvs;
+    if(cnf.ihs_init_sol_creation_mode != 0) best_fvs = createInitialSolution(V,cnf);
 
 
 
@@ -726,8 +750,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         VI init_sol = prev_res +  unhit_cycles_hs;
         if (cnf.use_init_sol_as_hint_mode == 3 && !best_fvs.empty() && best_fvs.size() < init_sol.size() ) init_sol = best_fvs;
         auto new_cnf = cnf;
-        if (cnf.use_init_sol_as_hint_mode == 3) new_cnf.use_init_sol_as_hint_mode = 1;
-        // return solveCpsatForCycles(V,cycles,prev_res,init_sol,timer, timer_option, new_cnf);
+        // if (cnf.use_init_sol_as_hint_mode == 3) new_cnf.use_init_sol_as_hint_mode = 1; // hint only variable set to 1
+        if (cnf.use_init_sol_as_hint_mode == 3) new_cnf.use_init_sol_as_hint_mode = 0; // hint all variables to 0 or 1
         auto r = solveCpsatForCycles(V,cycles,prev_res,init_sol,timer, timer_option, new_cnf);
         cnf.ihs_single_iteration_sec = new_cnf.ihs_single_iteration_sec;
         return r;
@@ -904,6 +928,9 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
              << ", full_sol.size(): " << full_sol.size() << ", best_fvs.size(): " << best_fvs.size() << endl;
 
         if ( response_status == CpSolverStatus::OPTIMAL && Utils::isFVS(V,sol) ) break;
+
+        // constexpr int B = 50'000;
+        // cnf.ihs_single_iteration_sec = max( cnf.ihs_single_iteration_sec, 1 + (int)cycles.size() / B );
     }
 
     timer.stop(timer_option);
@@ -973,9 +1000,15 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
         clog << "\t augmenting MTZ model with " << augmented_cycles.size() << " cycle constraints obtained using IHS" << endl;
     }
 
+    if( auxiliary_cycles_mode != 2 && cnf.ihs_init_sol_creation_mode != 0 ) init_sol = createInitialSolution(V,cnf);
+
+    clog << "In MTZ, init_sol.size(): " << init_sol.size() << endl;
+
     if(!init_sol.empty()) {
         in_init_sol = StandardUtils::toVB(N,init_sol);
-        addInitialSolutionHint(model,nodes,init_sol,init_sol,cnf); // here we intentionally add init_sol instead of prev_res
+        auto new_cnf = cnf;
+        if(cnf.use_init_sol_as_hint_mode == 3) new_cnf.use_init_sol_as_hint_mode = 0;
+        addInitialSolutionHint(model,nodes,init_sol,init_sol,new_cnf); // here we intentionally add init_sol instead of prev_res
 
         // now toposort to create initial ranks values
         VI topo, deg(N,0);
@@ -1090,12 +1123,43 @@ ExpData CpsatExp1::solveDiVerSeS(VVI V, ExpConfig cnf) {
     return exp_data;
 }
 
+VI CpsatExp1::createInitialSolution(VVI &V, ExpConfig cnf) {
+    VI init_sol;
+    if(cnf.ihs_init_sol_creation_mode == 1) {
+        clog << "Looking for initial solution using Agent-Flow approach" << endl;
+        init_sol = getUnhitGraphGreedyFVS(V,init_sol);
+        clog << "Found initial solution of size " << init_sol.size() << endl;
+    }
+    if(cnf.ihs_init_sol_creation_mode == 2) {
+        Config diverses_cnf;
+        diverses_cnf.write_logs = false;
+        diverses_cnf.sw.setLimit("main", 1000 * cnf.max_time_sec);
+        diverses_cnf.sw.start("main");
+        diverses_cnf.disableAllNonbasicReductions();
+        diverses_cnf.solverh_use_reductions_AF = false;
+        int iters = 1;
+        clog << "Looking for initial solution using " << iters << " iteration(s) of DiVerSeS" << endl;
+        while(iters--) {
+            DFVSSolverH sh(diverses_cnf);
+            auto r = sh.solveForGraph(V);
+            assert(Utils::isFVS(V,r));
+            if( init_sol.empty() || r.size() < init_sol.size() ) init_sol = r;
+        }
+        clog << "Found initial solution of size " << init_sol.size() << endl;
+    }
+    return init_sol;
+}
+
 ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
     auto alg = cnf.alg;
     if (alg == Algorithm::HS) return solveHS(V,cnf);
     if (alg == Algorithm::IHS) return solveIHS(V,cnf);
     if (alg == Algorithm::MTZ) return solveMTZ(V,cnf, cnf.mtz_auxiliary_cycles_mode);
     if (alg == Algorithm::DIVERSES) return solveDiVerSeS(V,cnf);
+    if (alg == Algorithm::DIV_IHS) {
+        cnf.ihs_init_sol_creation_mode = 2;
+        return solveIHS(V,cnf);
+    }
 
     return ExpData{};
 }

@@ -150,6 +150,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("pi_arcs_perc_to_add", false);
     ap.addOption("run_experiment", false);
     ap.addOption("focus_mostly_onh_heuristics", false);
+    ap.addOption("ihs_init_sol_creation_mode", false);
     // ap.addOption("fill_partial_result_using_greedy_fvs", false);
 
     ap.parse(argc, argv);
@@ -162,7 +163,8 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("alg", "string", &alg);
     std::transform(alg.begin(), alg.end(), alg.begin(), [](unsigned char c){ return std::tolower(c); });
     if ( alg == "ihs" ) cnf.alg = IHS; if ( alg == "hs" ) cnf.alg = HS;
-    if ( alg == "mtz" ) cnf.alg = MTZ; if (alg == "diverses") cnf.alg = DIVERSES;
+    if ( alg == "mtz" ) cnf.alg = MTZ; if ( alg == "diverses") cnf.alg = DIVERSES;
+    if ( alg == "div_ihs") cnf.alg = DIV_IHS;
     // cnf.setParametersForAlgorithm();
 
     ap.findAndAssign("mtd", "string", &cnf.metadata_filepath);
@@ -182,6 +184,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("pi_arcs_perc_to_add", "double", &cnf.pi_arcs_perc_to_add);
     ap.findAndAssign("run_experiment", "bool", &run_experiment);
     ap.findAndAssign("focus_mostly_onh_heuristics", "bool", &cnf.focus_mostly_onh_heuristics);
+    ap.findAndAssign("ihs_init_sol_creation_mode", "int", &cnf.ihs_init_sol_creation_mode);
     // ap.findAndAssign("fill_partial_result_using_greedy_fvs", "bool", &cnf.fill_partial_result_using_greedy_fvs);
 
 
@@ -337,7 +340,7 @@ int main(int argc, char** argv){
     if (run_experiment) {
         exp_data.updateBestResultSoFar();
         clog << endl << endl << "FINAL RESULT: " << exp_data.iterations.back().best_result_so_far << endl;
-        exp_data.writeToFile(cnf.metadata_filepath);
+        exp_data.writeToFile(cnf);
     }
     else {
         clog << "Experiment not run, creating dummy metadata file" << endl;
