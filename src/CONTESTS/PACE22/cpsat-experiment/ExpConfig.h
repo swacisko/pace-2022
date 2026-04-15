@@ -78,6 +78,8 @@ public:
      */
     bool use_only_cpsat_lns = false;
 
+    bool focus_mostly_onh_heuristics = true;
+
     string metadata_filepath;
 
     /**

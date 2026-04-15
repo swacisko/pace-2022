@@ -39,7 +39,9 @@ def getDefaultCommand():
           ' --skip_existing_results=true' + \
           ' --compute=true' + \
           ' --run_judge=false' + \
-          ' --create_rankings=false'
+          ' --create_rankings=false' + \
+          ' --rerun_failed_tests=true' + \
+          ' --require_metadata_creation=true'
     return cmd
 
 def createTablesAndRankings():
@@ -67,7 +69,7 @@ all_tests_commands = []
 algorithms = ["hs", "ihs", "mtz", "diverses"]
 cycle_enumeration_types = [1,2,3]
 mtz_cycle_augmentation = [0,1,2]
-pi_arcs_percentage = np.arange(0.1, 0.51, 0.05)
+pi_arcs_percentage = np.arange(0.05, 0.51, 0.05)
 init_single_iter_time = [1,2,3]
 cycle_scales = ['linear', 'log', 'sqrt', 'unbounded']
 cpsat_threads = 8
@@ -93,11 +95,11 @@ def createCycleEnumerationCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
-    for alg in algorithms:
+    for alg in filter(lambda s : s.lower() != 'hs', algorithms):
         for cet in cycle_enumeration_types:
             cmd = getDefaultCommand()
             cmd += ' --run_name=cycle_enumeration__' + alg + '_' + str(cet)
-            solver_params = ' --time=' + str(large_time_sec) + \
+            solver_params = ' --time=' + str(small_time_sec) + \
                             ' --threads=' + str(cpsat_threads) + \
                             ' --alg=' + alg + \
                             ' --cycle_enumeration=' + str(cet)
@@ -111,7 +113,7 @@ def createMTZCycleAugmentationCommands():
     for ca in mtz_cycle_augmentation:
         cmd = getDefaultCommand()
         cmd += ' --run_name=mtz_cycle_augmentation__mtz_' + str(ca)
-        solver_params = ' --time=' + str(large_time_sec) + \
+        solver_params = ' --time=' + str(small_time_sec) + \
                         ' --threads=' + str(cpsat_threads) + \
                         ' --alg=mtz' + \
                         ' --mtz_auxiliary_cycles_mode=' + str(ca)
@@ -122,11 +124,11 @@ def createCycleScalingCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
-    for alg in algorithms:
+    for alg in filter(lambda s : s.lower() != 'hs', algorithms):
         for cs in cycle_scales:
             cmd = getDefaultCommand()
             cmd += ' --run_name=cycle_scaling__' + alg + '_' + cs
-            solver_params = ' --time=' + str(large_time_sec) + \
+            solver_params = ' --time=' + str(small_time_sec) + \
                             ' --threads=' + str(cpsat_threads) + \
                             ' --alg=' + alg + \
                             ' --max_new_cycles_iter_scale=' + cs
@@ -141,7 +143,7 @@ def createPiArcsPercentageCommands():
         for pap in pi_arcs_percentage:
             cmd = getDefaultCommand()
             cmd += ' --run_name=pi_arcs_percentage__' + alg + '_' + str(pap)
-            solver_params = ' --time=' + str(large_time_sec) + \
+            solver_params = ' --time=' + str(small_time_sec) + \
                             ' --threads=' + str(cpsat_threads) + \
                             ' --alg=' + alg + \
                             ' --pi_arcs_perc_to_add=' + str(pap)
@@ -152,11 +154,11 @@ def createInitialSingleIterationTimeCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
-    for alg in algorithms:
+    for alg in filter(lambda s : s.lower() != 'hs', algorithms):
         for sit in init_single_iter_time:
             cmd = getDefaultCommand()
             cmd += ' --run_name=init_single_iter_time__' + alg + '_' + str(sit)
-            solver_params = ' --time=' + str(large_time_sec) + \
+            solver_params = ' --time=' + str(small_time_sec) + \
                             ' --threads=' + str(cpsat_threads) + \
                             ' --alg=' + alg + \
                             ' --iter_time=' + str(sit)
@@ -213,10 +215,24 @@ if __name__ == '__main__':
     print(f'{RUN_TESTS=} {thread_cnt=} {tests_runner_threads=} {all_input_files=}')
 
     try:
+        if not os.path.exists(results_minimal_dir):
+            os.makedirs(results_minimal_dir)
+    except Exception as e:
+        print(f"Error creating directory: {e}")
+
+    try:
+        if not os.path.exists(results_large_dir):
+            os.makedirs(results_large_dir)
+    except Exception as e:
+        print(f"Error creating directory: {e}")
+
+    try:
         if not os.path.exists(output_root_dir):
             os.makedirs(output_root_dir)
     except Exception as e:
         print(f"Error creating directory: {e}")
+
+    RUN_TESTS = True
 
     if RUN_TESTS:
         solver_name = 'cpsat_exp_1_no_run'

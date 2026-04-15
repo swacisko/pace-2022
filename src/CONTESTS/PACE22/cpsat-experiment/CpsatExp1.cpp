@@ -22,6 +22,32 @@ SatParameters getDefaultSatParameters(ExpConfig cnf, int time_in_sec) {
     if(cnf.use_only_cpsat_lns) params.set_use_lns_only(true);
     params.set_num_search_workers(cnf.threads);
     params.set_log_search_progress(cnf.log_cpsat_search_progress);
+
+    if(cnf.focus_mostly_onh_heuristics) {
+        IntGenerator rnd;
+        params.set_randomize_search(true);
+        params.set_random_seed(rnd.nextInt(inf));
+
+        params.set_use_lns(true);
+        // params.set_symmetry_level(0);
+        // params.set_use_sat_inprocessing(false);
+
+        params.set_linearization_level(0);
+        params.set_cut_level(0);
+        params.set_add_lp_constraints_lazily(false);
+
+        // params.set_optimize_with_core(false); // without this it seems to work better
+        params.set_use_exact_lp_reason(false);
+
+        params.set_use_feasibility_jump(true);
+
+        params.set_random_branches_ratio(0.1);
+        params.set_random_polarity_ratio(0.01);
+
+        params.set_max_number_of_conflicts(10000);
+        // params.set_max_deterministic_time(0.1);
+    }
+
     return params;
 }
 
@@ -365,11 +391,13 @@ void CpsatExp1::addMaxHammingDstConstraint(CpModelBuilder &model, vector<BoolVar
 }
 
 tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpModelProto &model_proto, vector<BoolVar> &nodes,
-    CpSolverResponse & response, Stopwatch & timer, string timer_option, VI & init_sol, int init_time, ExpConfig cnf) {
+    CpSolverResponse & response, Stopwatch & timer, string timer_option, VI & init_sol, int init_time, ExpConfig& cnf) {
 
     VI inter_fvs;
 
     while(response.status() == CpSolverStatus::UNKNOWN && !timer.tle(timer_option)) {
+        if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
+
         init_time = ceil(min( 3000.0 * init_time, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
         clog << "Response status unknown, increasing max_time_per_iter to " << init_time << endl;
 
@@ -456,7 +484,7 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
     model.Minimize(LinearExpr::Sum(nodes));
     auto model_proto = model.Build();
     CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
-    if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
+    // if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
 
     // return rerunModelUntilFeasibleOrTle( V, model_proto,nodes, response,timer, timer_option,time,cnf );
     auto [sol,resp,fvs] = rerunModelUntilFeasibleOrTle( V, model_proto,nodes,
