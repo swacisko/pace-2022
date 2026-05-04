@@ -443,7 +443,17 @@ tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpM
                         inter_fvs = temp;
                         clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size() << endl;
                     }
-
+                    // else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
+                    //     std::lock_guard<std::mutex> lk(log_mutex);
+                    //     auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
+                    //     if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
+                    //         (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
+                    //         ) {
+                    //         inter_fvs = temp + unhit_graph_dfvs;
+                    //         assert(Utils::isFVS(V,inter_fvs));
+                    //         clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
+                    //     }
+                    // }
                 }
             ));
         }
@@ -501,7 +511,17 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
                     inter_fvs = temp;
                     clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size() << endl;
                 }
-
+                // else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
+                //     std::lock_guard<std::mutex> lk(log_mutex);
+                //     auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
+                //     if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
+                //         (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
+                //         ) {
+                //         inter_fvs = temp + unhit_graph_dfvs;
+                //         assert(Utils::isFVS(V,inter_fvs));
+                //         clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
+                //     }
+                // }
             }
         ));
     }
