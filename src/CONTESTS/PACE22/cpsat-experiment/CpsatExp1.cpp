@@ -817,14 +817,15 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         if ( USE_CYCLE_TRIMMING && (iters_done % CYCLE_TRIMMING_FREQ == 0 || rnd.nextInt(1000) < 1000*CYCLE_TRIMMING_PROBAB ) ) {
             auto hs = best_fvs;
+            string scale = cnf.cycle_trimming_max_cycles_to_trim_scale;
 
             // int R = (CYCLE_TRIMMING_FREQ == 1 ? 1 : 4);
             int R = 4;
             for (int i=0; i<R; i++) {
-                trimCycles(hs,cycles,cnf.scaleIters(N) / (i+1), MIN_NODES_IN_HS + R-1-i); // orig
+                trimCycles(hs,cycles,ExpConfig::scaleIters(N, scale) / (i+1), MIN_NODES_IN_HS + R-1-i);
 
-                // if (CYCLE_TRIMMING_FREQ > 1) trimCycles(hs,cycles,cnf.scaleIters(N) / (i+1), MIN_NODES_IN_HS + R-1-i); // orig
-                // else trimCycles(hs,cycles,cnf.scaleIters(N) / (i+2), MIN_NODES_IN_HS + R-1-i);
+                // if (CYCLE_TRIMMING_FREQ > 1) trimCycles(hs,cycles, cnf.scaleIters(N, scale) / (i+1), MIN_NODES_IN_HS + R-1-i); // orig
+                // else trimCycles(hs,cycles, cnf.scaleIters(N, scale) / (i+2), MIN_NODES_IN_HS + R-1-i);
             }
         }
 
@@ -864,7 +865,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         }
 
 
-        const int MAX_NEW_CYCLES = cnf.scaleIters(N);
+        const int MAX_NEW_CYCLES = ExpConfig::scaleIters(N, cnf.max_new_cycles_iter_scale, cnf.max_new_cycles_per_iter);
 
         bool cond1 = ( new_cycles.size() > MAX_NEW_CYCLES );
         if( ( cnf.unhit_cycle_enumeration_type >= 2 || L > cnf.init_L_for_all_constraints) &&

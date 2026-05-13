@@ -113,7 +113,8 @@ public:
      */
     bool use_cycle_trimming = true;
     int cycle_trimming_freq = inf;
-    double cycle_trimming_probab = 0.66;
+    double cycle_trimming_probab = 0.8;
+    string cycle_trimming_max_cycles_to_trim_scale = "linear_h";
     int cycle_trimming_min_nodes_in_hs = 3;
 
     /**
@@ -123,7 +124,7 @@ public:
 
     string max_new_cycles_iter_scale = "linear"; // options: linear_h, linear, log, sqrt, bounded, unbounded
     int max_new_cycles_per_iter = inf;
-    int scaleIters(int N);
+    static int scaleIters(int N, string scale, int bound = inf);
 
     /**
      * If true, then any time the CPSAT improves a solution, it is checked, whether it is a valid FVS of the graph V.

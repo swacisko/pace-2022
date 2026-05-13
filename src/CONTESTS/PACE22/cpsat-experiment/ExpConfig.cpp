@@ -32,14 +32,22 @@ string parseAlgorithm(int alg)  {
 }
 
 
-int ExpConfig::scaleIters(int N) {
-    if (max_new_cycles_iter_scale == "linear_h") return N/2;
-    if (max_new_cycles_iter_scale == "linear") return N;
-    if (max_new_cycles_iter_scale == "log") return N * ceil(log2(N));
-    if (max_new_cycles_iter_scale == "sqrt") return N * sqrt(N);
-    if ( max_new_cycles_iter_scale == "bounded" ) return max_new_cycles_per_iter;
-    if ( max_new_cycles_iter_scale == "unbounded" ) return inf; // take all
-    assert(false && "invalid max_new_cycles_per_iter_scale");
+int ExpConfig::scaleIters(int N, string scale, int bound) {
+    // if (max_new_cycles_iter_scale == "linear_h") return N/2;
+    // if (max_new_cycles_iter_scale == "linear") return N;
+    // if (max_new_cycles_iter_scale == "log") return N * ceil(log2(N));
+    // if (max_new_cycles_iter_scale == "sqrt") return N * sqrt(N);
+    // if ( max_new_cycles_iter_scale == "bounded" ) return max_new_cycles_per_iter;
+    // if ( max_new_cycles_iter_scale == "unbounded" ) return inf; // take all
+    // assert(false && "invalid max_new_cycles_per_iter_scale");
+
+    if (scale == "linear_h") return N/2;
+    if (scale == "linear") return N;
+    if (scale == "log") return N * ceil(log2(N));
+    if (scale == "sqrt") return N * sqrt(N);
+    if ( scale == "bounded" ) return bound;
+    if ( scale == "unbounded" ) return inf; // take all
+    assert(false && "invalid scale");
     return -1;
 }
 
@@ -70,6 +78,7 @@ vector<pair<string, string>> ExpConfig::getConfigEntries() {
     entries.emplace_back("use_cycle_trimming",to_string(use_cycle_trimming));
     entries.emplace_back("cycle_trimming_probab",to_string(cycle_trimming_probab));
     entries.emplace_back("cycle_trimming_min_nodes_in_hs",to_string(cycle_trimming_min_nodes_in_hs));
+    entries.emplace_back("cycle_trimming_max_cycles_to_trim_scale",cycle_trimming_max_cycles_to_trim_scale);
 
     return entries;
 }
