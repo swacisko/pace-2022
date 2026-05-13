@@ -443,17 +443,17 @@ tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpM
                         inter_fvs = temp;
                         clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size() << endl;
                     }
-                    // else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
-                    //     std::lock_guard<std::mutex> lk(log_mutex);
-                    //     auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
-                    //     if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
-                    //         (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
-                    //         ) {
-                    //         inter_fvs = temp + unhit_graph_dfvs;
-                    //         assert(Utils::isFVS(V,inter_fvs));
-                    //         clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
-                    //     }
-                    // }
+                    else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
+                        std::lock_guard<std::mutex> lk(log_mutex);
+                        auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
+                        if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
+                            (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
+                            ) {
+                            inter_fvs = temp + unhit_graph_dfvs;
+                            assert(Utils::isFVS(V,inter_fvs));
+                            clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
+                        }
+                    }
                 }
             ));
         }
@@ -511,17 +511,17 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
                     inter_fvs = temp;
                     clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size() << endl;
                 }
-                // else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
-                //     std::lock_guard<std::mutex> lk(log_mutex);
-                //     auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
-                //     if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
-                //         (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
-                //         ) {
-                //         inter_fvs = temp + unhit_graph_dfvs;
-                //         assert(Utils::isFVS(V,inter_fvs));
-                //         clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
-                //     }
-                // }
+                else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
+                    std::lock_guard<std::mutex> lk(log_mutex);
+                    auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
+                    if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
+                        (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
+                        ) {
+                        inter_fvs = temp + unhit_graph_dfvs;
+                        assert(Utils::isFVS(V,inter_fvs));
+                        clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
+                    }
+                }
             }
         ));
     }
@@ -916,6 +916,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         VI unhit_graph_dfvs;
 
         if ( Utils::isFVS(V,sol) ) {
+        // if ( Utils::isFVS(V,sol) && (sol.size() <  prev_res.size() +  unhit_cycles_hs.size()) ) {
             iters_streak_with_hs_valid_res++;
 
             if( best_fvs.empty() || sol.size() < best_fvs.size() ) best_fvs = sol;
@@ -924,7 +925,17 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
                 break;
             }else {
                 // cnf.ihs_single_iteration_sec++;
-                cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res;
+
+                // cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res;
+                // cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res-1;
+
+                {
+                    VI init_sol = prev_res +  unhit_cycles_hs;
+                    if (cnf.use_init_sol_as_hint_mode == 3 && !best_fvs.empty() && best_fvs.size() < init_sol.size() ) init_sol = best_fvs;
+                    if (sol.size() < init_sol.size() ) cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res-1;
+                    else cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res;
+                }
+
                 clog << endl << "--> Found a valid FVS, increasing max_time_seconds_per_iter to " << cnf.ihs_single_iteration_sec << " sec." << endl << endl;
             }
 
