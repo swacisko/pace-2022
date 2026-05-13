@@ -777,6 +777,32 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         return r;
     };
 
+    const bool USE_CYCLE_TRIMMING = cnf.use_cycle_trimming;
+    const int CYCLE_TRIMMING_FREQ = cnf.cycle_trimming_freq;
+    const double CYCLE_TRIMMING_PROBAB = cnf.cycle_trimming_probab;
+    const int MIN_NODES_IN_HS = cnf.cycle_trimming_min_nodes_in_hs;
+    auto trimCycles = [&](VI & hs, VVI & cycles, int max_to_trim, int min_nodes_in_hs) {
+        // clog << "\t Trimming cycles" << endl;
+        int trimmed = 0;
+
+        IntGenerator rnd;
+        StandardUtils::shuffle(cycles,rnd);
+        sort(ALL(cycles),[&](auto & c1, auto & c2){ return c1.size() < c2.size(); });
+        VB in_hs = StandardUtils::toVB(N,hs);
+        for ( int i=(int)cycles.size()-1; i>=0; i-- ) {
+            int cnt = accumulate(ALL(cycles[i]),0, [&](int a, int b){ return a + in_hs[b]; });
+            if (cnt >= min_nodes_in_hs) {
+                swap(cycles[i],cycles.back());
+                cycles.pop_back();
+                max_to_trim--;
+                trimmed++;
+                if (max_to_trim == 0) break;
+            }
+        }
+        clog << "\t trimmed " << trimmed << " cycles with at least " << min_nodes_in_hs << " nodes in hs" << endl;
+    };
+
+    IntGenerator rnd;
     while(true) {
         if(timer.tle(timer_option)) break;
         if (iters_done++ > cnf.ihs_max_iterations) break;
@@ -789,6 +815,19 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
              << ", time: " << (int)timer.getTime(timer_option) / 1000 << endl;
 
 
+        if ( USE_CYCLE_TRIMMING && (iters_done % CYCLE_TRIMMING_FREQ == 0 || rnd.nextInt(1000) < 1000*CYCLE_TRIMMING_PROBAB ) ) {
+            auto hs = best_fvs;
+
+            // int R = (CYCLE_TRIMMING_FREQ == 1 ? 1 : 4);
+            int R = 4;
+            for (int i=0; i<R; i++) {
+                trimCycles(hs,cycles,cnf.scaleIters(N) / (i+1), MIN_NODES_IN_HS + R-1-i); // orig
+
+                // if (CYCLE_TRIMMING_FREQ > 1) trimCycles(hs,cycles,cnf.scaleIters(N) / (i+1), MIN_NODES_IN_HS + R-1-i); // orig
+                // else trimCycles(hs,cycles,cnf.scaleIters(N) / (i+2), MIN_NODES_IN_HS + R-1-i);
+            }
+        }
+
         exp_data.iterations.emplace_back();
         // exp_data.iterations.back().hs_size_before_impr = prev_res.size();
         exp_data.iterations.back().max_cycle_length = L;
@@ -798,7 +837,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         s.start("cycles");
         int cycle_enumeration_type = cnf.unhit_cycle_enumeration_type;
-        if ( cycle_enumeration_type == 3 && (iters_done % 2 == 0) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time
+        if ( cycle_enumeration_type == 3 && (iters_done % 2 == 0) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
         VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,200*cnf.ihs_single_iteration_sec, cycle_enumeration_type );
 
 

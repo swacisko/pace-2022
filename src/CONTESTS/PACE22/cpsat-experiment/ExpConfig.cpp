@@ -66,6 +66,10 @@ vector<pair<string, string>> ExpConfig::getConfigEntries() {
     entries.emplace_back("fill_partial_result_using_greedy_fvs",to_string(fill_partial_result_using_greedy_fvs));
     entries.emplace_back("focus_mostly_onh_heuristics",to_string(focus_mostly_onh_heuristics));
     entries.emplace_back("ihs_init_sol_creation_mode",to_string(ihs_init_sol_creation_mode));
+    entries.emplace_back("mtz_auxiliary_cycles_mode",to_string(mtz_auxiliary_cycles_mode));
+    entries.emplace_back("use_cycle_trimming",to_string(use_cycle_trimming));
+    entries.emplace_back("cycle_trimming_probab",to_string(cycle_trimming_probab));
+    entries.emplace_back("cycle_trimming_min_nodes_in_hs",to_string(cycle_trimming_min_nodes_in_hs));
 
     return entries;
 }
