@@ -816,20 +816,20 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         // if (iters_done % 10 == 0) CYCLE_TRIMMING_PROBAB *= 0.92;
 
-        if ( USE_CYCLE_TRIMMING && (iters_done % CYCLE_TRIMMING_FREQ == 0 || rnd.nextInt(1000) < 1000*CYCLE_TRIMMING_PROBAB ) ) {
-            // auto hs = best_fvs;
-            auto hs = prev_res;
-            string scale = cnf.cycle_trimming_max_cycles_to_trim_scale;
-
-            // int R = (CYCLE_TRIMMING_FREQ == 1 ? 1 : 4);
-            int R = 4;
-            for (int i=0; i<R; i++) {
-                trimCycles(hs,cycles,ExpConfig::scaleIters(N, scale) / (i+1), MIN_NODES_IN_HS + R-1-i);
-
-                // if (CYCLE_TRIMMING_FREQ > 1) trimCycles(hs,cycles, cnf.scaleIters(N, scale) / (i+1), MIN_NODES_IN_HS + R-1-i); // orig
-                // else trimCycles(hs,cycles, cnf.scaleIters(N, scale) / (i+2), MIN_NODES_IN_HS + R-1-i);
-            }
-        }
+        // if ( USE_CYCLE_TRIMMING && (iters_done % CYCLE_TRIMMING_FREQ == 0 || rnd.nextInt(1000) < 1000*CYCLE_TRIMMING_PROBAB ) ) {
+        //     // auto hs = best_fvs;
+        //     auto hs = prev_res;
+        //     string scale = cnf.cycle_trimming_max_cycles_to_trim_scale;
+        //
+        //     // int R = (CYCLE_TRIMMING_FREQ == 1 ? 1 : 4);
+        //     int R = 4;
+        //     for (int i=0; i<R; i++) {
+        //         trimCycles(hs,cycles,ExpConfig::scaleIters(N, scale) / (i+1), MIN_NODES_IN_HS + R-1-i);
+        //
+        //         // if (CYCLE_TRIMMING_FREQ > 1) trimCycles(hs,cycles, cnf.scaleIters(N, scale) / (i+1), MIN_NODES_IN_HS + R-1-i); // orig
+        //         // else trimCycles(hs,cycles, cnf.scaleIters(N, scale) / (i+2), MIN_NODES_IN_HS + R-1-i);
+        //     }
+        // }
 
         exp_data.iterations.emplace_back();
         // exp_data.iterations.back().hs_size_before_impr = prev_res.size();
@@ -890,6 +890,15 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
             clog << endl << "---> INCREASING LENGTH, L: " << L << endl << endl;
             exp_data.iterations.pop_back();
             continue;
+        }
+
+        if ( USE_CYCLE_TRIMMING && (iters_done % CYCLE_TRIMMING_FREQ == 0 || rnd.nextInt(1000) < 1000*CYCLE_TRIMMING_PROBAB ) ) {
+            auto hs = prev_res;
+            string scale = cnf.cycle_trimming_max_cycles_to_trim_scale;
+            int R = 4;
+            for (int i=0; i<R; i++) {
+                trimCycles(hs,cycles,ExpConfig::scaleIters(N, scale) / (i+1), MIN_NODES_IN_HS + R-1-i);
+            }
         }
 
         iters_without_new_cycles = 0;

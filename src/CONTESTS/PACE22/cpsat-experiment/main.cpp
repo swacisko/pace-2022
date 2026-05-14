@@ -317,15 +317,46 @@ int main(int argc, char** argv){
     assert(GraphUtils::isSimple(V));
 
     if (cnf.pi_arcs_perc_to_add > 0) {
-        auto arcs = GraphUtils::getGraphEdges(V,true);
-        IntGenerator rnd(894238492);
-        StandardUtils::shuffle(arcs, rnd);
-        int P = cnf.pi_arcs_perc_to_add * arcs.size() / 2;
-        int A = arcs.size();
-        for (int i=0; i<P; i++) arcs.emplace_back( arcs[i].second, arcs[i].first );
-        StandardUtils::makeUnique(arcs);
-        arcs.resize(A);
-        V = GraphUtils::getGraphForEdges(arcs, true);
+        clog << "Adding pi-arcs, ratio before: " << 1.0 * Utils::countPiEdges(V) / GraphUtils::countEdges(V,true) << endl;
+        // auto arcs = GraphUtils::getGraphEdges(V,true);
+        // IntGenerator rnd(894238492);
+        // StandardUtils::shuffle(arcs, rnd);
+        // int P = cnf.pi_arcs_perc_to_add * arcs.size() / 2;
+        // int A = arcs.size();
+        // for (int i=0; i<P; i++) arcs.emplace_back( arcs[i].second, arcs[i].first );
+        // StandardUtils::makeUnique(arcs);
+        // StandardUtils::shuffle(arcs, rnd);
+        // arcs.resize(A);
+        // V = GraphUtils::getGraphForEdges(arcs, true);
+
+        int A = GraphUtils::getGraphEdges(V,true).size();
+        auto revV = GraphUtils::reverseGraph(V);
+        VB helper(V.size());
+        VPII pi_arcs = Utils::getAllPIEdges(V,revV, helper);
+        auto npnpiV = Utils::getNonPIGraph(V);
+        auto nonpi_arcs = GraphUtils::getGraphEdges(npnpiV,true);
+        assert( pi_arcs.size() + nonpi_arcs.size() == A );
+
+        IntGenerator rnd(2839244);
+        StandardUtils::shuffle(nonpi_arcs, rnd);
+
+        DEBUG(pi_arcs.size());
+        DEBUG(nonpi_arcs.size());
+        while ( pi_arcs.size() < cnf.pi_arcs_perc_to_add * A ) {
+            auto [a,b] = nonpi_arcs.back();
+            nonpi_arcs.pop_back();
+            nonpi_arcs.pop_back();
+            pi_arcs.emplace_back(a,b);
+            pi_arcs.emplace_back(b,a);
+        }
+        DEBUG(pi_arcs.size());
+        DEBUG(nonpi_arcs.size());
+
+        VPII all_arcs = pi_arcs + nonpi_arcs;
+        assert(all_arcs.size() == A);
+        V = GraphUtils::getGraphForEdges(all_arcs,true);
+
+        clog << "\t added pi-arcs, ratio after: " << 1.0 * Utils::countPiEdges(V) / GraphUtils::countEdges(V,true) << endl;
     }
 
     DEBUG(V.size());
