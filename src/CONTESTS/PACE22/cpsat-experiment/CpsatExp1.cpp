@@ -840,7 +840,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         s.start("cycles");
         int cycle_enumeration_type = cnf.unhit_cycle_enumeration_type;
-        if ( cycle_enumeration_type == 3 && (iters_done % 2 == 0) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
+        // if ( cycle_enumeration_type == 3 && (iters_done % 2 == 0) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
+        if ( cycle_enumeration_type == 3 && rnd.nextInt(5) == 0 ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
         VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,200*cnf.ihs_single_iteration_sec, cycle_enumeration_type );
 
 
@@ -921,24 +922,27 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         // if ( Utils::isFVS(V,sol) && (sol.size() <  prev_res.size() +  unhit_cycles_hs.size()) ) {
             iters_streak_with_hs_valid_res++;
 
-            if( best_fvs.empty() || sol.size() < best_fvs.size() ) best_fvs = sol;
+            VI init_sol = prev_res +  unhit_cycles_hs;
+            if (cnf.use_init_sol_as_hint_mode == 3 && !best_fvs.empty() && best_fvs.size() < init_sol.size() ) init_sol = best_fvs;
+
+            if( best_fvs.empty() || sol.size() <= best_fvs.size() ) best_fvs = sol;
             if(cnf.find_optimal_result) {
                 assert( best_fvs.size() == sol.size() );
                 break;
             }else {
-                // cnf.ihs_single_iteration_sec++;
+                DEBUG(sol.size());
+                DEBUG(init_sol.size());
+                DEBUG(best_fvs.size());
 
-                // cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res;
-                // cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res-1;
-
-                {
-                    VI init_sol = prev_res +  unhit_cycles_hs;
-                    if (cnf.use_init_sol_as_hint_mode == 3 && !best_fvs.empty() && best_fvs.size() < init_sol.size() ) init_sol = best_fvs;
-                    if (sol.size() < init_sol.size() ) cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res-1;
-                    else cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res;
+                // if (sol.size() < init_sol.size() ) {
+                if (sol.size() < best_fvs.size() ) {
+                    cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res-1;
+                    clog << endl << "--> Found a valid FVS, not increasing max_time_seconds_per_iter" << endl;
                 }
-
-                clog << endl << "--> Found a valid FVS, increasing max_time_seconds_per_iter to " << cnf.ihs_single_iteration_sec << " sec." << endl << endl;
+                else {
+                    cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res;
+                    clog << endl << "--> Found a valid FVS, increasing max_time_seconds_per_iter to " << cnf.ihs_single_iteration_sec << " sec." << endl << endl;
+                }
             }
 
         }else iters_streak_with_hs_valid_res = 0;

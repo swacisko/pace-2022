@@ -362,3 +362,22 @@ int main(int argc, char** argv){
 
     return 0;
 }
+
+/**
+--threads=6
+--mtd=ex_mtd_file.csv
+--time=180
+--iter_time=1
+--find_optimal=false
+--alg=ihs
+--log_cpsat_progress=false
+--cycle_enumeration=3
+--init_L=4
+--max_new_cycles_iter_scale=linear
+--mtz_auxiliary_cycles_mode=2
+--pi_arcs_perc_to_add=0.0
+--use_init_sol_as_hint_mode=3
+--use_cycle_trimming=true
+--cycle_trimming_probab=0.5
+--focus_mostly_onh_heuristics=true
+ */
