@@ -779,7 +779,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
     const bool USE_CYCLE_TRIMMING = cnf.use_cycle_trimming;
     const int CYCLE_TRIMMING_FREQ = cnf.cycle_trimming_freq;
-    const double CYCLE_TRIMMING_PROBAB = cnf.cycle_trimming_probab;
+    double CYCLE_TRIMMING_PROBAB = cnf.cycle_trimming_probab;
     const int MIN_NODES_IN_HS = cnf.cycle_trimming_min_nodes_in_hs;
     auto trimCycles = [&](VI & hs, VVI & cycles, int max_to_trim, int min_nodes_in_hs) {
         // clog << "\t Trimming cycles" << endl;
@@ -814,9 +814,11 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
              << ", prev_res.size(): " << prev_res.size() << ", best_fvs.size(): " << best_fvs.size()
              << ", time: " << (int)timer.getTime(timer_option) / 1000 << endl;
 
+        // if (iters_done % 10 == 0) CYCLE_TRIMMING_PROBAB *= 0.92;
 
         if ( USE_CYCLE_TRIMMING && (iters_done % CYCLE_TRIMMING_FREQ == 0 || rnd.nextInt(1000) < 1000*CYCLE_TRIMMING_PROBAB ) ) {
-            auto hs = best_fvs;
+            // auto hs = best_fvs;
+            auto hs = prev_res;
             string scale = cnf.cycle_trimming_max_cycles_to_trim_scale;
 
             // int R = (CYCLE_TRIMMING_FREQ == 1 ? 1 : 4);

@@ -151,6 +151,11 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("run_experiment", false);
     ap.addOption("focus_mostly_onh_heuristics", false);
     ap.addOption("ihs_init_sol_creation_mode", false);
+    ap.addOption("use_cycle_trimming", false);
+    ap.addOption("cycle_trimming_freq", false);
+    ap.addOption("cycle_trimming_probab", false);
+    ap.addOption("cycle_trimming_min_nodes_in_hs", false);
+    ap.addOption("cycle_trimming_max_cycles_to_trim_scale", false);
     // ap.addOption("fill_partial_result_using_greedy_fvs", false);
 
     ap.parse(argc, argv);
@@ -185,6 +190,11 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("run_experiment", "bool", &run_experiment);
     ap.findAndAssign("focus_mostly_onh_heuristics", "bool", &cnf.focus_mostly_onh_heuristics);
     ap.findAndAssign("ihs_init_sol_creation_mode", "int", &cnf.ihs_init_sol_creation_mode);
+    ap.findAndAssign("use_cycle_trimming", "bool", &cnf.use_cycle_trimming);
+    ap.findAndAssign("cycle_trimming_freq", "int", &cnf.cycle_trimming_freq);
+    ap.findAndAssign("cycle_trimming_probab", "double", &cnf.cycle_trimming_probab);
+    ap.findAndAssign("cycle_trimming_min_nodes_in_hs", "int", &cnf.cycle_trimming_min_nodes_in_hs);
+    ap.findAndAssign("cycle_trimming_max_cycles_to_trim_scale", "string", &cnf.cycle_trimming_max_cycles_to_trim_scale);
     // ap.findAndAssign("fill_partial_result_using_greedy_fvs", "bool", &cnf.fill_partial_result_using_greedy_fvs);
 
 

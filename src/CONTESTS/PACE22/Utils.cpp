@@ -1418,8 +1418,33 @@ namespace Utils{
             return chrono::duration<double, std::milli >(chrono::steady_clock::now() - start_time ).count();
         };
 
+        constexpr int inf = 1e9+1;
+        int arcs_cnt = accumulate(ALL(A), 0, [&](int a, int b){ return a + V[b].size(); });
+        const bool use_distance_trimming = ( arcs_cnt < 5e3 ) && false;
+        VI dst;
+        if (use_distance_trimming) dst = VI(N,inf);
+        auto findDst = [&](int beg) {
+            for (int d : A) dst[d] = inf;
+            VI neigh;
+            dst[beg] = 0;
+            neigh.push_back(beg);
+            for (int i=0; i<neigh.size(); i++) {
+                int v = neigh[i];
+                for (int d : revV[v]) if (in_V[d] && dst[d] == inf) {
+                    dst[d] = dst[v] + 1;
+                    neigh.push_back(d);
+                }
+            }
+        };
+
+
         function<void(int,VI&)> findSimpleCycles = [&](int num, VI & C){
-            if( cycle_length+1 >= max_cycle_length) return;
+            // if( cycle_length+1 >= max_cycle_length) return;
+            if (!use_distance_trimming) {
+                if( cycle_length+1 >= max_cycle_length) return;
+            }else {
+                if ( cycle_length+dst[num] >= max_cycle_length) return;
+            }
             if(getMillisFromStart() > millis) return;
 
             cycle_length++;
@@ -1454,6 +1479,8 @@ namespace Utils{
         for( int v : A) {
             if(getMillisFromStart() > millis) break;
             in_V[v] = true;
+
+            if (use_distance_trimming) findDst(v);
 
             { // here we check if there exists a cycle of length 2
                 for (int d : revV[v]) is_end[d] = true;
