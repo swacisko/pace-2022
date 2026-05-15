@@ -113,7 +113,7 @@ public:
      */
     bool use_cycle_trimming = true;
     int cycle_trimming_freq = inf;
-    double cycle_trimming_probab = 0.75;
+    double cycle_trimming_probab = 0.5;
     string cycle_trimming_max_cycles_to_trim_scale = "linear_h";
     int cycle_trimming_min_nodes_in_hs = 3;
 
