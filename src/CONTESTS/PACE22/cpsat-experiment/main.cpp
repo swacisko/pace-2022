@@ -409,6 +409,6 @@ int main(int argc, char** argv){
 --pi_arcs_perc_to_add=0.0
 --use_init_sol_as_hint_mode=3
 --use_cycle_trimming=true
---cycle_trimming_probab=0.5
+--cycle_trimming_probab=0.75
 --focus_mostly_onh_heuristics=true
  */

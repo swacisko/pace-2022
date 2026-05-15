@@ -841,8 +841,12 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         s.start("cycles");
         int cycle_enumeration_type = cnf.unhit_cycle_enumeration_type;
         // if ( cycle_enumeration_type == 3 && (iters_done % 2 == 0) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
-        if ( cycle_enumeration_type == 3 && rnd.nextInt(5) == 0 ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
-        VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L,200*cnf.ihs_single_iteration_sec, cycle_enumeration_type );
+        if ( cycle_enumeration_type == 3 && (rnd.nextInt(5) == 0 && (iters_done > 1)) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
+        // if ( cycle_enumeration_type == 3 && (rnd.nextInt(5) == 0 || (iters_done == 1)) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
+
+        int cycle_enumeration_time_millis = 200*cnf.ihs_single_iteration_sec;
+        // if (iters_done == 1) cycle_enumeration_time_millis = 1000 * cnf.ihs_single_iteration_sec;
+        VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L, cycle_enumeration_time_millis, cycle_enumeration_type );
 
 
         {
@@ -868,7 +872,9 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         }
 
 
-        const int MAX_NEW_CYCLES = ExpConfig::scaleIters(N, cnf.max_new_cycles_iter_scale, cnf.max_new_cycles_per_iter);
+        int MAX_NEW_CYCLES = ExpConfig::scaleIters(N, cnf.max_new_cycles_iter_scale, cnf.max_new_cycles_per_iter);
+        // if (iters_done == 1) MAX_NEW_CYCLES = N * sqrt(N); // for the first iteration, we want to have many short cycles
+        // if (iters_done == 1) MAX_NEW_CYCLES = N * log2(N); // for the first iteration, we want to have many short cycles
 
         bool cond1 = ( new_cycles.size() > MAX_NEW_CYCLES );
         if( ( cnf.unhit_cycle_enumeration_type >= 2 || L > cnf.init_L_for_all_constraints) &&
@@ -876,7 +882,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
             ) {
             StandardUtils::shuffle(new_cycles);
             sort(ALL(new_cycles),[&](auto & c1, auto & c2){ return c1.size() < c2.size(); });
-            if ( L == cnf.init_L_for_all_constraints ) {
+            if ( L == cnf.init_L_for_all_constraints ) { // in the first iteration we must add all cycles of length <= L
                 int p = 0;
                 while ( p < new_cycles.size() && new_cycles[p].size() <= L ) p++;
                 new_cycles.resize( max(p,MAX_NEW_CYCLES) );
@@ -1015,8 +1021,14 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         if ( response_status == CpSolverStatus::OPTIMAL && Utils::isFVS(V,sol) ) break;
 
-        // constexpr int B = 50'000;
-        // cnf.ihs_single_iteration_sec = max( cnf.ihs_single_iteration_sec, 1 + (int)cycles.size() / B );
+        // if ( USE_CYCLE_TRIMMING && (iters_done % CYCLE_TRIMMING_FREQ == 0 || rnd.nextInt(1000) < 1000*CYCLE_TRIMMING_PROBAB ) ) {
+        //     auto hs = prev_res;
+        //     string scale = cnf.cycle_trimming_max_cycles_to_trim_scale;
+        //     int R = 4;
+        //     for (int i=0; i<R; i++) {
+        //         trimCycles(hs,cycles,ExpConfig::scaleIters(N, scale) / (i+1), MIN_NODES_IN_HS + R-1-i);
+        //     }
+        // }
     }
 
     timer.stop(timer_option);
@@ -1076,7 +1088,7 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
         auto new_cnf = cnf;
         new_cnf.ihs_max_iterations = cnf.ihs_iterations_in_mtz;
         new_cnf.max_time_sec = 0.2 * ( timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000;
-        if (cnf.find_optimal_result ) cnf.max_time_sec = 30;
+        if (cnf.find_optimal_result) cnf.max_time_sec = 30;
         VVI cycles;
         VI res;
         auto r = solveIHS(V,new_cnf,cycles, res);
@@ -1130,7 +1142,7 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
         solver_model.Add(NewFeasibleSolutionObserver(
             [&](const CpSolverResponse& r) {
                 std::lock_guard<std::mutex> lk(log_mutex);
-                // std::cout << "obj=" << r.objective_value() << " bound=" << r.best_objective_bound() << " time=" << r.wall_time() << '\n';
+                clog << "obj=" << r.objective_value() << " bound=" << r.best_objective_bound() << " time=" << r.wall_time() << '\n';
                 addStats(r.objective_value(), r.best_objective_bound(), (int)r.wall_time() * 1000);
             }
         ));
