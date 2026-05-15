@@ -118,7 +118,7 @@ public:
     int cycle_trimming_min_nodes_in_hs = 3;
 
 
-    bool use_ihs_intermittent_cycle_constraints = false;
+    bool use_ihs_intermittent_cycle_constraints = true;
 
     /**
      * This is the value, for which all cycles of at most this length will be created as constraints.
