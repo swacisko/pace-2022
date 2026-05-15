@@ -926,7 +926,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         int MAX_NEW_CYCLES = ExpConfig::scaleIters(N, cnf.max_new_cycles_iter_scale, cnf.max_new_cycles_per_iter);
         // if (iters_done == 1) MAX_NEW_CYCLES = max(MAX_NEW_CYCLES, int(N * sqrt(N))); // for the first iteration, we want to have many short cycles
-        if (iters_done == 1) MAX_NEW_CYCLES = max(MAX_NEW_CYCLES, int(N * log2(N)) ); // for the first iteration, we want to have many short cycles
+        // if (iters_done == 1) MAX_NEW_CYCLES = max(MAX_NEW_CYCLES, int(N * log2(N)) ); // for the first iteration, we want to have many short cycles
 
         bool cond1 = ( new_cycles.size() > MAX_NEW_CYCLES );
         if( ( cnf.unhit_cycle_enumeration_type >= 2 || L > cnf.init_L_for_all_constraints) &&
