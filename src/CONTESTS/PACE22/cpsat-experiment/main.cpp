@@ -156,6 +156,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.addOption("cycle_trimming_probab", false);
     ap.addOption("cycle_trimming_min_nodes_in_hs", false);
     ap.addOption("cycle_trimming_max_cycles_to_trim_scale", false);
+    ap.addOption("use_ihs_intermittent_cycle_constraints", false);
     // ap.addOption("fill_partial_result_using_greedy_fvs", false);
 
     ap.parse(argc, argv);
@@ -195,6 +196,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("cycle_trimming_probab", "double", &cnf.cycle_trimming_probab);
     ap.findAndAssign("cycle_trimming_min_nodes_in_hs", "int", &cnf.cycle_trimming_min_nodes_in_hs);
     ap.findAndAssign("cycle_trimming_max_cycles_to_trim_scale", "string", &cnf.cycle_trimming_max_cycles_to_trim_scale);
+    ap.findAndAssign("use_ihs_intermittent_cycle_constraints", "bool", &cnf.use_ihs_intermittent_cycle_constraints);
     // ap.findAndAssign("fill_partial_result_using_greedy_fvs", "bool", &cnf.fill_partial_result_using_greedy_fvs);
 
 

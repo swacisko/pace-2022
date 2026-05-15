@@ -163,7 +163,7 @@ void ExpData::writeToFile(ExpConfig cnf) {
 }
 
 VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis, int enumeration_option) {
-    clog << "\t Looking for cycles for at most " << max_millis << " millis" << endl;
+    // clog << "\t Looking for cycles for at most " << max_millis << " millis" << endl;
     VVI all_cycles;
 
     if (enumeration_option == 3) max_millis /= 2;
@@ -470,7 +470,23 @@ tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpM
     return { {}, CpSolverStatus::UNKNOWN, VI{} };
 }
 
-tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &prev_res, VI &init_sol, Stopwatch &timer,
+static void makeCyclesUnique(int N, VVI &cycles) {
+    vector<LL> hashes(N);
+    IntGenerator rnd;
+    for (int i=0; i<N; i++) hashes[i] = rnd.rand();
+    auto getHash = [&](VI cyc)-> LL {
+        LL h = 0;
+        for (int d : cyc) h ^= hashes[d];
+        return h;
+    };
+    map<LL,VI> unique_cycles;
+    for ( const auto& cyc : cycles ) unique_cycles[getHash(cyc)] = cyc;
+    cycles.clear();
+    for( auto & cyc : views::values(unique_cycles) ) cycles.push_back(cyc);
+    StandardUtils::shuffle(cycles,rnd);
+}
+
+tuple<VI,CpSolverStatus, VI, VVI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles, VI &prev_res, VI &init_sol, Stopwatch &timer,
     string timer_option, ExpConfig& cnf) {
 
     int N = V.size();
@@ -496,6 +512,7 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
     if (cnf.next_sol_max_dst_from_init_sol != inf && !prev_res.empty()) addMaxHammingDstConstraint(model,nodes,init_sol,cnf);
 
     VI inter_fvs;
+    VVI intermittent_cycles;
     if ( cnf.check_incumbent_cpsat_solutions ) {
         mutex log_mutex;
         solver_model.Add(NewFeasibleSolutionObserver(
@@ -521,6 +538,11 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
                         assert(Utils::isFVS(V,inter_fvs));
                         clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
                     }
+
+                    if (cnf.use_ihs_intermittent_cycle_constraints) {
+                        auto unhit_cycles = getUnhitChordlessCycles(V,temp, 30, 30, 2);
+                        intermittent_cycles += unhit_cycles;
+                    }
                 }
             }
         ));
@@ -531,11 +553,13 @@ tuple<VI,CpSolverStatus, VI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cycles,
     CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
     // if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
 
+    if (cnf.use_ihs_intermittent_cycle_constraints) makeCyclesUnique(N,intermittent_cycles);
+
     // return rerunModelUntilFeasibleOrTle( V, model_proto,nodes, response,timer, timer_option,time,cnf );
     auto [sol,resp,fvs] = rerunModelUntilFeasibleOrTle( V, model_proto,nodes,
         response,timer, timer_option, init_sol, time,cnf );
     if ( !inter_fvs.empty() && (fvs.empty() || inter_fvs.size() < fvs.size()) ) fvs = inter_fvs;
-    return {sol,resp,fvs};
+    return {sol,resp,fvs, intermittent_cycles};
 }
 
 VI CpsatExp1::getUnhitCyclesHSGreedy(VVI &cycles) {
@@ -615,6 +639,7 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
 
     constexpr int max_l = inf;
 
+    VVI prev_iter_intermittent_cycles;
 
     for (int L=cnf.init_L_for_all_constraints; L <= max_l ; L++) {
         if ( !cnf.find_optimal_result && timer.tle(timer_option)) {
@@ -654,7 +679,7 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
 
         if (timer.tle(timer_option)) break;
 
-        auto [sol,response_status, inter_fvs] = solveHSLocal(cycles, unhit_cycles_hs);
+        auto [sol,response_status, inter_fvs, intermittent_cycles] = solveHSLocal(cycles, unhit_cycles_hs);
         clog << "\t found hs of size sol.size(): " << sol.size() << endl;
         clog << "\t "; DEBUG(Utils::isFVS(V,sol));
 
@@ -663,7 +688,7 @@ ExpData CpsatExp1::solveHS(VVI V, ExpConfig cnf) {
 
         if ( !cnf.find_optimal_result && Utils::isFVS(V,sol) && !timer.tle(timer_option) ) {
             cnf.ihs_single_iteration_sec *= 3;
-            tie(sol,response_status, inter_fvs) = solveHSLocal(cycles, unhit_cycles_hs);
+            tie(sol,response_status, inter_fvs, intermittent_cycles) = solveHSLocal(cycles, unhit_cycles_hs);
             clog << "\t found hs of size sol.size(): " << sol.size() << endl;
             clog << "\t "; DEBUG(Utils::isFVS(V,sol));
         }
@@ -802,6 +827,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         clog << "\t trimmed " << trimmed << " cycles with at least " << min_nodes_in_hs << " nodes in hs" << endl;
     };
 
+    VVI prev_iter_intermittent_cycles;
+
     IntGenerator rnd;
     while(true) {
         if(timer.tle(timer_option)) break;
@@ -845,9 +872,34 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         // if ( cycle_enumeration_type == 3 && (rnd.nextInt(5) == 0 || (iters_done == 1)) ) cycle_enumeration_type = 1; // take every second iteration, just to be able to increase L after some time #original
 
         int cycle_enumeration_time_millis = 200*cnf.ihs_single_iteration_sec;
-        // if (iters_done == 1) cycle_enumeration_time_millis = 1000 * cnf.ihs_single_iteration_sec;
+        if (iters_done == 1) cycle_enumeration_time_millis = 1000 * cnf.ihs_single_iteration_sec;
         VVI new_cycles = getUnhitChordlessCycles(V,prev_res,L, cycle_enumeration_time_millis, cycle_enumeration_type );
 
+        if (cnf.use_ihs_intermittent_cycle_constraints &&cnf.unhit_cycle_enumeration_type != 1 ) {
+            VB W = StandardUtils::toVB(N,prev_res);
+            for (int i=(int)prev_iter_intermittent_cycles.size()-1; i>=0; i--) { // removing intermittent cycles that are hit by prev_res
+                auto & cyc = prev_iter_intermittent_cycles[i];
+                bool hit = false;
+                for (int d : cyc) hit |= W[d];
+                if (hit) {
+                    swap(prev_iter_intermittent_cycles[i],prev_iter_intermittent_cycles.back());
+                    prev_iter_intermittent_cycles.pop_back();
+                }
+            }
+            new_cycles += prev_iter_intermittent_cycles;
+            makeCyclesUnique(N,new_cycles);
+        }
+
+        // VVI new_cycles;
+        // if ( !cnf.use_ihs_intermittent_cycle_constraints || prev_iter_intermittent_cycles.empty() || cycle_enumeration_type == 1 ) {
+        //     new_cycles = getUnhitChordlessCycles(V,prev_res,L, cycle_enumeration_time_millis, cycle_enumeration_type );
+        // }
+        // else {
+        //     clog << "\t using " << prev_iter_intermittent_cycles.size() << " intermittent cycles from previous iteration" << endl;
+        //     new_cycles = prev_iter_intermittent_cycles;
+        // }
+
+        prev_iter_intermittent_cycles.clear();
 
         {
             int all_arcs = GraphUtils::countEdges(V,true);
@@ -873,8 +925,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
 
         int MAX_NEW_CYCLES = ExpConfig::scaleIters(N, cnf.max_new_cycles_iter_scale, cnf.max_new_cycles_per_iter);
-        // if (iters_done == 1) MAX_NEW_CYCLES = N * sqrt(N); // for the first iteration, we want to have many short cycles
-        // if (iters_done == 1) MAX_NEW_CYCLES = N * log2(N); // for the first iteration, we want to have many short cycles
+        // if (iters_done == 1) MAX_NEW_CYCLES = max(MAX_NEW_CYCLES, int(N * sqrt(N))); // for the first iteration, we want to have many short cycles
+        if (iters_done == 1) MAX_NEW_CYCLES = max(MAX_NEW_CYCLES, int(N * log2(N)) ); // for the first iteration, we want to have many short cycles
 
         bool cond1 = ( new_cycles.size() > MAX_NEW_CYCLES );
         if( ( cnf.unhit_cycle_enumeration_type >= 2 || L > cnf.init_L_for_all_constraints) &&
@@ -925,7 +977,23 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         exp_data.iterations.back().hs_size_before_impr = prev_res.size() + unhit_cycles_hs.size();
 
         cycles += new_cycles;
-        auto [sol,response_status, inter_fvs] = solveHSLocal(cycles, unhit_cycles_hs);
+
+        // int C0 = cycles.size();
+        // makeCyclesUnique(N, cycles);
+        // assert(cycles.size() == C0);
+
+        auto [sol,response_status, inter_fvs, intermittent_cycles] = solveHSLocal(cycles, unhit_cycles_hs);
+        // if ( cnf.use_ihs_intermittent_cycle_constraints && cnf.unhit_cycle_enumeration_type == 1 ) {
+        if ( cnf.use_ihs_intermittent_cycle_constraints ) {
+            for (int i=(int)intermittent_cycles.size()-1; i>=0; i--) {
+                if (intermittent_cycles[i].size() > L) {
+                    swap(intermittent_cycles[i],intermittent_cycles.back());
+                    intermittent_cycles.pop_back();
+                }
+            }
+        }
+        if (cnf.use_ihs_intermittent_cycle_constraints) clog << "\t found " << intermittent_cycles.size() << " intermittent cycles" << endl;
+
         clog << "\t found hs of size sol.size(): " << sol.size() << endl;
         clog << "\t "; DEBUG(Utils::isFVS(V,sol));
         if (cnf.find_optimal_result) assert(response_status == CpSolverStatus::OPTIMAL);
@@ -1015,6 +1083,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         if (full_sol.size() <= best_fvs.size() || best_fvs.empty()) {
             best_fvs = full_sol;
         }
+        prev_iter_intermittent_cycles = intermittent_cycles;
 
         clog << "\t found sol.size(): " << sol.size() << ", unhit_graph_fvs_size: " << unhit_graph_dfvs.size()
              << ", full_sol.size(): " << full_sol.size() << ", best_fvs.size(): " << best_fvs.size() << endl;

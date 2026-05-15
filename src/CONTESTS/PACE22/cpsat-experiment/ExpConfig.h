@@ -117,6 +117,9 @@ public:
     string cycle_trimming_max_cycles_to_trim_scale = "linear_h";
     int cycle_trimming_min_nodes_in_hs = 3;
 
+
+    bool use_ihs_intermittent_cycle_constraints = true;
+
     /**
      * This is the value, for which all cycles of at most this length will be created as constraints.
      */
