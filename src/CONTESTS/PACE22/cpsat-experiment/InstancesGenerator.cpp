@@ -16,7 +16,7 @@ vector<string> classes = {"er", "torus", "circulant", "circulant2", "circulant3"
 // VI Ns = {5'000, 10'000, 20'000, 40'000};
 // VD avg_outdegs = {2.5, 5, 10, 20};
 
-VI Ns = {500, 1'000, 1500};
+VI Ns = {500, 1'000, 1'500};
 VD avg_outdegs = {3, 5, 10, 20};
 
 int representatives = 5;
@@ -37,7 +37,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
 
     string class_name = classes[test_id / (B*C*R) % A];
     int N = Ns[test_id / (C*R) % B];
-    double deg = avg_outdegs[R % C];
+    double deg = avg_outdegs[test_id / R % C];
     int repr = test_id % R;
 
     clog << "Creating instance " << test_id << " of class " << class_name << " with N="
