@@ -12,35 +12,37 @@ void InstancesGenerator::createHardcodedTests() {
 
 }
 
-vector<string> classes = {"er", "torus", "cyclic"};
+vector<string> classes = {"er", "torus", "circulant", "circulant2", "circulant3"};
 // VI Ns = {5'000, 10'000, 20'000, 40'000};
 // VD avg_outdegs = {2.5, 5, 10, 20};
 
-// VI Ns = {250, 500, 1'000};
-// VD avg_outdegs = {3, 5, 10, 20};
+VI Ns = {500, 1'000, 1500};
+VD avg_outdegs = {3, 5, 10, 20};
 
-VI Ns = {500};
-VD avg_outdegs = {5};
-
-// int A = Ns.size() * avg_outdegs.size(); // 12 instances altogether
-// int B = Ns.size() * avg_outdegs.size(); // 12 instances - no need for the 'super dense' one, neighborhood sizes: 4, 4+8=12, 4+8+12=24, 4+8+12+16=40, 4+8+12+16+20 = 60
-// // int B = Ns.size() * (degs.size()-1); // 9 instances - no need for the 'super dense' one, neighborhood sizes: 4, 4+8=12, 4+8+12=24, 4+8+12+16=40, 4+8+12+16+20 = 60
-// int C = Ns.size() * avg_outdegs.size(); // 12 instances
-int total = classes.size() * Ns.size() * avg_outdegs.size();
+int representatives = 5;
+int total = representatives * classes.size() * Ns.size() * avg_outdegs.size();
 
 void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
     test_id -= hardcoded_test_count;
 
+
     int A = classes.size();
     int B = Ns.size();
     int C = avg_outdegs.size();
+    int R = representatives;
 
-    string class_name = classes[test_id / (B*C) % A];
-    int N = Ns[test_id / C % B];
-    double deg = avg_outdegs[test_id % C];
+    // string class_name = classes[test_id / (B*C) % A];
+    // int N = Ns[test_id / C % B];
+    // double deg = avg_outdegs[test_id % C];
 
-    clog << "Creating instance " << test_id << " of class " << class_name << " with N=" << N << " and avg_outdeg=" << deg << endl;
-    string instance_name = class_name + "_" + to_string(N) + "_" + to_string((int)deg);
+    string class_name = classes[test_id / (B*C*R) % A];
+    int N = Ns[test_id / (C*R) % B];
+    double deg = avg_outdegs[R % C];
+    int repr = test_id % R;
+
+    clog << "Creating instance " << test_id << " of class " << class_name << " with N="
+         << N << " and avg_outdeg=" << deg << " (repr " << repr << ")" << endl;
+    string instance_name = class_name + "_" + to_string(N) + "_" + to_string((int)deg) + "_" + to_string(repr);
     clog << "\t\tinstance_name: " << instance_name << endl;
 
     input_files_to_rename[test_id + hardcoded_test_count] = instance_name;
@@ -155,13 +157,12 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         V = randomNeighborhoodClosure(V,max_distance,ceil(deg));
     }
 
-    if (class_name == "cyclic") {
+    if (class_name == "circulant") {
         VI perm(N);
         iota(ALL(perm),0);
         IntGenerator rnd;
         StandardUtils::shuffle(perm,rnd);
-        int offset = 0;
-        int window_size = 3 * max(sqrt(N), deg);
+        int window_size = 3 * sqrt(N);
         assert(window_size > deg);
         if (window_size < deg) window_size = deg;
 
@@ -169,7 +170,45 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         for ( int i=0; i<N; i++ ) {
             zb.clear();
             while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size));
-            for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+offset+d) % perm.size() ] );
+            for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+d) % perm.size() ] );
+        }
+    }
+
+    if (class_name == "circulant2") {
+        VI perm(N);
+        iota(ALL(perm),0);
+        IntGenerator rnd;
+        StandardUtils::shuffle(perm,rnd);
+        int window_size = 3 * sqrt(N);
+        assert(window_size > deg);
+        if (window_size < deg) window_size = deg;
+
+        unordered_set<int> zb;
+        for ( int i=0; i<N; i++ ) {
+            zb.clear();
+            while ( zb.size() < ceil(deg-1) ) zb.insert(rnd.nextInt(window_size));
+            for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+d) % perm.size() ] );
+            V[perm[i]].push_back( perm[ (i-1-(int)rnd.nextInt(window_size)+N) % N ] );
+        }
+    }
+
+    if (class_name == "circulant3") {
+        VI perm(N);
+        iota(ALL(perm),0);
+        IntGenerator rnd;
+        StandardUtils::shuffle(perm,rnd);
+        int window_size = 3 * sqrt(N);
+        assert(window_size > deg);
+        if (window_size < deg) window_size = deg;
+
+        unordered_set<int> zb;
+        for ( int i=0; i<N; i++ ) {
+            zb.clear();
+            while ( zb.size() < ceil(deg) ) {
+                int x = ( i - window_size + (int)rnd.nextInt(2*window_size+1) + N ) % N;
+                if ( x != i ) zb.insert(x);
+            }
+            for ( int d : zb ) V[perm[i]].push_back( perm[d] );
         }
     }
 
@@ -202,7 +241,8 @@ int main() {
 
     // InstancesGenerator ig("dfvs-instances-small-334", total);
     // InstancesGenerator ig("dfvs-instances-representatives-small", total);
-    InstancesGenerator ig("dfvs-instances-representatives-minimal", total);
+    // InstancesGenerator ig("dfvs-instances-representatives-minimal", total);
+    InstancesGenerator ig("dfvs-instances-representatives-large", total);
     ig.threads = 1;
     ig.generate();
 
