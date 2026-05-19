@@ -13,6 +13,7 @@ enum Algorithm {
     MTZ = 2,
     DIVERSES = 3,
     DIV_IHS = 4,
+    FHS = 5,
 };
 
 string parseAlgorithm(int alg);

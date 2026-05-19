@@ -4,6 +4,7 @@
 
 #include "CpsatExp1.h"
 
+#include "CombinatoricUtils.h"
 #include "GraphUtils.h"
 #include "StandardUtils.h"
 #include "Stopwatch.h"
@@ -162,7 +163,7 @@ void ExpData::writeToFile(ExpConfig cnf) {
     str.close();
 }
 
-VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis, int enumeration_option) {
+VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis, int enumeration_option, int trees_to_consider_in_tree_enum) {
     // clog << "\t Looking for cycles for at most " << max_millis << " millis" << endl;
     VVI all_cycles;
 
@@ -278,6 +279,8 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
         VVI cycles;
         VI perm(N); iota(ALL(perm),0);
         StandardUtils::shuffle(perm,rnd);
+
+        if (perm.size() > trees_to_consider_in_tree_enum) perm.resize(trees_to_consider_in_tree_enum);
 
         for (int v : perm) {
             if ( sw.tle("cycles") ) break;
@@ -441,7 +444,8 @@ tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpM
                     if ( Utils::isFVS(V,temp) ) {
                         std::lock_guard<std::mutex> lk(log_mutex);
                         inter_fvs = temp;
-                        clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size() << endl;
+                        if (temp.size() < init_sol.size()) clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size()
+                             << ", while HS size: " << temp.size() << endl;
                     }
                     else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
                         std::lock_guard<std::mutex> lk(log_mutex);
@@ -451,7 +455,8 @@ tuple<VI,CpSolverStatus,VI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V, CpM
                             ) {
                             inter_fvs = temp + unhit_graph_dfvs;
                             assert(Utils::isFVS(V,inter_fvs));
-                            clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
+                            if (temp.size() < init_sol.size()) clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size()
+                                 << ", while HS size: " << temp.size() << endl;
                         }
                     }
                 }
@@ -519,14 +524,16 @@ tuple<VI,CpSolverStatus, VI, VVI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cy
             [&](const CpSolverResponse& r) {
                 int cnt = 0;
                 for (int i = 0; i < nodes.size(); ++i) cnt += SolutionBooleanValue(r, nodes[i]);
-                if ( !init_sol.empty() && cnt >= init_sol.size() ) return;
+                // if ( !init_sol.empty() && cnt >= init_sol.size() ) return; // original
+                if ( !init_sol.empty() && cnt > init_sol.size() ) return;
 
                 VI temp; temp.reserve(cnt);
                 for (int i = 0; i < nodes.size(); ++i) if (SolutionBooleanValue(r, nodes[i])) temp.push_back(i);
                 if ( Utils::isFVS(V,temp) ) {
                     std::lock_guard<std::mutex> lk(log_mutex);
                     inter_fvs = temp;
-                    clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size() << endl;
+                    if (temp.size() < init_sol.size()) clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size()
+                         << ", while HS size: " << temp.size() << endl;
                 }
                 else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
                     std::lock_guard<std::mutex> lk(log_mutex);
@@ -536,7 +543,8 @@ tuple<VI,CpSolverStatus, VI, VVI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cy
                         ) {
                         inter_fvs = temp + unhit_graph_dfvs;
                         assert(Utils::isFVS(V,inter_fvs));
-                        clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size() << endl;
+                        if (temp.size() < init_sol.size()) clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size()
+                             << ", while HS size: " << temp.size() << endl;
                     }
 
                     if (cnf.use_ihs_intermittent_cycle_constraints) {
@@ -548,7 +556,24 @@ tuple<VI,CpSolverStatus, VI, VVI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cy
         ));
     }
 
-    model.Minimize(LinearExpr::Sum(nodes));
+    auto objective = LinearExpr::Sum(nodes);
+
+    IntGenerator rnd;
+    // bool randomize_objective_for_more_intermittent_solutions = true;
+    bool randomize_objective_for_more_intermittent_solutions = (rnd.nextInt(5) > 0);
+    if (randomize_objective_for_more_intermittent_solutions) {
+        VI subs = CombinatoricUtils::getRandomSubset(N-1, N * 0.8);
+
+        IntGenerator rnd;
+        int M = 100;
+        vector<int64_t> coeffs(N,M);
+        for ( int d : subs ) coeffs[d] += 1+rnd.nextInt(3);
+        // minimize M*sum_over_all_nodes + some_sum_over_random_subset_of_nodes
+        objective = LinearExpr::WeightedSum(nodes, coeffs);
+    }
+
+
+    model.Minimize(objective);
     auto model_proto = model.Build();
     CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
     // if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
@@ -1042,8 +1067,11 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
             // DEBUG(s.getTime("unhit_graph_greedy_dfvs_time"));
         }
 
-        if ( !inter_fvs.empty() && inter_fvs.size() < full_sol.size() ) {
-            clog << "\t\t\t inter_fvs improves full_sol!" << endl;
+        // if ( !inter_fvs.empty() && inter_fvs.size() < full_sol.size() ) {
+        if ( !inter_fvs.empty() && inter_fvs.size() <= full_sol.size() ) {
+            // if ( !inter_fvs.empty() && inter_fvs.size() < full_sol.size() ) {
+            //     clog << "\t\t\t inter_fvs improves full_sol!" << endl;
+            // }
             full_sol = inter_fvs;
         }
 
@@ -1247,6 +1275,78 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
     return exp_data;
 }
 
+ExpData CpsatExp1::solveFHS(VVI V, ExpConfig cnf) {
+    Stopwatch sw;
+    string option = "fhs";
+    sw.setLimit(option, cnf.max_time_sec * 1000);
+    sw.start(option);
+
+    int N = V.size();
+    VI init_sol = createInitialSolution(V,cnf);
+    VI prev_res = init_sol;
+
+
+    auto generateCycles = [&]()-> VVI {
+        clog << "Generating cycles" << endl;
+        VI S;
+        int L = 10;
+        int max_time = cnf.max_time_sec * 100;
+
+        VVI all_cycles = getUnhitChordlessCycles(V, S, L, max_time - sw.getTime(option), 1);
+        while (all_cycles.size() < 1e5 && L < 15) {
+            clog << "\t there are " << all_cycles.size() << " chordless cycles of length up to " << L << endl;
+            clog << "\t looking for cycles of length up to " << ++L << endl;
+            all_cycles = getUnhitChordlessCycles(V, S, L, max_time - sw.getTime(option), 1);
+        }
+
+        clog << "There are " << all_cycles.size() << " chordless cycles found of length up to " << L << endl;
+
+        unordered_set<LL> zb;
+
+        int maxc = 2'000;
+        int R = 3*N;
+
+        IntGenerator rnd;
+
+        for (int r=0; r<R; r++) {
+            clog << "\t r: " << r << flush;
+            int s = init_sol.size();
+            s *= (200.0 + rnd.nextInt(801)) / 1000;
+            S = CombinatoricUtils::getRandomSubset(N-1,s);
+            int trees_to_consider = max(N/10.0, sqrt(N));
+            VVI new_cycles = getUnhitChordlessCycles(V,S,inf,inf,2, trees_to_consider );
+            StandardUtils::shuffle(new_cycles);
+            clog << "\t new cycles found: " << new_cycles.size() << flush;
+            if (new_cycles.size() > maxc) new_cycles.resize(maxc);
+            clog << "\t new_cycles added: " << new_cycles.size() << flush;
+            all_cycles += new_cycles;
+            clog << "\t all_cycles.size(): " << all_cycles.size() << endl;
+            if (r%100 == 0) makeCyclesUnique(N,all_cycles);
+        }
+
+        makeCyclesUnique(N,all_cycles);
+
+        return all_cycles;
+    };
+
+
+    VVI cycles = generateCycles();
+    DEBUG(cycles.size())
+    cnf.ihs_single_iteration_sec = cnf.max_time_sec - sw.getTime(option) / 1000;
+    auto [sol,response_status, inter_fvs, intermittent_cycles] =
+        solveCpsatForCycles(V, cycles, prev_res, init_sol, sw, option, cnf);
+
+    DEBUG(sol.size());
+    DEBUG(inter_fvs.size());
+    DEBUG((response_status == OPTIMAL));
+    DEBUG((response_status == FEASIBLE));
+
+    ExpData res;
+    res.iterations.emplace_back();
+
+    return res;
+}
+
 ExpData CpsatExp1::solveDiVerSeS(VVI V, ExpConfig cnf) {
     ExpData exp_data;
 
@@ -1327,6 +1427,7 @@ ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
         cnf.ihs_init_sol_creation_mode = 2;
         return solveIHS(V,cnf);
     }
+    if (alg == Algorithm::FHS) return solveFHS(V,cnf);
 
     return ExpData{};
 }

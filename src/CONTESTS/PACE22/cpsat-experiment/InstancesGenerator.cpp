@@ -12,7 +12,7 @@ void InstancesGenerator::createHardcodedTests() {
 
 }
 
-vector<string> classes = {"er", "torus", "circulant", "circulant2", "circulant3"};
+vector<string> classes = {"er", "torus", "circulant", "circulant2", "circulant3", "circulant4"};
 // VI Ns = {5'000, 10'000, 20'000, 40'000};
 // VD avg_outdegs = {2.5, 5, 10, 20};
 
@@ -157,19 +157,29 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         V = randomNeighborhoodClosure(V,max_distance,ceil(deg));
     }
 
+    // int window_size = 3 * sqrt(N);
+    int window_size = N/5;
+
     if (class_name == "circulant") {
         VI perm(N);
         iota(ALL(perm),0);
         IntGenerator rnd;
         StandardUtils::shuffle(perm,rnd);
-        int window_size = 3 * sqrt(N);
         assert(window_size > deg);
         if (window_size < deg) window_size = deg;
+
+        int window_size1 = sqrt(N);
+        int window_size2 = window_size;
 
         unordered_set<int> zb;
         for ( int i=0; i<N; i++ ) {
             zb.clear();
-            while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size));
+            // while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size));
+
+            while ( zb.size() < floor(deg/2.0) ) zb.insert(rnd.nextInt(window_size1));
+            while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size2));
+
+
             for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+d) % perm.size() ] );
         }
     }
@@ -179,7 +189,6 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         iota(ALL(perm),0);
         IntGenerator rnd;
         StandardUtils::shuffle(perm,rnd);
-        int window_size = 3 * sqrt(N);
         assert(window_size > deg);
         if (window_size < deg) window_size = deg;
 
@@ -197,7 +206,6 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         iota(ALL(perm),0);
         IntGenerator rnd;
         StandardUtils::shuffle(perm,rnd);
-        int window_size = 3 * sqrt(N);
         assert(window_size > deg);
         if (window_size < deg) window_size = deg;
 
@@ -209,6 +217,24 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
                 if ( x != i ) zb.insert(x);
             }
             for ( int d : zb ) V[perm[i]].push_back( perm[d] );
+        }
+    }
+
+    if (class_name == "circulant4") {
+        VI perm(N);
+        iota(ALL(perm),0);
+        IntGenerator rnd;
+        StandardUtils::shuffle(perm,rnd);
+        assert(window_size > deg);
+        if (window_size < deg) window_size = deg;
+
+
+        unordered_set<int> zb;
+        for ( int i=0; i<N; i++ ) {
+            zb.clear();
+            zb.insert(0);
+            while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size));
+            for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+d) % perm.size() ] );
         }
     }
 
