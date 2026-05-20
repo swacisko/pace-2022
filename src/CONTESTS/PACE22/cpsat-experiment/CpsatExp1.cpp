@@ -560,7 +560,7 @@ tuple<VI,CpSolverStatus, VI, VVI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cy
 
     IntGenerator rnd;
     // bool randomize_objective_for_more_intermittent_solutions = true;
-    bool randomize_objective_for_more_intermittent_solutions = (rnd.nextInt(5) > 0);
+    bool randomize_objective_for_more_intermittent_solutions = (rnd.nextInt(2) > 0);
     if (randomize_objective_for_more_intermittent_solutions) {
         VI subs = CombinatoricUtils::getRandomSubset(N-1, N * 0.8);
 
@@ -911,6 +911,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
                     prev_iter_intermittent_cycles.pop_back();
                 }
             }
+            clog << "\t adding to cycles " << prev_iter_intermittent_cycles.size() << " prev_intermittent_cycles" << endl;
             new_cycles += prev_iter_intermittent_cycles;
             makeCyclesUnique(N,new_cycles);
         }
@@ -1140,7 +1141,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
 ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
     clog << "Solving using CpsatExp1::solveMTZ" << endl;
-    cnf.writeConfig();
+    // cnf.writeConfig();
 
     ExpData exp_data;
 
@@ -1184,7 +1185,7 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
     }else if (auxiliary_cycles_mode == 2) {
         auto new_cnf = cnf;
         new_cnf.ihs_max_iterations = cnf.ihs_iterations_in_mtz;
-        new_cnf.max_time_sec = 0.2 * ( timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000;
+        new_cnf.max_time_sec = 0.1 * ( timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000;
         if (cnf.find_optimal_result) cnf.max_time_sec = 30;
         VVI cycles;
         VI res;
@@ -1247,6 +1248,8 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
 
     model.Minimize(LinearExpr::Sum(nodes));
     CpSolverResponse response = SolveCpModel(model.Build(), &solver_model);
+
+    DEBUG(response.best_objective_bound());
 
     if ( response.status() == INFEASIBLE ) assert(false && "status cannot be infeasible, unless model is incorrect");
 

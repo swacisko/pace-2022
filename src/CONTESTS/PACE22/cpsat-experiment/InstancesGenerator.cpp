@@ -12,7 +12,7 @@ void InstancesGenerator::createHardcodedTests() {
 
 }
 
-vector<string> classes = {"er", "torus", "circulant", "circulant2", "circulant3", "circulant4"};
+vector<string> classes = {"er", "torus", "circulant", "circulant2", "circulant3", "circulant4", "circulant5"};
 // VI Ns = {5'000, 10'000, 20'000, 40'000};
 // VD avg_outdegs = {2.5, 5, 10, 20};
 
@@ -160,7 +160,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
     // int window_size = 3 * sqrt(N);
     int window_size = N/5;
 
-    if (class_name == "circulant") {
+    if (class_name == "circulant") { // only forward arcs
         VI perm(N);
         iota(ALL(perm),0);
         IntGenerator rnd;
@@ -184,7 +184,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         }
     }
 
-    if (class_name == "circulant2") {
+    if (class_name == "circulant2") { // single arc in reverse direction
         VI perm(N);
         iota(ALL(perm),0);
         IntGenerator rnd;
@@ -201,7 +201,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         }
     }
 
-    if (class_name == "circulant3") {
+    if (class_name == "circulant3") { // arcs added in both directions
         VI perm(N);
         iota(ALL(perm),0);
         IntGenerator rnd;
@@ -220,7 +220,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         }
     }
 
-    if (class_name == "circulant4") {
+    if (class_name == "circulant4") { // arcs added to a cycle (that is i->i+1 always exists)
         VI perm(N);
         iota(ALL(perm),0);
         IntGenerator rnd;
@@ -234,6 +234,25 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
             zb.clear();
             zb.insert(0);
             while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size));
+            for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+d) % perm.size() ] );
+        }
+    }
+
+    if (class_name == "circulant5") { // arcs added to a cycle (that is i->i+1 always exists)
+        VI perm(N);
+        iota(ALL(perm),0);
+        IntGenerator rnd;
+        StandardUtils::shuffle(perm,rnd);
+        assert(window_size > deg);
+        if (window_size < deg) window_size = deg;
+
+
+        unordered_set<int> zb;
+        for ( int i=0; i<N; i++ ) {
+            zb.clear();
+            zb.insert(0);
+            int W = window_size/2;
+            while ( zb.size() < ceil(deg) ) zb.insert(W + rnd.nextInt(W));
             for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+d) % perm.size() ] );
         }
     }
