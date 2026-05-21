@@ -158,7 +158,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
     }
 
     // int window_size = 3 * sqrt(N);
-    int window_size = N/5;
+    int window_size = N/10;
 
     if (class_name == "circulant") { // only forward arcs
         VI perm(N);
