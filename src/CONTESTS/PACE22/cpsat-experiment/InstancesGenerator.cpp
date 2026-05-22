@@ -12,10 +12,8 @@ void InstancesGenerator::createHardcodedTests() {
 
 }
 
-// vector<string> classes = {"er", "torus", "circulant1", "circulant2", "circulant3", "circulant4", "circulant5"};
+// vector<string> classes = {"er", "torus", "circulant0", "circulant1", "circulant2", "circulant3", "circulant4", "circulant5"};
 vector<string> classes = {"er", "torus", "circulant0", "circulant1"};
-// VI Ns = {5'000, 10'000, 20'000, 40'000};
-// VD avg_outdegs = {2.5, 5, 10, 20};
 
 VI Ns = {500, 1'000, 1'500};
 VD avg_outdegs = {3, 5, 10, 20};
@@ -164,7 +162,7 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         iota(ALL(perm),0);
         IntGenerator rnd;
         StandardUtils::shuffle(perm,rnd);
-        int window_size = N/3;
+        int window_size = N/4;
         assert(window_size > deg);
         if (window_size < deg) window_size = deg;
 
