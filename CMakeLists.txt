@@ -22,8 +22,6 @@ include_directories(
         include/combinatorics
         include/utils
         include/datastructures
-#        include/CONTESTS/PACE22/*
-#        include/CONTESTS/PACE22/*/*
         )
 
 file(GLOB SOURCES
@@ -97,6 +95,17 @@ add_executable(cpsat_exp_1 ${SOURCES}
         src/CONTESTS/PACE22/cpsat-experiment/main.cpp
         src/CONTESTS/PACE22/cpsat-experiment/CpsatExp1.cpp
         src/CONTESTS/PACE22/cpsat-experiment/CpsatExp1.h
+
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/set.h
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/common.h
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/dfvs.cpp
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/dfvs.h
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/graph.cpp
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/graph.h
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/kernel.cpp
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/kernel.h
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/upper_bound.cpp
+        src/CONTESTS/PACE22/cpsat-experiment/dreyfvs/upper_bound.h
 )
 target_link_libraries( cpsat_exp_1 stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX)
 #target_link_libraries( CpsatExp1 stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX ortools::ortools)

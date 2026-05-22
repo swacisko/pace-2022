@@ -172,6 +172,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     if ( alg == "mtz" ) cnf.alg = MTZ; if ( alg == "diverses") cnf.alg = DIVERSES;
     if ( alg == "div_ihs") cnf.alg = DIV_IHS;
     if ( alg == "fhs") cnf.alg = FHS;
+    if ( alg == "dreyfvs") cnf.alg = DREYFVS;
     // cnf.setParametersForAlgorithm();
 
     ap.findAndAssign("mtd", "string", &cnf.metadata_filepath);

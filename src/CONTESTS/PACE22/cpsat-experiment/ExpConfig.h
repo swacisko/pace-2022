@@ -9,11 +9,12 @@
 
 enum Algorithm {
     HS = 0,
-    IHS = 1, // IHS with cycle_enumeration_type=1
+    IHS = 1, // IHS with default cycle_enumeration_type
     MTZ = 2,
     DIVERSES = 3,
     DIV_IHS = 4,
     FHS = 5,
+    DREYFVS = 6,
 };
 
 string parseAlgorithm(int alg);

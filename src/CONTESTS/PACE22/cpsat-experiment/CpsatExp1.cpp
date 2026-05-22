@@ -15,6 +15,9 @@
 #include "ortools/sat/cp_model_solver.h"
 #include "scc/StronglyConnectedComponents.h"
 #include "mutex"
+#include "dreyfvs/common.h"
+#include "dreyfvs/dfvs.h"
+#include "dreyfvs/graph.h"
 using namespace operations_research::sat;
 
 SatParameters getDefaultSatParameters(ExpConfig cnf, int time_in_sec) {
@@ -1350,6 +1353,41 @@ ExpData CpsatExp1::solveFHS(VVI V, ExpConfig cnf) {
     return res;
 }
 
+ExpData CpsatExp1::solveDreyFVS(VVI V, ExpConfig cnf) {
+    Stopwatch sw;
+    sw.start("dreyfvs");
+
+    stringstream str;
+    int N = V.size();
+    int M = GraphUtils::countEdges(V,true);
+    str << N << " " << M << " 0" << "\n";
+    for (int i=0; i<N; i++) {
+        int cnt = 0;
+        for (int d : V[i]) str << (cnt++ ? " " : "") << d+1;
+        str << "\n";
+    }
+
+    clog << "Starting DreyFVS" << endl;
+
+    ExpData exp_data;
+    Graph g = Graph::from_istream(str);
+    PROFIL_INIT();
+    auto sol = computeDFVS(g, cnf.max_time_sec, exp_data);
+    assert(Utils::isFVS(V,sol));
+    PROFIL_SHOW();
+    // printSolution(r);
+    sw.stop("dreyfvs");
+
+    if (sol.size() < exp_data.iterations.back().full_sol_size) {
+        exp_data.iterations.emplace_back();
+        exp_data.iterations.back().full_sol_size = sol.size();
+        exp_data.iterations.back().hs_size_after_impr = sol.size();
+        exp_data.iterations.back().hs_valid_fvs = Utils::isFVS(V,sol);
+        exp_data.iterations.back().iteration_time = sw.getTime("dreyfvs");
+    }
+    return exp_data;
+}
+
 ExpData CpsatExp1::solveDiVerSeS(VVI V, ExpConfig cnf) {
     ExpData exp_data;
 
@@ -1431,6 +1469,7 @@ ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
         return solveIHS(V,cnf);
     }
     if (alg == Algorithm::FHS) return solveFHS(V,cnf);
+    if (alg == Algorithm::DREYFVS) return solveDreyFVS(V,cnf);
 
     return ExpData{};
 }

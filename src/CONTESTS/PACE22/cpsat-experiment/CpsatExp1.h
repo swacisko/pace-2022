@@ -109,6 +109,8 @@ public:
 
     static ExpData solveFHS(VVI V, ExpConfig cnf);
 
+    static ExpData solveDreyFVS(VVI V, ExpConfig cnf);
+
     /**
      * Runs the DiVerSeS solver to find out high-quality baseline solutions.
      */

@@ -28,6 +28,7 @@ string parseAlgorithm(int alg)  {
     if(alg == MTZ) return "MTZ";
     if(alg == DIVERSES) return "DiVerSeS";
     if(alg == DIV_IHS) return "DiVerSeS+IHS";
+    if(alg == DREYFVS) return "DreyFVS";
     return "unknown algorithm";
 }
 
