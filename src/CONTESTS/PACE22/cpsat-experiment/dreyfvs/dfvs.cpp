@@ -313,6 +313,14 @@ std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data) {
 		}
 	}
 
+	if (exp_data.iterations.empty() || SOL < exp_data.iterations.back().full_sol_size) {
+		exp_data.iterations.emplace_back();
+		exp_data.iterations.back().full_sol_size = SOL;
+		exp_data.iterations.back().hs_size_after_impr = SOL;
+		exp_data.iterations.back().hs_valid_fvs = true;
+		exp_data.iterations.back().iteration_time = sw.getTime("dreyfvs");
+	}
+
 	cerr << "SCORE: " << SOL << '\n';
 	Vi sol; for(Vi &s : best_sols) move(s.begin(), s.end(), back_inserter(sol));
 	return sol;

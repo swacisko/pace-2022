@@ -12,7 +12,8 @@ void InstancesGenerator::createHardcodedTests() {
 
 }
 
-vector<string> classes = {"er", "torus", "circulant", "circulant2", "circulant3", "circulant4", "circulant5"};
+// vector<string> classes = {"er", "torus", "circulant1", "circulant2", "circulant3", "circulant4", "circulant5"};
+vector<string> classes = {"er", "torus", "circulant0", "circulant1"};
 // VI Ns = {5'000, 10'000, 20'000, 40'000};
 // VD avg_outdegs = {2.5, 5, 10, 20};
 
@@ -157,10 +158,29 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
         V = randomNeighborhoodClosure(V,max_distance,ceil(deg));
     }
 
+
+    if (class_name == "circulant0") { // only forward arcs
+        VI perm(N);
+        iota(ALL(perm),0);
+        IntGenerator rnd;
+        StandardUtils::shuffle(perm,rnd);
+        int window_size = N/3;
+        assert(window_size > deg);
+        if (window_size < deg) window_size = deg;
+
+        unordered_set<int> zb;
+        for ( int i=0; i<N; i++ ) {
+            zb.clear();
+            while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size)); // random forward
+            for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+d) % perm.size() ] );
+        }
+    }
+
+
     // int window_size = 3 * sqrt(N);
     int window_size = N/10;
 
-    if (class_name == "circulant") { // only forward arcs
+    if (class_name == "circulant1") { // only forward arcs
         VI perm(N);
         iota(ALL(perm),0);
         IntGenerator rnd;
@@ -170,14 +190,22 @@ void InstancesGenerator::createRandomTest(int test_id, ofstream &out_in) {
 
         int window_size1 = sqrt(N);
         int window_size2 = window_size;
+        // if (window_size2 <= window_size1) window_size2 = window_size1 + 1;
 
         unordered_set<int> zb;
         for ( int i=0; i<N; i++ ) {
             zb.clear();
-            // while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size));
 
-            while ( zb.size() < floor(deg/2.0) ) zb.insert(rnd.nextInt(window_size1));
-            while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size2));
+            // zb.insert(0);
+            while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size)); // random forward
+
+            // zb.insert(0); // always add the one arc forward
+            // while ( zb.size() < floor(deg/2.0) ) zb.insert(rnd.nextInt(window_size1)); // random window_size1 forward
+            // while ( zb.size() < ceil(deg) ) zb.insert(rnd.nextInt(window_size2));  // random window_size2 forward
+
+            // zb.insert(0); // always add the one arc forward
+            // while ( zb.size() < floor(deg/2.0) ) zb.insert(rnd.nextInt(window_size1));  // random window_size1 forward
+            // while ( zb.size() < ceil(deg) ) zb.insert( window_size1 + rnd.nextInt(window_size2 - window_size1));  // random [window_size1,window_size2] forward
 
 
             for ( int d : zb ) V[perm[i]].push_back( perm[ (i+1+d) % perm.size() ] );

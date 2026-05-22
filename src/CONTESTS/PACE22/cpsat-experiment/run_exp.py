@@ -28,6 +28,7 @@ solver_name = 'cpsat_exp_1'
 # each of which calls the solver process (and CPSAT might use many workers...)
 thread_cnt = 1 if not RUN_TESTS else 1
 tests_runner_threads = 1 if not RUN_TESTS else 1
+single_core_solver_threads = 8
 
 def getDefaultCommand():
     cmd = 'python3 TestsRunner.py' + \
@@ -85,12 +86,12 @@ def createTablesAndRankings():
 all_tests_commands = []
 
 
-algorithms = ["hs", "ihs", "mtz", "diverses", "div_ihs"]
+algorithms = ["ihs", "mtz", "diverses", "dreyfvs"]
 cycle_enumeration_types = [1,2,3]
 mtz_cycle_augmentation = [0,1,2]
-pi_arcs_percentage = np.arange(0.05, 0.51, 0.05)
+pi_arcs_percentage = np.arange(0.05, 0.31, 0.05)
 init_single_iter_time = [1,2,3]
-cycle_scales = ['linear_h', 'linear', 'log', 'sqrt', 'unbounded']
+cycle_scales = ['linear_h', 'linear', 'log', 'sqrt']
 cpsat_threads = 8
 
 large_time_sec = 900
@@ -110,11 +111,15 @@ small_time_sec = 300
 # --pi_arcs_perc_to_add=0.1
 # --use_init_sol_as_hint_mode=3
 
+def setNumThreads(t):
+    global tests_runner_threads
+    tests_runner_threads = t
+
 def createCycleEnumerationCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
-    for alg in filter(lambda s : s.lower() != 'hs', algorithms):
+    for alg in algorithms:
         for cet in cycle_enumeration_types:
             cmd = getDefaultCommand()
             cmd += ' --run_name=cycle_enumeration__' + alg + '_' + str(cet)
@@ -143,7 +148,9 @@ def createCycleScalingCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
-    for alg in filter(lambda s : s.lower() != 'hs', algorithms):
+    for alg in algorithms:
+        setNumThreads( single_core_solver_threads if alg in ['diverses', 'dreyfvs'] else 1)
+
         for cs in cycle_scales:
             cmd = getDefaultCommand()
             cmd += ' --run_name=cycle_scaling__' + alg + '_' + cs
@@ -153,12 +160,15 @@ def createCycleScalingCommands():
                             ' --max_new_cycles_iter_scale=' + cs
             cmd += ' --solver_params=\'' + solver_params + '\''
             all_tests_commands.append(cmd)
+    setNumThreads(1)
 
 def createPiArcsPercentageCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
     for alg in algorithms:
+        setNumThreads( single_core_solver_threads if alg in ['diverses', 'dreyfvs'] else 1 )
+
         for pap in pi_arcs_percentage:
             cmd = getDefaultCommand()
             cmd += ' --run_name=pi_arcs_percentage__' + alg + '_' + str(pap)
@@ -169,11 +179,15 @@ def createPiArcsPercentageCommands():
             cmd += ' --solver_params=\'' + solver_params + '\''
             all_tests_commands.append(cmd)
 
+    setNumThreads(1)
+
 def createInitialSingleIterationTimeCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
     for alg in filter(lambda s : s.lower() != 'hs', algorithms):
+        setNumThreads( single_core_solver_threads if alg in ['diverses', 'dreyfvs'] else 1)
+
         for sit in init_single_iter_time:
             cmd = getDefaultCommand()
             cmd += ' --run_name=init_single_iter_time__' + alg + '_' + str(sit)
@@ -184,12 +198,15 @@ def createInitialSingleIterationTimeCommands():
             cmd += ' --solver_params=\'' + solver_params + '\''
             all_tests_commands.append(cmd)
 
+    setNumThreads(1)
 
 def createAllGraphCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_large_dir, results_large_dir
 
     for alg in algorithms:
+        setNumThreads( single_core_solver_threads if alg in ['diverses', 'dreyfvs'] else 1)
+
         cmd = getDefaultCommand()
         cmd += ' --run_name=all_graphs__' + alg
         solver_params = ' --time=' + str(large_time_sec) + \
@@ -197,6 +214,8 @@ def createAllGraphCommands():
                         ' --alg=' + alg
         cmd += ' --solver_params=\'' + solver_params + '\''
         all_tests_commands.append(cmd)
+
+    setNumThreads(1)
 
 def createTestsCommands():
 

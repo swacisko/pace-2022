@@ -34,14 +34,13 @@ SatParameters getDefaultSatParameters(ExpConfig cnf, int time_in_sec) {
 
         params.set_use_lns(true);
         params.set_symmetry_level(0); // disables detecting symmetries - often costs more than it helps, especially in hard instances
-        params.set_use_sat_inprocessing(false);
+        params.set_use_sat_inprocessing(true);
 
         params.set_linearization_level(0);
         params.set_cut_level(0);
-        params.set_add_lp_constraints_lazily(false);
+        params.set_add_lp_constraints_lazily(true);
 
-        // params.set_optimize_with_core(false); // without this it seems to work better
-        params.set_use_exact_lp_reason(false);
+        // params.set_optimize_with_core(false); // without this it seems to work better - we want a top-down approach instead of a conflict-based bottom-up approach
 
         // The [set_use_feasibility_jump] enables a local search / repair heuristic inside CP-SAT. Instead of only doing: systematic branching +
         // propagation the solver also does: start from a (possibly infeasible) assignment iteratively “repair” it by flipping
@@ -1161,8 +1160,8 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
 
     CpModelBuilder model;
 
-    vector<IntVar> ranks;
-    vector<BoolVar> nodes;
+    vector<IntVar> ranks; ranks.reserve(N);
+    vector<BoolVar> nodes; nodes.reserve(N);
     for (int i = 0; i < N; ++i) {
         ranks.push_back(model.NewIntVar({0,MAX_RANK_VALUE}));
         nodes.push_back(model.NewBoolVar());
@@ -1220,12 +1219,15 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
                 if(deg[d] == 0) topo.push_back(d);
             }
         }
+        assert(topo.size() + init_sol.size() == N);
+        assert(topo.size() == set(ALL(topo)).size());
         for(int i=0; i<topo.size(); i++) model.AddHint( ranks[topo[i]], (i+1)*sqrt(N) );
     }
 
-    clog << "\t Starting to solve MTZ model" << endl;
 
     int time_sec_left = ( timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000;
+    clog << "\t Starting to solve MTZ model, running for at most " << time_sec_left << " seconds" << endl;
+
     SatParameters params = getDefaultSatParameters(cnf, time_sec_left);
     Model solver_model;
     solver_model.Add(NewSatParameters(params));
