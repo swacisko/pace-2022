@@ -89,7 +89,7 @@ all_tests_commands = []
 algorithms = ["ihs", "mtz", "diverses", "dreyfvs"]
 cycle_enumeration_types = [1,2,3]
 mtz_cycle_augmentation = [0,1,2]
-pi_arcs_percentage = np.arange(0.05, 0.31, 0.05)
+pi_arcs_percentage = np.arange(0.00, 0.31, 0.05)
 init_single_iter_time = [1,2,3]
 cycle_scales = ['linear_h', 'linear', 'log', 'sqrt']
 cpsat_threads = 8
@@ -119,7 +119,9 @@ def createCycleEnumerationCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
-    for alg in algorithms:
+    for alg in ["ihs", "mtz"]:
+        setNumThreads( single_core_solver_threads if alg in ['diverses', 'dreyfvs'] else 1)
+
         for cet in cycle_enumeration_types:
             cmd = getDefaultCommand()
             cmd += ' --run_name=cycle_enumeration__' + alg + '_' + str(cet)
@@ -129,6 +131,8 @@ def createCycleEnumerationCommands():
                             ' --cycle_enumeration=' + str(cet)
             cmd += ' --solver_params=\'' + solver_params + '\''
             all_tests_commands.append(cmd)
+
+    setNumThreads(1)
 
 def createMTZCycleAugmentationCommands():
     global inst_dir, output_root_dir
@@ -148,7 +152,7 @@ def createCycleScalingCommands():
     global inst_dir, output_root_dir
     inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
 
-    for alg in algorithms:
+    for alg in ["ihs", "mtz"]:
         setNumThreads( single_core_solver_threads if alg in ['diverses', 'dreyfvs'] else 1)
 
         for cs in cycle_scales:
@@ -223,7 +227,7 @@ def createTestsCommands():
     createMTZCycleAugmentationCommands()
     createCycleScalingCommands()
     createPiArcsPercentageCommands()
-    createInitialSingleIterationTimeCommands()
+    # createInitialSingleIterationTimeCommands()
     createAllGraphCommands()
 
 
