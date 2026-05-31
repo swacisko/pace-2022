@@ -91,13 +91,12 @@ VI solveDiVerSeS(VVI V, ExpConfig cnf) {
     return best_res;
 }
 
-VI testForTopologicalOrder(VI order, VVI sets, VI hs, string alg = "diverses") {
+VI testForTopologicalOrder(VI order, VVI sets, string alg = "diverses", int time_sec = 3) {
     int N = order.size();
     VI in_order(N,0);
     for (auto [i,d] : views::enumerate(order)) in_order[d] = i;
 
     set<PII> arcs;
-    VB in_hs = StandardUtils::toVB(N,hs);
 
     for ( auto & cyc : sets ) {
         assert(cyc.size() >= 2);
@@ -112,21 +111,19 @@ VI testForTopologicalOrder(VI order, VVI sets, VI hs, string alg = "diverses") {
     clog << "\t created graph has " << A.size() << " arcs" << endl;
 
     VI sol;
+    ExpConfig cnf;
+    cnf.max_time_sec = time_sec;
+
     if (alg == "dreyfvs") {
-        ExpConfig cnf;
-        cnf.max_time_sec = 2;
         clog << "\t Looking for a FVS of the digraph using DreyFVS for " << cnf.max_time_sec << " seconds" << endl;
         sol = solveDreyFVS(V, cnf);
     }
 
     if (alg == "diverses") {
-        ExpConfig cnf;
-        cnf.max_time_sec = 4;
         clog << "\t Looking for a FVS of the digraph using DiVerSeS for " << cnf.max_time_sec << " seconds" << endl;
         sol = solveDiVerSeS(V, cnf);
     }
 
-    // auto fvs_size = exp_data.iterations.back().full_sol_size;
     clog << "\t found FVS of size " << sol.size() << endl;
 
     return sol;
@@ -139,7 +136,6 @@ void testAlgorithms() {
     const int MAXM = 1e6;
 
     const int MAIN_REPS = 20;
-    const int REPS = 5;
 
     for (int r = 0; r < MAIN_REPS; r++) {
         ENDL(5); ENDLS(10," -->MAIN REPS<-- "); ENDL(5);
@@ -194,7 +190,7 @@ void testAlgorithms() {
                 clog << "\tCreating order by setting elements in HS at the end" << endl;
                 auto in_hs = StandardUtils::toVB(N,hs);
                 sort(ALL(ord),[&](int a, int b) { return in_hs[a] && !in_hs[b]; });
-                auto fvs = testForTopologicalOrder(ord, sets, {});
+                auto fvs = testForTopologicalOrder(ord, sets);
                 clog << "\t Found FVS of size " << fvs.size() << " for a graph created for HS of size " << hs.size() << endl;
             }
 
@@ -206,34 +202,46 @@ void testAlgorithms() {
                 const int T = 100;
                 clog << "\t Running " << T << " iterations with HS order rearrangement" << endl;
                 sort(ALL(ord),[&](int a, int b) { return cnt[a] > cnt[b]; });
-                int prev_res = inf;
 
                 for ( int t=0; t<T; t++ ) {
-                    auto sol = testForTopologicalOrder(ord, sets, best_res);
+                    auto sol = testForTopologicalOrder(ord, sets, "diverses", 3 + (7.0 * (t+1) / T));
+                    // auto sol = testForTopologicalOrder(ord, sets, "dreyfvs", 2 + (3.0 * (t+1) / T));
+
+                    if (best_res.empty() || sol.size() <= best_res.size()) best_res = sol;
+
                     clog << "\tAfter iteration " << t+1 << " found FVS of size: " << sol.size() << endl;
 
-                    auto in_sol = StandardUtils::toVB(N,best_res);
+                    auto in_best_res = StandardUtils::toVB(N,best_res);
                     StandardUtils::shuffle(ord,rnd);
-                    // sort(ALL(ord),[&](int a, int b) { return cnt[a] > cnt[b]; });
-                    stable_partition(ALL(ord), [&](int d){ return in_sol[d]; });
+                    // if (rnd.nextInt(4) == 0) sort(ALL(ord), [&](int a, int b){ return cnt[a] < cnt[b]; });
+                    // if (rnd.nextInt(4) == 1) sort(ALL(ord), [&](int a, int b){ return cnt[a] > cnt[b]; });
+                    stable_partition(ALL(ord), [&](int d){ return in_best_res[d]; });
 
-                    if (t & 1){ // moving to the front elements in solution for which for some set only they hit it
+
+                    // if (t & 1)
+                    { // moving to the front elements in solution for which for some set only they hit it
                         VB sole_element(N,false);
                         for ( auto & cyc : sets ) {
                             int c = 0;
-                            for (int d : cyc) c += in_sol[d];
+                            for (int d : cyc) c += in_best_res[d];
                             assert(c>=1);
                             int el = -1;
-                            for (int d : cyc) if ( in_sol[d] ) el=d;
+                            for (int d : cyc) if ( in_best_res[d] ) el=d;
                             assert(el != -1);
                             if (c == 1) sole_element[el] = true;
                         }
-                        stable_partition(ALL(ord), [&](int d){ return sole_element[d]; });
-                        assert(is_partitioned(ALL(ord),[&](int d){ return in_sol[d]; }));
+                        // stable_partition(ALL(ord), [&](int d){ return sole_element[d]; });
+                        stable_sort(ALL(ord), [&](int a, int b) {
+                            if ( in_best_res[a] != in_best_res[b] ) return (bool)in_best_res[a];
+                            else {
+                                if (t&1) return (bool)sole_element[b];
+                                else return !sole_element[b];
+                            }
+                        });
+
+                        assert(is_partitioned(ALL(ord),[&](int d){ return in_best_res[d]; }));
                     }
 
-                    prev_res = sol.size();
-                    if (best_res.empty() || sol.size() <= best_res.size()) best_res = sol;
                 }
             }
 
@@ -247,7 +255,7 @@ void testAlgorithms() {
                 VI occ(N,0);
 
                 for ( int t=0; t<T; t++ ) {
-                    auto sol = testForTopologicalOrder(ord, sets, {});
+                    auto sol = testForTopologicalOrder(ord, sets);
                     clog << "\tAfter iteration " << t+1 << " found FVS of size: " << sol.size() << endl;
 
                     auto in_sol = StandardUtils::toVB(N,sol);
