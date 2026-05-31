@@ -396,6 +396,7 @@ VI DFVSSolverH::solveForBiconnectedGraph(VVI V, bool allow_improvements_here, co
     { // #TEST #CAUTION- do not use AF at all for large graphs with high percentage of pi-arcs
         if( E > 1'000'000 && Utils::getPieEdgesPercentage(V) > 0.5 ){
             dfvsH = Utils::getUpperBoundByVCOnSuperPIGraph(V, 3'000);
+            assert(Utils::isFVS(V, dfvsH));
         }else{
             dfvsH = solver.solveByAgentFlowAllWithinDistance(V, 2); // original
             assert(Utils::isFVS(V, dfvsH));
@@ -844,7 +845,11 @@ VI DFVSSolverH::solveByAgentFlowAllWithinDistance(VVI V, const int minimize) {
         for(int i=0; i<N; i++) if(Utils::hasLoop(V,i)) res.push_back(i);
     }
 
-    if(cnf.tle()) return res; // return without minimalization if time limit exceeded
+    if(cnf.tle()) {
+        clog << "Returning res without minimization" << endl;
+        StandardUtils::makeUnique(res);
+        return res; // return without minimalization if time limit exceeded
+    }
 
     if(minimize == 1) { // minimize the result
         reverse(ALL(res));

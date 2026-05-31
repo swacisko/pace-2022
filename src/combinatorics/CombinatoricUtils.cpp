@@ -5,6 +5,8 @@
 #include "combinatorics/CombinatoricUtils.h"
 #include <utils/RandomNumberGenerators.h>
 
+#include "../CONTESTS/PACE22/cpsat-experiment/IntGenerator.h"
+
 
 namespace CombinatoricUtils{
 
@@ -36,12 +38,13 @@ namespace CombinatoricUtils{
     }
 
     VI getRandomSubset( int U, int L, unsigned seed ){
-        UniformIntGenerator gen(0,U, seed);
+        // UniformIntGenerator gen(0,U, seed);
+        IntGenerator gen;
 
         VI res;
         if( L < U / 20 ){
             unordered_set<int> zb;
-            while( zb.size() < L ) zb.insert( gen.rand() );
+            while( zb.size() < L ) zb.insert( gen.nextInt(U+1) );
             res = VI(ALL(zb));
         }else{
             VI perm = getRandomPermutation(U+1, seed);

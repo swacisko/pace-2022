@@ -144,10 +144,13 @@ static bool find_cycle_bw_fw(const VVi& vin, const VVi& vout, const Vb& rmd, int
 	return false;
 }
 
-std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data) {
+std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data, const bool mute) {
 	const int niters = 7000;
 	const int niters2 = 50000;
 	const double maxTime = 430.0 / 600 *  time_seconds * 1e9; // in nanoseconds
+
+	SOL = 0;
+	best_sols.clear();
 
 	Stopwatch sw;
 	sw.start("dreyfvs");
@@ -155,7 +158,9 @@ std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data) {
 	// Init solution
 	const chrono::high_resolution_clock::time_point st_time = chrono::high_resolution_clock::now();
 	auto [gs, sol0] = Kernel::reduce_and_split(g);
-	cerr << "gs size : " << gs.size() << '\n';
+	// auto gs = vector<Graph>(1, g); auto sol0 = getUpperBound(g, -1);
+
+	if (!mute) cerr << "gs size : " << gs.size() << '\n';
 	int totM = 0;
 	for(const Graph &g : gs) totM += g.m;
 	best_sols.resize(gs.size()+1);
@@ -204,7 +209,7 @@ std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data) {
 		const double maxT = gs.size() == 1 && g.n < 1000 ? 550.e9 : (maxTime-ub_time) * double(g.m) / totM;
 		lastit = 0;
 		for(int iter = 0; iter < nit; ++iter) {
-			if((chrono::high_resolution_clock::now() - st_time).count() > maxT) break;
+			if( iter > 100 && (chrono::high_resolution_clock::now() - st_time).count() > maxT) break;
 
 			for(int i = 0; i < g.n; ++i) {
 				int a=0, b=0;
@@ -232,7 +237,7 @@ std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data) {
 					if(--count < (int) sol.size()) {
 						SOL -= sol.size() - count;
 
-						cerr << "Iter " << iter << ": " << SOL << '\n';
+						if(!mute) cerr << "Iter " << iter << ": " << SOL << ", time: " << sw.getTime("dreyfvs") / 1000 << '\n';
 						// TODO: Why using tmp???
 						exp_data.iterations.emplace_back();
 						exp_data.iterations.back().full_sol_size = SOL;
@@ -290,7 +295,7 @@ std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data) {
 		// cerr << "Ameliorations 2 from " << SOL << '\n';
 		const double maxT = maxTime2 * double(g.m) / totM;
 		for(int iter = 0; iter < niters2; ++iter) {
-			if((chrono::high_resolution_clock::now() - st_time).count() > maxT) break;
+			if( iter > 100 && (chrono::high_resolution_clock::now() - st_time).count() > maxT) break;
 			for(int u = 0; u < g.n; ++u) {
 				const int v = all_vert_dist(rengine);
 				if(u == v) continue;
@@ -298,7 +303,7 @@ std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data) {
 				if(delta < 0) {
 					SOL += delta;
 
-					cerr << "It " << iter << ": " << SOL << '\n';
+					if(!mute) cerr << "It " << iter << ": " << SOL << ", time: " << sw.getTime("dreyfvs") / 1000 << '\n';
 					exp_data.iterations.emplace_back();
 					exp_data.iterations.back().full_sol_size = SOL;
 					exp_data.iterations.back().hs_size_after_impr = SOL;
@@ -321,7 +326,7 @@ std::vector<int> computeDFVS(Graph& g, int time_seconds, ExpData & exp_data) {
 		exp_data.iterations.back().iteration_time = sw.getTime("dreyfvs");
 	}
 
-	cerr << "SCORE: " << SOL << '\n';
+	if(!mute) cerr << "SCORE: " << SOL << '\n';
 	Vi sol; for(Vi &s : best_sols) move(s.begin(), s.end(), back_inserter(sol));
 	return sol;
 }

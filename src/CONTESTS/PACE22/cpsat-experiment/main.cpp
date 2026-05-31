@@ -2,6 +2,7 @@
 // Created by sylwe on 08/04/2026.
 //
 
+#include "CombinatoricUtils.h"
 #include "CpsatExp1.h"
 #include "ExpConfig.h"
 #include "GraphReader.h"
@@ -10,409 +11,266 @@
 #include "StandardUtils.h"
 #include "Stopwatch.h"
 #include "CONTESTS/PACE22/Utils.h"
-// #include "ortools/base/version.h"
+#include "CONTESTS/PACE22/heur/DFVSSolverH.h"
+#include "dreyfvs/dfvs.h"
+#include "dreyfvs/graph.h"
 
-static bool run_experiment = true;
+VVI generateSets(int N, int M, int D) {
+    VVI res;
+    IntGenerator rnd;
+    for ( int i=0; i<M; i++ ) {
+        int d = 2 + rnd.nextInt(D-1);
+        VI S = CombinatoricUtils::getRandomSubset(N-1, d);
+        res.push_back(S);
+    }
+    return res;
+}
 
-ExpConfig parseArguments(int argc, char ** argv) {
-    ExpConfig cnf{};
+static VI solveDreyFVS(VVI V, ExpConfig cnf) {
+    Stopwatch sw;
+    sw.start("dreyfvs");
 
-    class ArgParser {
-    public:
-        // Store flags: --verbose, --help
-        unordered_map<string, bool> flags;
+    stringstream str;
+    int N = V.size();
+    int M = GraphUtils::countEdges(V,true);
+    str << N << " " << M << " 0" << "\n";
+    for (int i=0; i<N; i++) {
+        int cnt = 0;
+        for (int d : V[i]) str << (cnt++ ? " " : "") << d+1;
+        str << "\n";
+    }
 
-        // Store options with values: --input=..., --threads=...
-        unordered_map<string, string> options;
+    clog << "Starting DreyFVS" << endl;
 
-        // Which names are flags/options
-        unordered_set<string> flag_names;
-        unordered_set<string> option_names;
-        unordered_set<string> required_options;
+    ExpData exp_data;
+    Graph g = Graph::from_istream(str);
+    auto sol = computeDFVS(g, cnf.max_time_sec, exp_data, true);
+    assert(Utils::isFVS(V,sol));
+    sw.stop("dreyfvs");
 
-        void addFlag(const string &name) {
-            flag_names.insert(name);
-            flags[name] = false;
+    return sol;
+}
+
+
+VI solveDiVerSeS(VVI V, ExpConfig cnf) {
+
+    Stopwatch sw;
+    sw.setLimit("diverses", cnf.max_time_sec * 1000);
+    sw.start("diverses");
+
+    int best_res_size = 0;
+    VI best_res;
+
+    int iter_id = 0;
+    while (!sw.tle("diverses")) {
+        Config diverses_cnf;
+        diverses_cnf.write_logs = false;
+        int time_left_millis = ( sw.getLimit("diverses") - sw.getTime("diverses") );
+        diverses_cnf.sw.setLimit("main", time_left_millis);
+        diverses_cnf.sw.start("main");
+        diverses_cnf.disableAllNonbasicReductions();
+        diverses_cnf.solverh_use_reductions_AF = false;
+
+        Stopwatch sw2;
+        sw2.start("iteration");
+        DFVSSolverH sh(diverses_cnf);
+        auto res = sh.solveForGraph(V);
+        sw2.stop("iteration");
+
+        if (best_res_size == 0 || res.size() < best_res_size) {
+            best_res_size = res.size();
+            best_res = res;
         }
 
-        void addOption(const string &name, bool required) {
-            option_names.insert(name);
-            options[name] = "";
-            if (required) required_options.insert(name);
-        }
+        iter_id++;
+        clog << "After iteration " << iter_id << ", res.size(): " << res.size() << ", best_res_size: " << best_res_size << endl;
+    }
 
-        using VARIANT = variant<bool*,int*,double*,string*>;
-        void findAndAssign(string name, string type, VARIANT data) {
-            if (!hasProvidedOption(name)) return;
+    DEBUG(best_res_size);
 
+    return best_res;
+}
 
-            if (type == "bool") {
-                bool* ptr = get<bool*>(data);
-                auto isTrue = [&](string s) { return s == "True" || s == "true" || s == "1"; };
-                *ptr = isTrue(getOption(name));
+VI testForTopologicalOrder(VI order, VVI sets, VI hs, string alg = "diverses") {
+    int N = order.size();
+    VI in_order(N,0);
+    for (auto [i,d] : views::enumerate(order)) in_order[d] = i;
+
+    set<PII> arcs;
+    VB in_hs = StandardUtils::toVB(N,hs);
+
+    for ( auto & cyc : sets ) {
+        assert(cyc.size() >= 2);
+        sort(ALL(cyc), [&](int a, int b){ return in_order[a] < in_order[b]; });
+        for (int i=0; i<(int)cyc.size()-1; i++) arcs.insert( {cyc[i],cyc[i+1]});
+        arcs.insert( {cyc.back(),cyc.front()} );
+    }
+
+    VPII A(ALL(arcs));
+    VVI V = GraphUtils::getGraphForEdges(A,true);
+
+    clog << "\t created graph has " << A.size() << " arcs" << endl;
+
+    VI sol;
+    if (alg == "dreyfvs") {
+        ExpConfig cnf;
+        cnf.max_time_sec = 2;
+        clog << "\t Looking for a FVS of the digraph using DreyFVS for " << cnf.max_time_sec << " seconds" << endl;
+        sol = solveDreyFVS(V, cnf);
+    }
+
+    if (alg == "diverses") {
+        ExpConfig cnf;
+        cnf.max_time_sec = 4;
+        clog << "\t Looking for a FVS of the digraph using DiVerSeS for " << cnf.max_time_sec << " seconds" << endl;
+        sol = solveDiVerSeS(V, cnf);
+    }
+
+    // auto fvs_size = exp_data.iterations.back().full_sol_size;
+    clog << "\t found FVS of size " << sol.size() << endl;
+
+    return sol;
+}
+
+void testAlgorithms() {
+
+    const int MAXD = 20;
+    const int N = 1e3;
+    const int MAXM = 1e6;
+
+    const int MAIN_REPS = 20;
+    const int REPS = 5;
+
+    for (int r = 0; r < MAIN_REPS; r++) {
+        ENDL(5); ENDLS(10," -->MAIN REPS<-- "); ENDL(5);
+
+        for (int M = 10*N; M <= MAXM; M *= 2) {
+            ENDL(5); ENDLS(50,"*"); ENDL(5);
+            clog << "Creating instance for M = " << M << " sets" << endl;
+            VVI sets = generateSets(N,M,MAXD);
+
+            {
+                map<int,int> sets_sizes;
+                for (auto & cyc : sets) sets_sizes[cyc.size()]++;
+                DEBUG(sets_sizes);
+                int total_elements = accumulate(ALL(sets_sizes),0,[](int a, auto & b){ return a + b.first*b.second; });
+                DEBUG(total_elements);
             }
-            else if (type == "int") {
-                int* ptr = get<int*>(data);
-                *ptr = stoi(getOption(name));
-            }else if (type == "double") {
-                double* ptr = get<double*>(data);
-                *ptr = stod(getOption(name));
-            }else if (type == "string") {
-                string* ptr = get<string*>(data);
-                *ptr = getOption(name);
+
+            const int SEC = 10;
+            clog << "Running CP-SAT for " << SEC << " seconds to find HS" << endl;
+            VI hs;
+            {
+                SatParameters params;
+                params.set_max_time_in_seconds(SEC);
+                params.set_num_search_workers(6);
+
+                Model solver_model;
+                solver_model.Add(NewSatParameters(params));
+
+                CpModelBuilder model;
+                vector<BoolVar> nodes;
+                for (int i=0; i<N; i++) nodes.push_back(model.NewBoolVar());
+                for ( auto & c : sets ) {
+                    vector<BoolVar> cyc_vars;
+                    for ( int d : c ) cyc_vars.push_back(nodes[d]);
+                    model.AddAtLeastOne(cyc_vars);
+                }
+
+                auto objective = LinearExpr::Sum(nodes);
+                model.Minimize(objective);
+                auto model_proto = model.Build();
+                CpSolverResponse response = SolveCpModel(model_proto, &solver_model);
+                for (int i = 0; i < nodes.size(); ++i) if (SolutionBooleanValue(response, nodes[i])) hs.push_back(i);
             }
-        }
 
-        void parse(int argc, char **argv) {
-            for (int i = 1; i < argc; i++) {
-                string arg = argv[i];
+            clog << "\t found HS of size " << hs.size() << endl;
 
-                if (!startsWithDoubleDash(arg)) throw runtime_error("Unknown positional or malformed argument: " + arg);
+            VI ord = CombinatoricUtils::getRandomPermutation(N);
+            VI cnt(N,0);
+            for (auto & cyc : sets) for (auto & d : cyc) cnt[d]++;
 
-                string inner = arg.substr(2); // strip "--"
-                size_t eq = inner.find('='); // Split on '='
-                string name, value;
+            {
+                clog << "\tCreating order by setting elements in HS at the end" << endl;
+                auto in_hs = StandardUtils::toVB(N,hs);
+                sort(ALL(ord),[&](int a, int b) { return in_hs[a] && !in_hs[b]; });
+                auto fvs = testForTopologicalOrder(ord, sets, {});
+                clog << "\t Found FVS of size " << fvs.size() << " for a graph created for HS of size " << hs.size() << endl;
+            }
 
-                if (eq == string::npos) { // No '=' → must be a flag (e.g., --verbose)
-                    name = inner;
 
-                    if (flag_names.contains(name)) {
-                        flags[name] = true;
-                    } else if (option_names.contains(name)) {
-                        throw runtime_error("Missing '=value' for option --" + name + " (expected --" + name + "=VALUE)");
-                    } else {
-                        throw runtime_error("Unknown argument: --" + name);
-                    }
-                } else {
-                    // Has '=' → must be an option: --name=value
-                    name = inner.substr(0, eq);
-                    value = inner.substr(eq + 1);
+            if (true){
+                VI best_res;
 
-                    if (flag_names.contains(name)) {
-                        throw runtime_error("Flag --" + name + " does not take a value (remove '=...').");
-                    } else if (option_names.contains(name)) {
-                        if (value.empty()) {
-                            throw runtime_error("Missing value for option --" + name + " (use --" + name + "=VALUE)");
+                IntGenerator rnd;
+                const int T = 100;
+                clog << "\t Running " << T << " iterations with HS order rearrangement" << endl;
+                sort(ALL(ord),[&](int a, int b) { return cnt[a] > cnt[b]; });
+                int prev_res = inf;
+
+                for ( int t=0; t<T; t++ ) {
+                    auto sol = testForTopologicalOrder(ord, sets, best_res);
+                    clog << "\tAfter iteration " << t+1 << " found FVS of size: " << sol.size() << endl;
+
+                    auto in_sol = StandardUtils::toVB(N,best_res);
+                    StandardUtils::shuffle(ord,rnd);
+                    // sort(ALL(ord),[&](int a, int b) { return cnt[a] > cnt[b]; });
+                    stable_partition(ALL(ord), [&](int d){ return in_sol[d]; });
+
+                    if (t & 1){ // moving to the front elements in solution for which for some set only they hit it
+                        VB sole_element(N,false);
+                        for ( auto & cyc : sets ) {
+                            int c = 0;
+                            for (int d : cyc) c += in_sol[d];
+                            assert(c>=1);
+                            int el = -1;
+                            for (int d : cyc) if ( in_sol[d] ) el=d;
+                            assert(el != -1);
+                            if (c == 1) sole_element[el] = true;
                         }
-                        options[name] = value;
-                    } else {
-                        throw runtime_error("Unknown argument: --" + name);
+                        stable_partition(ALL(ord), [&](int d){ return sole_element[d]; });
+                        assert(is_partitioned(ALL(ord),[&](int d){ return in_sol[d]; }));
                     }
+
+                    prev_res = sol.size();
+                    if (best_res.empty() || sol.size() <= best_res.size()) best_res = sol;
                 }
             }
+
+
+            if (false){
+                IntGenerator rnd;
+                const int T = 50;
+                clog << "\t Running " << T << " iterations with HS order rearrangement using reinforcement learning" << endl;
+                sort(ALL(ord),[&](int a, int b) { return cnt[a] > cnt[b]; });
+                int prev_res = inf;
+                VI occ(N,0);
+
+                for ( int t=0; t<T; t++ ) {
+                    auto sol = testForTopologicalOrder(ord, sets, {});
+                    clog << "\tAfter iteration " << t+1 << " found FVS of size: " << sol.size() << endl;
+
+                    auto in_sol = StandardUtils::toVB(N,sol);
+                    VI tab = occ;
+                    if (t & 1) for (int & d : tab) d += rnd.nextInt(5);
+                    sort(ALL(ord), [&](int a, int b){ return tab[a] < tab[b]; });
+
+                    prev_res = sol.size();
+                    for (int d : sol) occ[d]++;
+                }
+            }
+
         }
-
-        bool getFlag(const string &name) const {
-            auto it = flags.find(name);
-            if (it == flags.end()) throw runtime_error("Flag not registered: " + name);
-            return it->second;
-        }
-
-        bool hasProvidedOption(const string &name) const { return options.find(name)->second != ""; }
-
-        string getOption(const string &name) const {
-            auto it = options.find(name);
-            if (it == options.end()) throw runtime_error("Option not registered: " + name);
-            return it->second;
-        }
-
-        void printHelp(const string &progName) const {
-            cout << "Usage: " << progName << " [options]\n\n";
-            cout << "Options:\n";
-            for (auto &f : flag_names) cout << "  --" << f << "\n";
-            for (auto &o : option_names) cout << "  --" << o << "=<value>\n";
-            cout << "\n";
-        }
-
-    private:
-        static bool startsWithDoubleDash(const string &s) {
-            return s.size() >= 2 && s[0] == '-' && s[1] == '-';
-        }
-    };
-
-
-    ArgParser ap;
-    ap.addOption("alg", false);
-    ap.addOption("mtd", true);
-    ap.addOption("threads", false);
-    ap.addOption("time", false);
-    ap.addOption("iter_time", false);
-    ap.addOption("cycle_enumeration", false);
-    ap.addOption("find_optimal", false);
-    ap.addOption("log_cpsat_progress", false);
-    ap.addOption("ihs_iterations_in_mtz", false);
-    ap.addOption("ihs_max_iterations", false);
-    ap.addOption("next_sol_max_dst_from_init_sol", false);
-    ap.addOption("use_init_sol_as_hint_mode", false);
-    ap.addOption("init_L", false);
-    ap.addOption("mtz_auxiliary_cycles_mode", false);
-    ap.addOption("max_new_cycles_iter_scale", false);
-    ap.addOption("pi_arcs_perc_to_add", false);
-    ap.addOption("run_experiment", false);
-    ap.addOption("focus_mostly_onh_heuristics", false);
-    ap.addOption("ihs_init_sol_creation_mode", false);
-    ap.addOption("use_cycle_trimming", false);
-    ap.addOption("cycle_trimming_freq", false);
-    ap.addOption("cycle_trimming_probab", false);
-    ap.addOption("cycle_trimming_min_nodes_in_hs", false);
-    ap.addOption("cycle_trimming_max_cycles_to_trim_scale", false);
-    ap.addOption("use_ihs_intermittent_cycle_constraints", false);
-    // ap.addOption("fill_partial_result_using_greedy_fvs", false);
-
-    ap.parse(argc, argv);
-    for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
-        clog << "Option " << opt << " is not provided, but is mandatory!" << endl;
     }
-    for ( const string& opt : ap.required_options ) assert( ap.hasProvidedOption(opt) );
 
-    string alg;
-    ap.findAndAssign("alg", "string", &alg);
-    std::transform(alg.begin(), alg.end(), alg.begin(), [](unsigned char c){ return std::tolower(c); });
-    if ( alg == "ihs" ) cnf.alg = IHS; if ( alg == "hs" ) cnf.alg = HS;
-    if ( alg == "mtz" ) cnf.alg = MTZ; if ( alg == "diverses") cnf.alg = DIVERSES;
-    if ( alg == "div_ihs") cnf.alg = DIV_IHS;
-    if ( alg == "fhs") cnf.alg = FHS;
-    if ( alg == "dreyfvs") cnf.alg = DREYFVS;
-    // cnf.setParametersForAlgorithm();
-
-    ap.findAndAssign("mtd", "string", &cnf.metadata_filepath);
-    ap.findAndAssign("threads", "int", &cnf.threads);
-    ap.findAndAssign("time", "int", &cnf.max_time_sec);
-    ap.findAndAssign("iter_time", "int", &cnf.ihs_single_iteration_sec);
-    ap.findAndAssign("cycle_enumeration", "int", &cnf.unhit_cycle_enumeration_type);
-    ap.findAndAssign("find_optimal", "bool", &cnf.find_optimal_result);
-    ap.findAndAssign("log_cpsat_progress", "bool", &cnf.log_cpsat_search_progress);
-    ap.findAndAssign("ihs_iterations_in_mtz", "int", &cnf.ihs_iterations_in_mtz);
-    ap.findAndAssign("ihs_max_iterations", "int", &cnf.ihs_max_iterations);
-    ap.findAndAssign("next_sol_max_dst_from_init_sol", "int", &cnf.next_sol_max_dst_from_init_sol);
-    ap.findAndAssign("use_init_sol_as_hint_mode", "int", &cnf.use_init_sol_as_hint_mode);
-    ap.findAndAssign("init_L", "int", &cnf.init_L_for_all_constraints);
-    ap.findAndAssign("mtz_auxiliary_cycles_mode", "int", &cnf.mtz_auxiliary_cycles_mode);
-    ap.findAndAssign("max_new_cycles_iter_scale", "string", &cnf.max_new_cycles_iter_scale);
-    ap.findAndAssign("pi_arcs_perc_to_add", "double", &cnf.pi_arcs_perc_to_add);
-    ap.findAndAssign("run_experiment", "bool", &run_experiment);
-    ap.findAndAssign("focus_mostly_onh_heuristics", "bool", &cnf.focus_mostly_onh_heuristics);
-    ap.findAndAssign("ihs_init_sol_creation_mode", "int", &cnf.ihs_init_sol_creation_mode);
-    ap.findAndAssign("use_cycle_trimming", "bool", &cnf.use_cycle_trimming);
-    ap.findAndAssign("cycle_trimming_freq", "int", &cnf.cycle_trimming_freq);
-    ap.findAndAssign("cycle_trimming_probab", "double", &cnf.cycle_trimming_probab);
-    ap.findAndAssign("cycle_trimming_min_nodes_in_hs", "int", &cnf.cycle_trimming_min_nodes_in_hs);
-    ap.findAndAssign("cycle_trimming_max_cycles_to_trim_scale", "string", &cnf.cycle_trimming_max_cycles_to_trim_scale);
-    ap.findAndAssign("use_ihs_intermittent_cycle_constraints", "bool", &cnf.use_ihs_intermittent_cycle_constraints);
-    // ap.findAndAssign("fill_partial_result_using_greedy_fvs", "bool", &cnf.fill_partial_result_using_greedy_fvs);
-
-
-    return cnf;
 }
 
-void testAlgorithms(VVI & V, ExpConfig cnf) {
-
-    constexpr bool check_heuristic_algorithms = true;
-    constexpr bool check_exact_algorithms = false;
-
-    if(check_heuristic_algorithms) {
-        Stopwatch sw;
-
-        //******************************
-
-        sw.start("HS1");
-        auto exp_data_hs1 = CpsatExp1::solveHS(V, cnf);
-        sw.stop("HS1");
-        ENDL(5); ENDLS(50,"*");
-
-        //******************************
-
-        sw.start("IHS-1");
-        cnf.unhit_cycle_enumeration_type = 1;
-        auto exp_data_ihs1 = CpsatExp1::solveIHS(V, cnf);
-        sw.stop("IHS-1");
-        ENDL(5); ENDLS(50,"*");
-
-        //******************************
-
-        // sw.start("IHS-2");
-        // cnf.unhit_cycle_enumeration_type = 2;
-        // auto exp_data_ihs2 = CpsatExp1::solveIHS(V, cnf);
-        // sw.stop("IHS-2");
-
-        //******************************
-
-        sw.start("mtz-0");
-        auto exp_data_mtz_0 = CpsatExp1::solveMTZ(V, cnf, 0);
-        sw.stop("mtz-0");
-        ENDL(5); ENDLS(50,"*");
-
-        //******************************
-
-        sw.start("mtz-1");
-        auto exp_data_mtz_1 = CpsatExp1::solveMTZ(V, cnf, 1);
-        sw.stop("mtz-1");
-        ENDL(5); ENDLS(50,"*");
-
-        //******************************
-
-        sw.start("mtz-2");
-        auto exp_data_mtz_2 = CpsatExp1::solveMTZ(V, cnf, 2);
-        sw.stop("mtz-2");
-        ENDL(5); ENDLS(50,"*");
-
-        //******************************
-
-        sw.writeAll();
-    }
-
-
-
-    if(check_exact_algorithms) {
-        cnf.max_time_sec = inf;
-        cnf.find_optimal_result = true;
-
-        Stopwatch sw;
-
-        //******************************
-
-        sw.start("ex-hs");
-        auto exp_data_exhs = CpsatExp1::solveHS(V,cnf);
-        sw.stop("ex-hs");
-        ENDL(5); ENDLS(50,"*");
-
-        sw.start("ex-ihs-1");
-        cnf.unhit_cycle_enumeration_type = 1;
-        auto exp_data_exihs1 = CpsatExp1::solveIHS(V,cnf);
-        sw.stop("ex-ihs-1");
-        ENDL(5); ENDLS(50,"*");
-
-        // sw.start("ex-ihs-2");
-        // cnf.unhit_cycle_enumeration_type = 2;
-        // auto exp_data_exihs2 = CpsatExp1::solveIHS(V,cnf);
-        // sw.stop("ex-ihs-2");
-        // ENDL(5); ENDLS(50,"*");
-
-        sw.start("ex-mtz-1");
-        auto exp_data_mtz1 = CpsatExp1::solveMTZ(V,cnf);
-        sw.stop("ex-mtz-1");
-        ENDL(5); ENDLS(50,"*");
-
-        sw.start("ex-mtz-2");
-        auto exp_data_mtz2 = CpsatExp1::solveMTZ(V,cnf);
-        sw.stop("ex-mtz-2");
-        ENDL(5); ENDLS(50,"*");
-
-        //******************************
-
-    }
-}
-
-// void checkORToolsAndCpsatVersion() {
-//     // clog << "operations_research::OrToolsMajorVersion(): " << operations_research::OrToolsMajorVersion() << endl;
-//     // clog << "operations_research::OrToolsMinorVersion(): " << operations_research::OrToolsMinorVersion() << endl;
-//     // clog << "operations_research::OrToolsPatchVersion(): " << operations_research::OrToolsPatchVersion() << endl;
-//     clog << "operations_research::OrToolsVersionString(): " << operations_research::OrToolsVersionString() << endl;
-// }
 
 int main(int argc, char** argv){
     MemoryUtils::increaseStack();
-    // checkORToolsAndCpsatVersion();
 
-    auto cnf = parseArguments(argc, argv);
-    cnf.writeConfig();
+    testAlgorithms();
 
-    VVI V = GraphReader::readGraphStandardEdges(cin,true);
-    assert(GraphUtils::isSimple(V));
-
-    if (cnf.pi_arcs_perc_to_add > 0) {
-        clog << "Adding pi-arcs, ratio before: " << 1.0 * Utils::countPiEdges(V) / GraphUtils::countEdges(V,true) << endl;
-        // auto arcs = GraphUtils::getGraphEdges(V,true);
-        // IntGenerator rnd(894238492);
-        // StandardUtils::shuffle(arcs, rnd);
-        // int P = cnf.pi_arcs_perc_to_add * arcs.size() / 2;
-        // int A = arcs.size();
-        // for (int i=0; i<P; i++) arcs.emplace_back( arcs[i].second, arcs[i].first );
-        // StandardUtils::makeUnique(arcs);
-        // StandardUtils::shuffle(arcs, rnd);
-        // arcs.resize(A);
-        // V = GraphUtils::getGraphForEdges(arcs, true);
-
-        int A = GraphUtils::getGraphEdges(V,true).size();
-        auto revV = GraphUtils::reverseGraph(V);
-        VB helper(V.size());
-        VPII pi_arcs = Utils::getAllPIEdges(V,revV, helper);
-        auto npnpiV = Utils::getNonPIGraph(V);
-        auto nonpi_arcs = GraphUtils::getGraphEdges(npnpiV,true);
-        assert( pi_arcs.size() + nonpi_arcs.size() == A );
-
-        IntGenerator rnd(2839244);
-        StandardUtils::shuffle(nonpi_arcs, rnd);
-
-        DEBUG(pi_arcs.size());
-        DEBUG(nonpi_arcs.size());
-        while ( pi_arcs.size() < cnf.pi_arcs_perc_to_add * A ) {
-            auto [a,b] = nonpi_arcs.back();
-            nonpi_arcs.pop_back();
-            nonpi_arcs.pop_back();
-            pi_arcs.emplace_back(a,b);
-            pi_arcs.emplace_back(b,a);
-        }
-        DEBUG(pi_arcs.size());
-        DEBUG(nonpi_arcs.size());
-
-        VPII all_arcs = pi_arcs + nonpi_arcs;
-        assert(all_arcs.size() == A);
-        V = GraphUtils::getGraphForEdges(all_arcs,true);
-
-        clog << "\t added pi-arcs, ratio after: " << 1.0 * Utils::countPiEdges(V) / GraphUtils::countEdges(V,true) << endl;
-    }
-
-    DEBUG(V.size());
-    DEBUG(GraphUtils::countEdges(V,true));
-    DEBUG( Utils::countPiEdges(V) );
-    DEBUG( 1.0 * Utils::countPiEdges(V) / GraphUtils::countEdges(V,true) );
-
-
-
-
-    // testAlgorithms(V,cnf);
-
-
-    ExpData exp_data;
-    // if (run_experiment) exp_data = CpsatExp1::solveHS(V,cnf);
-    // if (run_experiment) exp_data = CpsatExp1::solveIHS(V,cnf);
-    // if (run_experiment) exp_data = CpsatExp1::solveMTZ(V,cnf);
-    if (run_experiment) exp_data = CpsatExp1::solve(V,cnf);
-    DEBUG(exp_data.iterations.size());
-
-
-    if (run_experiment) {
-        exp_data.updateBestResultSoFar();
-        clog << endl << endl << "FINAL RESULT: " << exp_data.iterations.back().best_result_so_far << endl;
-        exp_data.writeToFile(cnf);
-    }
-    else {
-        clog << "Experiment not run, creating dummy metadata file" << endl;
-        ofstream str(cnf.metadata_filepath);
-        str << "dummy_header" << endl;
-        str << "dummy_data" << endl;
-        str.close();
-    }
 
     return 0;
 }
-
-/**
---threads=6
---mtd=ex_mtd_file.csv
---time=180
---iter_time=1
---find_optimal=false
---alg=ihs
---log_cpsat_progress=false
---cycle_enumeration=3
---init_L=4
---max_new_cycles_iter_scale=linear
---mtz_auxiliary_cycles_mode=2
---pi_arcs_perc_to_add=0.0
---use_init_sol_as_hint_mode=3
---use_cycle_trimming=true
---cycle_trimming_probab=0.75
---focus_mostly_onh_heuristics=true
- */
