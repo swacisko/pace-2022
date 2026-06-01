@@ -399,6 +399,7 @@ VI DFVSSolverH::solveForBiconnectedGraph(VVI V, bool allow_improvements_here, co
             assert(Utils::isFVS(V, dfvsH));
         }else{
             dfvsH = solver.solveByAgentFlowAllWithinDistance(V, 2); // original
+            Utils::emergencyExit(V, dfvsH);
             assert(Utils::isFVS(V, dfvsH));
         }
     }

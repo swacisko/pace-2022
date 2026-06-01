@@ -15,11 +15,13 @@
 #include "dreyfvs/dfvs.h"
 #include "dreyfvs/graph.h"
 
-VVI generateSets(int N, int M, int D) {
+VVI generateSets(int N, int M, int mind, int maxd) {
     VVI res;
     IntGenerator rnd;
+    int D = maxd;
     for ( int i=0; i<M; i++ ) {
-        int d = 2 + rnd.nextInt(D-1);
+        const int X = min(mind,D);
+        int d = X + rnd.nextInt(D-X+1);
         VI S = CombinatoricUtils::getRandomSubset(N-1, d);
         res.push_back(S);
     }
@@ -131,6 +133,7 @@ VI testForTopologicalOrder(VI order, VVI sets, string alg = "diverses", int time
 
 void testAlgorithms() {
 
+    const int MIND = 4;
     const int MAXD = 20;
     const int N = 1e3;
     const int MAXM = 1e6;
@@ -143,7 +146,7 @@ void testAlgorithms() {
         for (int M = 10*N; M <= MAXM; M *= 2) {
             ENDL(5); ENDLS(50,"*"); ENDL(5);
             clog << "Creating instance for M = " << M << " sets" << endl;
-            VVI sets = generateSets(N,M,MAXD);
+            VVI sets = generateSets(N,M,MIND, MAXD);
 
             {
                 map<int,int> sets_sizes;
@@ -203,13 +206,95 @@ void testAlgorithms() {
                 clog << "\t Running " << T << " iterations with HS order rearrangement" << endl;
                 sort(ALL(ord),[&](int a, int b) { return cnt[a] > cnt[b]; });
 
+                auto minimize = [&](VVI & sets, VI & sol) -> VI {
+                    bool improved = true;
+
+                    while (improved) {
+                        improved = false;
+                        VB in_sol = StandardUtils::toVB(N,sol);
+                        VVI A(N);
+                        for (auto [i,cyc] : views::enumerate(sets)) for (int d : cyc | views::filter([&](int x){ return in_sol[x]; })) {
+                            A[d].push_back(i);
+                        }
+                        VI covered(M,0);
+                        for ( int i : sol ) for (int d : A[i]) covered[d]++;
+                        for ( int i : sol ) {
+                            bool exists = false;
+                            for ( int d : A[i] ) exists |= (covered[d] == 1);
+                            if (!exists) {
+                                in_sol[i] = false;
+                                for (int d : A[i]) covered[d]--;
+                                improved = true;
+                            }
+                        }
+
+                        sol = StandardUtils::toVI(in_sol);
+                    }
+
+                    return sol;
+                };
+
+
+                auto createExpansionOrder = [&](VI sol) {
+                    VB in_sol = StandardUtils::toVB(N,sol);
+
+                    VVI A(N), B(M);
+                    for (auto [i,cyc] : views::enumerate(sets)) for (int d : cyc ) {
+                        A[d].push_back(i);
+                        B[i].push_back(d);
+                    }
+
+                    VI adjacent(M,0);
+
+                    for (int i=0; i<N; i++) for (int d : A[i]) adjacent[d]++;
+                    for ( int d : sol ) for (int dd : A[d]) adjacent[dd] += rnd.nextInt(5);
+
+                    VI perm = CombinatoricUtils::getRandomPermutation(M);
+                    auto cmp = [&](int a, int b) {
+                        if ( adjacent[a] != adjacent[b] ) return adjacent[a] > adjacent[b];
+                        return perm[a] < perm[b];
+                    };
+                    set<int,decltype(cmp)> zb(cmp);
+                    for (int i=0; i<M; i++) zb.insert(i);
+
+                    VB was(N);
+                    VI res, temp;
+
+                    while (!zb.empty()) {
+                        int v = *zb.begin();
+                        zb.erase(v);
+
+                        for ( int d : B[v] ) if (!was[d]) {
+                            was[d] = true;
+                            res.push_back(d);
+                            temp.clear();
+                            for (int dd : A[d]) if (zb.contains(dd)) {
+                                zb.erase(dd);
+                                temp.push_back(dd);
+                            }
+                            for (int dd : A[d]) adjacent[dd]--;
+                            // for (int dd : A[d]) adjacent[dd]++;
+                            for (int dd : temp) zb.insert(dd);
+                        }
+                    }
+
+                    assert(res.size() == N);
+                    return res;
+                };
+
                 for ( int t=0; t<T; t++ ) {
                     auto sol = testForTopologicalOrder(ord, sets, "diverses", 3 + (7.0 * (t+1) / T));
                     // auto sol = testForTopologicalOrder(ord, sets, "dreyfvs", 2 + (3.0 * (t+1) / T));
 
+                    clog << "\tAfter iteration " << t+1 << " found FVS of size: " << sol.size() << endl;
+                    int B = sol.size();
+                    assert(CpsatExp1::isHS(sets,sol));
+                    sol = minimize(sets, sol);
+                    assert(CpsatExp1::isHS(sets,sol));
+                    if (sol.size() < B) clog << "\t\tMINIMIZED SOLUTION SIZE: " << sol.size() << endl;
+
                     if (best_res.empty() || sol.size() <= best_res.size()) best_res = sol;
 
-                    clog << "\tAfter iteration " << t+1 << " found FVS of size: " << sol.size() << endl;
 
                     auto in_best_res = StandardUtils::toVB(N,best_res);
                     StandardUtils::shuffle(ord,rnd);
@@ -242,6 +327,10 @@ void testAlgorithms() {
                         assert(is_partitioned(ALL(ord),[&](int d){ return in_best_res[d]; }));
                     }
 
+                    {
+                        ord = createExpansionOrder(best_res);
+                        stable_partition(ALL(ord), [&](int d){ return in_best_res[d]; });
+                    }
                 }
             }
 
