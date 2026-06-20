@@ -42,6 +42,11 @@ public:
         int iteration_time = -1;
         int max_cycle_length = -1;
         int best_result_so_far = -1;
+        int initGraphN = -1;
+        int initGraphM = -1;
+        int coreGraphN = -1;
+        int coreGraphM = -1;
+        int coreGraphPiArcs = -1;
     };
 
     int N,M;

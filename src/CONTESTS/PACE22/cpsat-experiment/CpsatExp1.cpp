@@ -94,6 +94,10 @@ vector<map<string, string>> ExpData::getIterationEntries() {
         ADD_ENTRY(I,iteration_time);
         ADD_ENTRY(I,max_cycle_length);
         ADD_ENTRY(I,best_result_so_far);
+        ADD_ENTRY(I,initGraphN);
+        ADD_ENTRY(I,initGraphM);
+        ADD_ENTRY(I,coreGraphN);
+        ADD_ENTRY(I,coreGraphM);
         // ADD_ENTRY(I,cycle_hs_valid_dfvs);
 
         string str;
@@ -356,26 +360,34 @@ VI CpsatExp1::getUnhitGraphGreedyFVS(VVI &V, VI &S) {
 
     Config diverses_cnf;
     diverses_cnf.write_logs = false;
-    diverses_cnf.agent_flow_min_distance = 3;
+    diverses_cnf.agent_flow_min_distance = 2;
     // diverses_cnf.agent_flow_node_update_frequency = 1;
     // diverses_cnf.agent_flow_max_distance_from_best = 1;
-    diverses_cnf.agent_flow_max_distance_from_best = 1 + sqrt(V.size());
+    diverses_cnf.agent_flow_max_distance_from_best = 1 + sqrt(indg.V.size());
     diverses_cnf.agent_flow_method = Config::agent_flow_sinkhorn;
     diverses_cnf.agent_flow_node_selection_type = Config::agent_flow_remove_largest_flow_node;
     diverses_cnf.agent_flow_alternate_selection_type = diverses_cnf.solver_improve_alternate_selection_type = true;
 
     diverses_cnf.disableAllNonbasicReductions();
+    diverses_cnf.disableAllConditionalReductions();
+    diverses_cnf.disableAllRecursiveReductions();
     // diverses_cnf.reducer_use_pie = diverses_cnf.reducer_use_dome = diverses_cnf.reducer_use_folding = true;
     diverses_cnf.reducer_use_pie = diverses_cnf.reducer_use_dome = true;
+
+    diverses_cnf.sw.setLimit("main", inf);
 
     Reducer red(indg.V, diverses_cnf);
     auto reductions = red.reduce();
     auto newV = red.V;
     assert(newV.size() == indg.V.size());
 
+    clog << "Looking for solution using agent flow" << endl;
     DFVSSolverH sh(diverses_cnf);
-    auto res = sh.solveByAgentFlow(newV);
+    // auto res = sh.solveByAgentFlow(newV);
+    auto res = sh.solveByAgentFlowAllWithinDistance(newV);
     assert(Utils::isFVS(newV,res));
+
+    clog << "\tFound solution using agent flow" << endl;
 
     Reducer::liftSolution(newV.size(), res, reductions);
 
@@ -1437,8 +1449,11 @@ VI CpsatExp1::createInitialSolution(VVI &V, ExpConfig cnf) {
     VI init_sol;
     if(cnf.ihs_init_sol_creation_mode == 1) {
         clog << "Looking for initial solution using Agent-Flow approach" << endl;
+        Stopwatch sw;
+        sw.start("init_sol");
         init_sol = getUnhitGraphGreedyFVS(V,init_sol);
-        clog << "Found initial solution of size " << init_sol.size() << endl;
+        sw.stop("init_sol");
+        clog << "Found initial solution of size " << init_sol.size() << " (in " << sw.getTime("init_sol")/1000 << " sec.)" << endl;
     }
     if(cnf.ihs_init_sol_creation_mode == 2) {
         Config diverses_cnf;
@@ -1461,19 +1476,65 @@ VI CpsatExp1::createInitialSolution(VVI &V, ExpConfig cnf) {
 }
 
 ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
-    auto alg = cnf.alg;
-    if (alg == Algorithm::HS) return solveHS(V,cnf);
-    if (alg == Algorithm::IHS) return solveIHS(V,cnf);
-    if (alg == Algorithm::MTZ) return solveMTZ(V,cnf, cnf.mtz_auxiliary_cycles_mode);
-    if (alg == Algorithm::DIVERSES) return solveDiVerSeS(V,cnf);
-    if (alg == Algorithm::DIV_IHS) {
-        cnf.ihs_init_sol_creation_mode = 2;
-        return solveIHS(V,cnf);
-    }
-    if (alg == Algorithm::FHS) return solveFHS(V,cnf);
-    if (alg == Algorithm::DREYFVS) return solveDreyFVS(V,cnf);
 
-    return ExpData{};
+    int initN = V.size();
+    int initM = GraphUtils::countEdges(V,true);
+
+    clog << "Starting initial preprocessing" << endl;
+    Config div_cnf{};
+    Reducer red(V, div_cnf);
+    red.disableAllNonbasicReductions();
+    red.cnf.write_logs = false;
+    red.cnf.disableAllRecursiveReductions();
+    red.cnf.disableAllConditionalReductions();
+    red.cnf.reducer_use_core = red.cnf.reducer_use_pie = red.cnf.reducer_use_dome = true;
+    red.cnf.reducer_use_domination = red.cnf.reducer_use_domination_3 = true;
+    red.cnf.reducer_use_unconfined = red.cnf.reducer_use_folding = red.cnf.reducer_use_funnel = true;
+    red.cnf.reducer_use_mixed_domination = red.cnf.reducer_use_inoutclique = true;
+    // red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+
+    // #CAUTION! No conditional reductions can be used here
+    red.cnf.disableAllConditionalReductions();
+    auto reductions = red.reduce();
+    // VI red_dfvs = Reducer::convertKernelizedReductions(reductions);
+    V = red.V;
+    V = GraphInducer::induceByNonisolatedNodes(V).V;
+
+    int N = V.size();
+    int M = GraphUtils::countEdges(V,true);
+    int pi_arcs = Utils::countPiEdges(V);
+    clog << "After reductions graph has " << N << " nodes and " << M << " arcs, from which " << pi_arcs << " pi arcs" << endl;
+
+    ExpData res{};
+
+    if(GraphUtils::countEdges(V,true) == 0) {
+        ExpData exp_data{};
+        exp_data.iterations.emplace_back();
+        return exp_data;
+    }else {
+        DEBUG(M / pi_arcs);
+
+        auto alg = cnf.alg;
+        if (alg == Algorithm::HS) res = solveHS(V,cnf);
+        if (alg == Algorithm::IHS) res = solveIHS(V,cnf);
+        if (alg == Algorithm::MTZ) res = solveMTZ(V,cnf, cnf.mtz_auxiliary_cycles_mode);
+        if (alg == Algorithm::DIVERSES) res = solveDiVerSeS(V,cnf);
+        if (alg == Algorithm::DIV_IHS) {
+            cnf.ihs_init_sol_creation_mode = 2;
+            res = solveIHS(V,cnf);
+        }
+        if (alg == Algorithm::FHS) res = solveFHS(V,cnf);
+        if (alg == Algorithm::DREYFVS) res = solveDreyFVS(V,cnf);
+    }
+
+    // add information about core graph and init graph sizes
+    for( auto & it : res.iterations ) {
+        tie(it.initGraphN, it.initGraphM) = PII(initN, initM);
+        tie(it.coreGraphN, it.coreGraphM) = PII(N, M);
+        it.coreGraphPiArcs = pi_arcs;
+    }
+
+    return res;
 }
 
 

@@ -108,7 +108,7 @@ public:
     /**
      *  Maximum number of cycles to create in HS method, so that we can terminate without exceeding memory limit.
      */
-    int max_cycles_for_hs = 2e6;
+    int max_cycles_for_hs = 1e7;
 
     /**
      * If true, then cycle trimming will be used in IHS.
