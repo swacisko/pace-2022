@@ -65,23 +65,23 @@ def createTablesAndRankings():
     print('\nCreating tables and ranking, running command', cmd)
     os.system(cmd)
 
-    inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
-    cmd = 'python3 TestsRunner.py' + \
-          ' --instances_dir=' + inst_dir + \
-          ' --output_root_dir=' + output_root_dir + \
-          ' --compute=true' + \
-          ' --run_solver=false' + \
-          ' --run_judge=false' + \
-          ' --create_verdict_file=false' + \
-          ' --create_rankings=true' + \
-          ' --threads=1' + \
-          ' --solver_name=' + solver_name + \
-          ' --remove_existing_results=false' + \
-          ' --skip_existing_results=true' + \
-          ' --report_runs_in_separate_lines=true'
-
-    print('\nCreating tables and ranking, running command', cmd)
-    os.system(cmd)
+    # inst_dir, output_root_dir = input_minimal_dir, results_minimal_dir
+    # cmd = 'python3 TestsRunner.py' + \
+    #       ' --instances_dir=' + inst_dir + \
+    #       ' --output_root_dir=' + output_root_dir + \
+    #       ' --compute=true' + \
+    #       ' --run_solver=false' + \
+    #       ' --run_judge=false' + \
+    #       ' --create_verdict_file=false' + \
+    #       ' --create_rankings=true' + \
+    #       ' --threads=1' + \
+    #       ' --solver_name=' + solver_name + \
+    #       ' --remove_existing_results=false' + \
+    #       ' --skip_existing_results=true' + \
+    #       ' --report_runs_in_separate_lines=true'
+    #
+    # print('\nCreating tables and ranking, running command', cmd)
+    # os.system(cmd)
 
 all_tests_commands = []
 
@@ -223,11 +223,11 @@ def createAllGraphCommands():
 
 def createTestsCommands():
 
-    createCycleEnumerationCommands()
-    createMTZCycleAugmentationCommands()
-    createCycleScalingCommands()
-    createPiArcsPercentageCommands()
-    # createInitialSingleIterationTimeCommands()
+    # createCycleEnumerationCommands()
+    # createMTZCycleAugmentationCommands()
+    # createCycleScalingCommands()
+    # createPiArcsPercentageCommands()
+    # # createInitialSingleIterationTimeCommands()
     createAllGraphCommands()
 
 

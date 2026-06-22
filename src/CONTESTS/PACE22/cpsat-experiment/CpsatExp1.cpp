@@ -180,7 +180,9 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
         VVI revH = GraphUtils::reverseGraph(H);
         VB helper(V.size());
         Utils::removeNodes(H, revH, S, helper);
+        // clog << "Looking for cycles (backtracking) for " << max_millis << " millis" << endl;
         auto cycles = Utils::getAllSimpleCycles3(H,max_l, max_millis);
+        // clog << "\tfinished, found " << cycles.size() << endl;
         if (enumeration_option == 1) return cycles;
         all_cycles += cycles;
     }
@@ -198,6 +200,7 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
     if (enumeration_option == 2 || enumeration_option == 3){
         auto indg = getUnhitGraph(V,S);
         VVI H = indg.V;
+        auto revH = GraphUtils::reverseGraph(H);
         int N = H.size();
 
         unordered_set<LL> cycle_hashes;
@@ -206,34 +209,34 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
         sw.setLimit("cycles",max_millis);
         sw.start("cycles");
 
-        auto getCycles = [&](int v) -> VVI {
-            VB was(N);
-            VI par(N,-1);
-            VB on_path(N);
-            for (auto & vec : H) StandardUtils::shuffle(vec,rnd);
-            VVI cycles;
-
-            function<void(int)> dfs = [&](int num) {
-                was[num] = true;
-                on_path[num] = true;
-                for ( int d : H[num] ) {
-                    if ( was[d] && on_path[d] ) { // create a cycle
-                        VI cyc(1,num);
-                        int p = num;
-                        while (p != d) cyc.push_back(p = par[p]);
-                        reverse(ALL(cyc));
-                        cycles.push_back(cyc);
-                    }else if ( !was[d] ) {
-                        par[d] = num;
-                        dfs(d);
-                    }
-                }
-                on_path[num] = false;
-            };
-            dfs(v);
-
-            return cycles;
-        };
+        // auto getCycles = [&](int v) -> VVI {
+        //     VB was(N);
+        //     VI par(N,-1);
+        //     VB on_path(N);
+        //     for (auto & vec : H) StandardUtils::shuffle(vec,rnd);
+        //     VVI cycles;
+        //
+        //     function<void(int)> dfs = [&](int num) {
+        //         was[num] = true;
+        //         on_path[num] = true;
+        //         for ( int d : H[num] ) {
+        //             if ( was[d] && on_path[d] ) { // create a cycle
+        //                 VI cyc(1,num);
+        //                 int p = num;
+        //                 while (p != d) cyc.push_back(p = par[p]);
+        //                 reverse(ALL(cyc));
+        //                 cycles.push_back(cyc);
+        //             }else if ( !was[d] ) {
+        //                 par[d] = num;
+        //                 dfs(d);
+        //             }
+        //         }
+        //         on_path[num] = false;
+        //     };
+        //     dfs(v);
+        //
+        //     return cycles;
+        // };
 
         VI ind_on_cycle(N,-1);
         VB temp(N);
@@ -269,6 +272,64 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
             return res;
         };
 
+        VB was_gc(N);
+        VI par_gc(N);
+        VB on_path_gc(N);
+        VI temp_gc; temp_gc.reserve(N);
+        VI ind_on_path_gc(N,-1);
+
+        auto getCycles = [&](int v) -> VVI {
+            // VB was(N);
+            // VI par(N,-1);
+            // VB on_path(N);
+            // for (auto & vec : H) StandardUtils::shuffle(vec,rnd);
+            VB &was = was_gc;
+            VI &par = par_gc;
+            VB &on_path = on_path_gc;
+            temp_gc.clear();
+
+            VVI cycles;
+
+            function<void(int,int)> dfs = [&](int num, int l) {
+                temp_gc.push_back(num);
+
+                was[num] = true;
+                on_path[num] = true;
+                ind_on_path_gc[num] = l;
+
+                bool has_short_back_arc = false;
+                for( int d : H[num] ) has_short_back_arc |= ( on_path[d] && l-ind_on_path_gc[d] <= 5 );
+                for( int d : revH[num] ) has_short_back_arc |= ( on_path[d] && l-ind_on_path_gc[d] <= 5 );
+
+
+                StandardUtils::shuffle(H[num],rnd);
+                for ( int d : H[num] ) {
+                    if ( was[d] && on_path[d] ) { // create a cycle
+                        VI cyc(1,num);
+                        int p = num;
+                        while (p != d) cyc.push_back(p = par[p]);
+                        reverse(ALL(cyc));
+                        cyc = makeChordless(cyc);
+                        cycles.push_back(cyc);
+                    // }else if ( !was[d] ) {
+                    }else if ( !was[d] && !has_short_back_arc ) {
+                        par[d] = num;
+                        dfs(d,l+1);
+                    }
+                }
+                on_path[num] = false;
+            };
+            dfs(v,0);
+
+            for(int d : temp_gc) {
+                par[d] = -1;
+                was[d] = on_path[d] = false;
+                ind_on_path_gc[d] = -1;
+            }
+
+            return cycles;
+        };
+
 
         auto isChordless = [&](VI cyc)-> bool {
             bool chordless = true;
@@ -290,8 +351,9 @@ VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis,
 
         for (int v : perm) {
             if ( sw.tle("cycles") ) break;
-            // clog << "Getting cycles for node v: " << v << endl;
+            // clog << "Getting cycles (tree method) for node v: " << v << endl;
             auto new_cycles = getCycles(v);
+            // clog << "\tfound " << new_cycles.size() << " new cycles" << endl;
             int cycles_added = 0;
             int new_chordless_cycles = 0;
             double suml1 = 0, suml2 = 0;
@@ -1553,7 +1615,7 @@ ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
         exp_data.iterations.emplace_back();
         return exp_data;
     }else {
-        DEBUG(M / pi_arcs);
+        DEBUG(1.0 * pi_arcs / M);
 
         auto alg = cnf.alg;
         if (alg == Algorithm::HS) res = solveHS(V,cnf);
