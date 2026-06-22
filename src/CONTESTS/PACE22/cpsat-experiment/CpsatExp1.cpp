@@ -507,12 +507,15 @@ tuple<VI,CpSolverStatus,VI, VVI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V
     VI inter_fvs;
     VVI interm_cyc;
 
+    int N = V.size(), M = GraphUtils::countEdges(V,true);
+
     while(response.status() == CpSolverStatus::UNKNOWN && !timer.tle(timer_option)) {
         if (response.status() == CpSolverStatus::UNKNOWN) cnf.ihs_single_iteration_sec++;
 
         init_time = ceil(min( 3000.0 * init_time, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
         clog << "Response status unknown, increasing max_time_per_iter to " << init_time << endl;
 
+        int last_incumbent_solution_filled_size = inf;
         SatParameters params = getDefaultSatParameters(cnf, init_time);
         Model solv_model;
         solv_model.Add(NewSatParameters(params));
@@ -532,9 +535,14 @@ tuple<VI,CpSolverStatus,VI, VVI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V
                         if (temp.size() < init_sol.size()) clog << "\t\t\t found new inter_fvs of size: " << inter_fvs.size()
                              << ", while HS size: " << temp.size() << endl;
                     }
-                    // else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
                     else {
-                        if(temp.size()+10 > 0.75 * init_sol.size()) { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
+                        // fill incumbent solution to the full solution only if the HS is already close to it
+                        bool is_large_graph = ( M < 1e5 );
+                        bool is_hs_close_to_init_sol = ( temp.size()+100 > 0.9 * init_sol.size() );
+                        bool last_sol_larger = ( last_incumbent_solution_filled_size > temp.size() );
+
+                        if(!is_large_graph || (is_hs_close_to_init_sol && last_sol_larger)) {
+                            last_incumbent_solution_filled_size = temp.size();
                             std::lock_guard<std::mutex> lk(log_mutex);
                             auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
                             if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
@@ -558,7 +566,8 @@ tuple<VI,CpSolverStatus,VI, VVI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V
         response = SolveCpModel(model_proto, &solv_model);
     }
 
-    int N = nodes.size();
+    // int N = nodes.size();
+    assert(N == nodes.size());
     if (response.status() == CpSolverStatus::OPTIMAL || response.status() == CpSolverStatus::FEASIBLE) {
         VI res;
         for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
@@ -588,6 +597,7 @@ tuple<VI,CpSolverStatus, VI, VVI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cy
     string timer_option, ExpConfig& cnf) {
 
     int N = V.size();
+    int M = GraphUtils::countEdges(V,true);
     int F = ( Utils::isFVS(V,prev_res) ? 2 : 1 );
     int time = ceil(min( 1000.0 * F * cnf.ihs_single_iteration_sec, timer.getLimit(timer_option) - timer.getTime(timer_option) ) / 1000);
     time = max(time,1);
@@ -611,6 +621,8 @@ tuple<VI,CpSolverStatus, VI, VVI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cy
 
     VI inter_fvs;
     VVI intermittent_cycles;
+    int last_incumbent_solution_filled_size = inf;
+
     if ( cnf.check_incumbent_cpsat_solutions ) {
         mutex log_mutex;
         solver_model.Add(NewFeasibleSolutionObserver(
@@ -630,17 +642,22 @@ tuple<VI,CpSolverStatus, VI, VVI> CpsatExp1::solveCpsatForCycles(VVI &V, VVI &cy
                 }
                 // else { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
                 else{
-                    if(temp.size()+10 > 0.75 * init_sol.size()) { // uncomment this to check the a 'fixed' solution every time a new hitting set is found
-                        // uncomment this to check the a 'fixed' solution every time a new hitting set is found
+                    // fill incumbent solution to the full solution only if the HS is already close to it
+                    bool is_large_graph = ( M < 1e5 );
+                    bool is_hs_close_to_init_sol = ( temp.size()+100 > 0.9 * init_sol.size() );
+                    bool last_sol_larger = ( last_incumbent_solution_filled_size > temp.size() );
+
+                   if(!is_large_graph || (is_hs_close_to_init_sol && last_sol_larger )) {
+                        last_incumbent_solution_filled_size = temp.size();
                         std::lock_guard<std::mutex> lk(log_mutex);
                         auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
                         if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
-                        (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
-                        ) {
-                        inter_fvs = temp + unhit_graph_dfvs;
-                        assert(Utils::isFVS(V,inter_fvs));
-                        if (temp.size() < init_sol.size()) clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size()
-                           << ", while HS size: " << temp.size() << endl;
+                            (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
+                            ) {
+                            inter_fvs = temp + unhit_graph_dfvs;
+                            assert(Utils::isFVS(V,inter_fvs));
+                            if (temp.size() < init_sol.size()) clog << "\t\t\t found SUPPL. inter_fvs of size: " << inter_fvs.size()
+                                 << ", while HS size: " << temp.size() << endl;
                         }
                     }
 
@@ -1134,6 +1151,11 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         clog << "\t "; DEBUG(Utils::isFVS(V,sol));
         if (cnf.find_optimal_result) assert(response_status == CpSolverStatus::OPTIMAL);
 
+        if (timer.tle(timer_option) && sol.empty()) {
+            exp_data.iterations.pop_back();
+            break;
+        }
+
         VI full_sol;
         VI unhit_graph_dfvs;
 
@@ -1156,10 +1178,12 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
                 // if (sol.size() < init_sol.size() ) {
                 if (sol.size() < best_fvs.size() ) {
                     cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res-1;
+                    if( iters_streak_with_hs_valid_res >= 2 ) cnf.ihs_single_iteration_sec *= 1.15; // for 7 seconds, it should increase by additional 1 second
                     clog << endl << "--> Found a valid FVS, not increasing max_time_seconds_per_iter" << endl;
                 }
                 else {
                     cnf.ihs_single_iteration_sec += iters_streak_with_hs_valid_res;
+                    if( iters_streak_with_hs_valid_res >= 2 ) cnf.ihs_single_iteration_sec *= 1.15; // for 7 seconds, it should increase by additional 1 second
                     clog << endl << "--> Found a valid FVS, increasing max_time_seconds_per_iter to " << cnf.ihs_single_iteration_sec << " sec." << endl << endl;
                 }
             }
