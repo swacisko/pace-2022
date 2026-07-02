@@ -18,6 +18,8 @@
 #include <graphs/graphtraversals/BFS.h>
 #include "CONTESTS/PACE22/Reducer.h"
 
+#include "EDReducer.h"
+
 using namespace Utils;
 
 Reducer::Reducer(VVI &V, Config c) : origN(V.size()) {
@@ -408,15 +410,26 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
     if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
-    if(Utils::isPIGraph(V, revV, helper)){
-        VVI Vcp = V;
-        KernelizerVC kern;
-        auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
-        addKNR(kern_nodes);
-        Utils::removeNodes(V, revV, kern_nodes,helper);
-    }
+    // if(Utils::isPIGraph(V, revV, helper)){
+    //     VVI Vcp = V;
+    //     KernelizerVC kern;
+    //     auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
+    //     addKNR(kern_nodes);
+    //     Utils::removeNodes(V, revV, kern_nodes,helper);
+    // }
+
+    int ed_rules_checked = 0;
 
     do{
+
+        if(Utils::isPIGraph(V, revV, helper)){
+            VVI Vcp = V;
+            KernelizerVC kern;
+            auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
+            addKNR(kern_nodes);
+            Utils::removeNodes(V, revV, kern_nodes,helper);
+        }
+
 
         if(write_progress_on_the_fly){
             StronglyConnectedComponents scc(V, revV);
@@ -581,6 +594,20 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if(!modified) modified = (!uncon.empty());
             if(modified) continue;
         }
+
+
+        bool is_pi_graph = Utils::isPIGraph(V, revV, helper);
+        if(cnf.reducer_use_ed && is_pi_graph
+            && ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) )){
+            ed_rules_checked++;
+            EDReducer edred(V.size(), cnf);
+            VI res = edred.reduce(V);
+            addKNR(res);
+            Utils::removeNodes(V, revV, res, helper);
+            if(!modified) modified = (!res.empty());
+            if(modified) continue;
+        }
+
 
         if(cnf.reducer_use_folding){
             //TimeMeasurer::start("Reducer::folding");
@@ -1088,6 +1115,37 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             //TimeMeasurer::stop("Reducer::spiderweb_gadgets");
             if(modified) continue;
         }
+
+
+        is_pi_graph = Utils::isPIGraph(V, revV, helper);
+        if(cnf.reducer_use_ed && is_pi_graph){
+            ed_rules_checked++;
+            EDReducer edred(V.size(), cnf);
+            VI res = edred.reduce(V);
+            addKNR(res);
+            Utils::removeNodes(V, revV, res, helper);
+            if(!modified) modified = (!res.empty());
+            if(modified) {
+                clog << "Considering ED rule at the very end, found " << res.size() << " reducible nodes" << endl;
+                continue;
+            }
+
+            if (res.empty()) { // now adding edges if possible...
+                int ecnt_0 = GraphUtils::countEdges(V,true);
+                edred.apply_type1_constraints_on_the_fly = true;
+                res = edred.reduce(V);
+                assert(res.empty() && "if failed then ED rules does not run deterministically...");
+                addKNR(res);
+                Utils::removeNodes(V, revV, res, helper);
+                int ecnt_1 = GraphUtils::countEdges(V,true);
+                if(!modified) modified = (!res.empty() || ecnt_1 != ecnt_0);
+                if(modified) {
+                    clog << "Considering ED rule at the very end, added " << ecnt_1 - ecnt_0 << " new ARCS" << endl;
+                    continue;
+                }
+            }
+        }
+
 
     }while(modified);
 

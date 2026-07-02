@@ -69,6 +69,37 @@ public:
     bool reducer_use_bottleneck2 = false;
     bool reducer_use_recursive_reducer = false;
 
+    //*****************
+    bool reducer_use_ed = false;
+
+    /**
+     * 0 - only at the very end
+     * 1 - apply only once after reducible and before liftable rules, then at the very end.
+     * 2 - apply exhaustively after all reducible reductions are done and before foldable reductions are done,
+     *      and at the end
+     *
+     * When ed is applied at the end and no reducible node is found, edges are added according to type1-constraints
+     */
+    int ed_application_mode = 0;
+
+    /**
+     * Used for order in which nodes are considered by ED rule
+     * 0 - order in which the nodes just are, nothing is done
+     * 1 - sort nodes considered in ED by degrees, largest to smallest
+     * 2 - sort nodes considered in ED by degrees, smallest to largest
+     */
+    int ed_node_sorting_mode = 0;
+
+    /**
+     * Order in which nodes in
+     * 0 - order in which the nodes just are, nothing is done
+     * 1 - sort nodes in U1 based on their |N(u) \setminus W|, largest to smallest
+     * 2 - sort nodes in U1 based on their |N(u) \setminus W|, smallest to largest
+     */
+    int ed_U_nodes_sorting_mode = 0;
+
+    //*****************
+
     int reducer_simple_cycle_max_branch_depth = 50; // set this to 1e9 to make full search for simple cycles
 
     int reducer_max_time_millis = 60'000; // one minute max reduction time
@@ -124,6 +155,8 @@ public:
         reducer_use_bottleneck = true;
         reducer_use_bottleneck2 = true;
         reducer_use_cycle_folding = true;
+
+        reducer_use_ed = true;
     }
 
     void disableAllNonbasicReductions(){
@@ -158,6 +191,8 @@ public:
         reducer_use_cycle_folding = false;
         reducer_use_spiderweb_gadgets = false;
         reducer_use_recursive_reducer = false;
+
+        reducer_use_ed = false;
     }
 
     void disableAllConditionalReductions(){
