@@ -546,6 +546,12 @@ public:
     int total_bottlenecks_applied = 0;
     int total_bottleneck2_nodes_removed = 0;
     int total_recursive_reducer_nodes_removed = 0;
+
+    int ed_nodes_reduced = 0;
+    int ed_edges_removed = 0;
+    int ed_t1_inference_rules_added = 0;
+    int ed_total_t2_inference_rules_created = 0;
+    int ed_t2_inference_rules_added = 0;
 };
 
 #endif //ALGORITHMSPROJECT_REDUCER_H

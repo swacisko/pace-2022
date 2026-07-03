@@ -602,6 +602,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             ed_rules_checked++;
             EDReducer edred(V.size(), cnf);
             VI res = edred.reduce(V);
+            ed_nodes_reduced += res.size();
             addKNR(res);
             Utils::removeNodes(V, revV, res, helper);
             if(!modified) modified = (!res.empty());
@@ -1122,6 +1123,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             ed_rules_checked++;
             EDReducer edred(V.size(), cnf);
             VI res = edred.reduce(V);
+            ed_nodes_reduced += res.size();
             addKNR(res);
             Utils::removeNodes(V, revV, res, helper);
             if(!modified) modified = (!res.empty());
@@ -1134,10 +1136,13 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 int ecnt_0 = GraphUtils::countEdges(V,true);
                 edred.apply_type1_constraints_on_the_fly = true;
                 res = edred.reduce(V);
+                ed_nodes_reduced += res.size();
                 assert(res.empty() && "if failed then ED rules does not run deterministically...");
                 addKNR(res);
                 Utils::removeNodes(V, revV, res, helper);
                 int ecnt_1 = GraphUtils::countEdges(V,true);
+                assert( (ecnt_1 - ecnt_0) % 2 == 0 ); // this is the number of arcs, and since we add pi-arcs...
+                ed_t1_inference_rules_added += (ecnt_1 - ecnt_0) / 2;
                 if(!modified) modified = (!res.empty() || ecnt_1 != ecnt_0);
                 if(modified) {
                     clog << "Considering ED rule at the very end, added " << ecnt_1 - ecnt_0 << " new ARCS" << endl;

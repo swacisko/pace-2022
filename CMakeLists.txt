@@ -1,13 +1,13 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.24)
 project(DiVerSeS)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 
 
-#SET(CMAKE_CXX_FLAGS "-std=c++17 -O0") # profiling
+#SET(CMAKE_CXX_FLAGS "-std=c++23 -O0") # profiling
 #SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG -std=c++17 -Wreturn-type -O0") # debugging
 
-SET(CMAKE_CXX_FLAGS "-std=c++20 -O3 -fopenmp")
+SET(CMAKE_CXX_FLAGS "-std=c++23 -O3 -fopenmp")
 
 
 
