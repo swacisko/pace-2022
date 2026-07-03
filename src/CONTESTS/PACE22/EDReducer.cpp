@@ -19,6 +19,8 @@ VI EDReducer::reduce(VVI& V0) {
 
     VI reducible_nodes;
 
+    DEBUG(V);
+
     for (int v : nodes) {
         if (considerNode(v)) {
             reducible_nodes.push_back(v);
@@ -56,7 +58,7 @@ bool EDReducer::existsExtDominator() {
         int marked_cnt = 0;
 
         for ( int w : V[u] ) if (!inW[w]) {
-            all_marked |= marked[w];
+            all_marked &= marked[w];
             marked_cnt++;
         }
         if (all_marked) {
@@ -125,13 +127,19 @@ void EDReducer::markDominationNodes() {
     for (int u : U1) {
         if (V[u].empty()) continue;
 
-        int c = 0;
+        int _c = 0;
         for (int w : V[u]) if (!inW[w]) {
-            c++;
+            _c++;
             for (int d : V[w]) cnt[d]++;
         }
 
-        for ( int w : V[u] ) if (!inW[w]) for ( int d : V[w] ) if ( cnt[d] == c ) marked[d] = true;
+        for ( int w : V[u] ) if (!inW[w]) {
+            for ( int d : V[w] ) if ( !inW[d] && cnt[d] == _c ) {
+                if (write_logs) clog << "\t\tmarking node d = " << d << " for u = " << u << ", _c: " << _c << endl;
+                marked[d] = true;
+            }
+            break; // we need only 1 node to mark the intersection, so we can break here
+        }
 
         for (int w : V[u]) for (int d : V[w]) cnt[d] = 0; // clearing cnt array for next node u
     }
@@ -148,9 +156,9 @@ int EDReducer::nextStep() {
 
     if (write_logs) {
         VI temp;
-        for ( int u : U ) for (int w : V[u]) if (!inW[w]) temp.push_back(w);
+        for ( int u : U ) for (int w : V[u]) if (!inW[w] && marked[w]) temp.push_back(w);
         StandardUtils::makeUnique(temp);
-        clog << "\t\tnodes marked: " << temp << endl;
+        clog << "\t\tnodes in N(U) marked: " << temp << endl;
     }
 
     if (existsExtDominator()) {

@@ -175,7 +175,8 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined =  cnf.reducer_use_twins_merge = cnf.reducer_use_domination = true;
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10;
-        Reducer red(V,cnf);
+        auto Vcp = V;
+        Reducer red(Vcp,cnf);
         auto to_lift = red.reduce();
         sw.stop("main");
 
@@ -187,6 +188,15 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
         auto [res,times] = solveInstanceUsingSatBasedSolver(constraints, solver_max_time_sec, solver_time_granularity, solver_repeats, alg);
         for (auto& d : times) d += solution_lift_overhead;
         exp_data.noned_results = times;
+    }
+
+    {
+        Config cnf;
+        cnf.disableAllNonbasicReductions();
+        cnf.reducer_use_ed = true;
+        EDReducer edred(N,cnf);
+        auto res = edred.reduce(V);
+        exit(4);
     }
 
 
@@ -252,7 +262,8 @@ VVI getTestV1() {
         int v = 0, a = 1, b = 2, x = 3, c = 4, d = 5, p = 6, q = 7, k = 8, y = 9, r = 10, s = 11, l = 12;
         edges = {
             {v,a}, {v,b}, {v,c}, {v,d},
-            {a,p}, {a,q}, {a,b}, {b,q},
+            {a,p}, {a,q}, {a,b},
+            {b,q}, {b,x},
             {c,x}, {c,y}, {c,d},
             {d,r}, {d,s},
             {p,x}, {p,l},
@@ -265,7 +276,7 @@ VVI getTestV1() {
         };
     }
 
-    return GraphUtils::getGraphForEdges(edges);
+    return GraphUtils::getGraphForEdges(edges,false);
 }
 
 
