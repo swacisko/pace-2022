@@ -48,6 +48,7 @@ def getDefaultCommand():
 def createTablesAndRankings():
     global inst_dir, output_root_dir
 
+    inst_dir, output_root_dir = input_large_dir, results_large_dir
     cmd = 'python3 TestsRunner.py' + \
           ' --instances_dir=' + inst_dir + \
           ' --output_root_dir=' + output_root_dir + \

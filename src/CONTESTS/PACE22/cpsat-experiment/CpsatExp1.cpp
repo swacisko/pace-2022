@@ -457,9 +457,8 @@ VI CpsatExp1::getUnhitGraphGreedyFVS(VVI &V, VI &S) {
     indg2.remapNodes(res);
     assert(Utils::isFVS(newV,res));
 
-    clog << "\tFound solution using agent flow" << endl;
-
     Reducer::liftSolution(newV.size(), res, reductions);
+    clog << "\tFound solution using agent flow with res.size(): " << res.size() << endl;
 
     assert(Utils::isFVS(indg.V,res));
     indg.remapNodes(res);
@@ -977,7 +976,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
     IntGenerator rnd;
     while(true) {
-        if(timer.tle(timer_option)) break;
+        if(timer.tle(timer_option) && iters_done > 0) break;
+
         if (iters_done++ > cnf.ihs_max_iterations) break;
 
         if (cycles.size() > cnf.max_cycles_for_hs) break;
@@ -1121,6 +1121,8 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         s.stop("hs_greedy");
         clog << "\t found HS for " << new_cycles.size() << " unhit cycles of size " << unhit_cycles_hs.size() << endl;
 
+        cycles += new_cycles;
+
         if (timer.tle(timer_option)) {
             exp_data.iterations.pop_back();
             break;
@@ -1128,7 +1130,6 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
 
         exp_data.iterations.back().hs_size_before_impr = prev_res.size() + unhit_cycles_hs.size();
 
-        cycles += new_cycles;
         recently_added_constraints = new_cycles.size();
 
         // int C0 = cycles.size();
@@ -1270,6 +1271,12 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
     if (!best_fvs.empty()) res = best_fvs;
     else res = prev_res;
 
+    if(exp_data.iterations.empty()) {
+        exp_data.iterations.emplace_back();
+        exp_data.iterations.back().full_sol_size = best_fvs.size();
+        exp_data.iterations.back().hs_valid_fvs = Utils::isFVS(V,best_fvs);
+    }
+
     if(exp_data.iterations.back().full_sol_size < best_fvs.size()) {
         exp_data.iterations.emplace_back();
         exp_data.iterations.back().full_sol_size = best_fvs.size();
@@ -1331,6 +1338,7 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
         VVI cycles;
         VI res;
         auto r = solveIHS(V,new_cnf,cycles, res);
+        assert(!res.empty());
         addCycleConstraints(model,cycles,nodes);
         init_sol = res;
         augmented_cycles = cycles;
@@ -1400,7 +1408,7 @@ ExpData CpsatExp1::solveMTZ(VVI V, ExpConfig cnf, int auxiliary_cycles_mode) {
     VI res;
     if ( response.status() == OPTIMAL || response.status() == FEASIBLE ) {
         for (int i=0; i<N; i++) if ( SolutionBooleanValue(response,nodes[i]) ) res.push_back(i);
-    }
+    }else res = init_sol;
 
     {
         map<int,int> cycles_of_length;
@@ -1575,12 +1583,12 @@ ExpData CpsatExp1::solveDiVerSeS(VVI V, ExpConfig cnf) {
 VI CpsatExp1::createInitialSolution(VVI &V, ExpConfig cnf) {
     VI init_sol;
     if(cnf.ihs_init_sol_creation_mode == 1) {
-        clog << "Looking for initial solution using Agent-Flow approach" << endl;
+        // clog << "Looking for initial solution using Agent-Flow approach" << endl;
         Stopwatch sw;
         sw.start("init_sol");
         init_sol = getUnhitGraphGreedyFVS(V,init_sol);
         sw.stop("init_sol");
-        clog << "Found initial solution of size " << init_sol.size() << " (in " << sw.getTime("init_sol")/1000 << " sec.)" << endl;
+        // clog << "Found initial solution of size " << init_sol.size() << " (in " << sw.getTime("init_sol")/1000 << " sec.)" << endl;
     }
     if(cnf.ihs_init_sol_creation_mode == 2) {
         Config diverses_cnf;
