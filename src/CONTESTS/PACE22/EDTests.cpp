@@ -13,17 +13,17 @@
 #include <ranges>
 
 struct ExpData {
-    int N0,M0,N1,M1,N2,M2;
-    int type1_constraints;
-    int type2_constraints;
+    int N0=-1, M0=-1, N1=-1, M1=-1, N2=-1, M2=-1, N3=-1, M3=-1;
+    int type1_constraints = -1;
+    int type2_constraints = -1;
 
-    int red_init_time_millis;
-    int red_noned_time_millis;
-    int red_ed_time_millis;
+    int red_init_time_millis = -1;
+    int red_noned_time_millis = -1;
+    int red_ed_time_millis = -1;
 
-    int solver_max_time_sec;
-    int solver_time_granularity;
-    int solver_repeats;
+    int solver_max_time_sec = -1;
+    int solver_time_granularity = -1;
+    int solver_repeats = -1;
     VD noned_results;
     VD ed_results;
 
@@ -35,12 +35,10 @@ struct ExpData {
 
     map<string,string> getEntries() {
         map<string,string> res;
-        res["N0"] = to_string(N0);
-        res["M0"] = to_string(M0);
-        res["N1"] = to_string(N1);
-        res["M1"] = to_string(M1);
-        res["N2"] = to_string(N2);
-        res["M2"] = to_string(M2);
+        res["N0"] = to_string(N0); res["M0"] = to_string(M0);
+        res["N1"] = to_string(N1); res["M1"] = to_string(M1);
+        res["N2"] = to_string(N2); res["M2"] = to_string(M2);
+        res["N3"] = to_string(N3); res["M3"] = to_string(M3);
 
         res["type1_constraints"] = to_string(type1_constraints);
         res["type2_constraints"] = to_string(type2_constraints);
@@ -68,18 +66,17 @@ struct ExpData {
 
     void writeToFile(ostream & str) {
         auto mapa = getEntries();
-        vector<string> header = { "N0", "M0", "N1", "M1", "N2", "M2",
+        vector<string> header = { "N0", "M0", "N1", "M1", "N2", "M2", "N3", "M3",
             "type1_constraints", "type2_constraints",
         "red_init_time_millis", "red_noned_time_millis", "red_ed_time_millis",
         "solver_max_time_sec", "solver_time_granularity", "solver_repeats",
         "noned_results", "ed_results"
         };
-        for (auto k : views::keys(mapa)) header.push_back(k);
 
         auto writeLine = [&](vector<string> & l) {
             int cnt = 0;
             for ( auto s : l ) {
-                if (cnt++) str << " ";
+                if (cnt++) str << ",";
                 str << s;
             }
             str << "\n";
@@ -95,7 +92,7 @@ struct ExpData {
 pair<VI,VD> solveInstanceUsingSatBasedSolver(VPII constraints, int max_time_sec, int granularity, int repeats, string alg = "cpsat") {
     // times[i] is the result found by the solver after time (i+1) * granularity seconds
     const int I = ceil(max_time_sec / granularity);
-    VVI iteration_res_times(I);
+    VVI iteration_res_times(I, VI());
     VD res_times(I, -1);
     VI res; // valid solution for provided constraints
 
@@ -119,14 +116,17 @@ pair<VI,VD> solveInstanceUsingSatBasedSolver(VPII constraints, int max_time_sec,
         };
 
         VI iter_res_times = solve();
-        for ( int i=0; i<iter_res_times.size(); i++ ) iteration_res_times[i].push_back(iter_res_times[i]);
+        for ( int i=0; i<I; i++ ) {
+            assert(i < iter_res_times.size());
+            assert(i < iteration_res_times.size());
+            iteration_res_times[i].push_back(iter_res_times[i]);
+        }
     }
 
     for (int i=0; i<iteration_res_times.size(); i++ ) {
         const auto & irt = iteration_res_times[i];
-        if ( !irt.empty() ) {
-            res_times[i] = accumulate(ALL(irt),0.0) / irt.size();
-        }
+        if ( !irt.empty() ) res_times[i] = accumulate(ALL(irt),0.0) / irt.size();
+
     }
 
     return make_pair(res,res_times);
@@ -134,6 +134,7 @@ pair<VI,VD> solveInstanceUsingSatBasedSolver(VPII constraints, int max_time_sec,
 
 pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time_granularity, int solver_repeats, string alg) {
     int N = V.size();
+    auto initV = V;
 
     ExpData exp_data;
     exp_data.solver_time_granularity = solver_time_granularity;
@@ -141,9 +142,22 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
     exp_data.solver_repeats = solver_repeats;
 
     exp_data.N0 = N;
-    exp_data.M0 = GraphUtils::countEdges(V,true);
+    exp_data.M0 = GraphUtils::countEdges(V);
 
     DEBUG(PII(exp_data.N0,exp_data.M0));
+
+
+    constexpr bool run_ed_test = false;
+    if (run_ed_test){
+        Config cnf;
+        cnf.disableAllNonbasicReductions();
+        cnf.reducer_use_ed = true;
+        EDReducer edred(N,cnf);
+        auto res = edred.reduce(V);
+        exit(4);
+    }
+
+
 
     if (false){
         Stopwatch sw;
@@ -160,14 +174,16 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
         sw.stop("main");
 
         exp_data.red_init_time_millis = sw.getTime("main");
+
+        exp_data.N1 = N;
+        exp_data.M1 = GraphUtils::countEdges(V);
     }
 
-    exp_data.N1 = N;
-    exp_data.M1 = GraphUtils::countEdges(V,true);
 
     DEBUG(PII(exp_data.N1,exp_data.M1));
 
-    { // measuring just the VC reduction time WITHOUT ED rule, and the solver results for the non-ed reduced graph
+    constexpr bool test_noned_vc_rules = true;
+    if (test_noned_vc_rules){ // measuring just the VC reduction time WITHOUT ED rule, and the solver results for the non-ed reduced graph
         Stopwatch sw;
         sw.start("main");
         Config cnf;
@@ -175,8 +191,7 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined =  cnf.reducer_use_twins_merge = cnf.reducer_use_domination = true;
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10;
-        auto Vcp = V;
-        Reducer red(Vcp,cnf);
+        Reducer red(V,cnf);
         auto to_lift = red.reduce();
         sw.stop("main");
 
@@ -188,15 +203,11 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
         auto [res,times] = solveInstanceUsingSatBasedSolver(constraints, solver_max_time_sec, solver_time_granularity, solver_repeats, alg);
         for (auto& d : times) d += solution_lift_overhead;
         exp_data.noned_results = times;
-    }
 
-    {
-        Config cnf;
-        cnf.disableAllNonbasicReductions();
-        cnf.reducer_use_ed = true;
-        EDReducer edred(N,cnf);
-        auto res = edred.reduce(V);
-        exit(4);
+        auto indg = GraphInducer::induceByNonisolatedNodes(red.V);
+        exp_data.N2 = indg.V.size();
+        exp_data.M2 = GraphUtils::countEdges(indg.V);
+        DEBUG(PII(exp_data.N2,exp_data.M2));
     }
 
 
@@ -221,18 +232,18 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
     exp_data.ed_t2_inference_rules_added = red.ed_t2_inference_rules_added;
     exp_data.ed_total_t2_inference_rules_created = red.ed_total_t2_inference_rules_created;
 
-    auto newV = red.V;
-    auto indg = GraphInducer::induceByNonisolatedNodes(newV);
+    auto indg = GraphInducer::induceByNonisolatedNodes(red.V);
 
     V = indg.V;
     N = V.size();
 
-    exp_data.N2 = N;
-    exp_data.M2 = GraphUtils::countEdges(V,true);
+    exp_data.N3 = N;
+    exp_data.M3 = GraphUtils::countEdges(V);
 
-    DEBUG(PII(exp_data.N2,exp_data.M2));
+    DEBUG(PII(exp_data.N3,exp_data.M3));
 
 
+    clog << endl << "CAUTION!! Constraints need to be remapped to the induced graph, before solver is called!" << endl << endl;
 
     // now solve the reduced problem using constraints...
 
@@ -242,8 +253,9 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
     // Take into account type2 constraints as well, type1 constrains were already added to the graph
 
     int solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
+    DEBUG(solution_lift_overhead);
     auto [res,times] = solveInstanceUsingSatBasedSolver(constraints,solver_max_time_sec,solver_time_granularity, solver_repeats);
-    for (auto& d : times) d += solution_lift_overhead;
+    for (auto& d : times) if (d != -1) d += solution_lift_overhead;
     exp_data.ed_results = times;
 
 
@@ -269,7 +281,7 @@ VVI getTestV1() {
             {p,x}, {p,l},
             {q,x}, {q,l},
             {x,k}, {x,y},
-            {k,l},
+            {k,l}, {k,y},
             {y,r},
             {r,l}, {r,s},
             {s,l}

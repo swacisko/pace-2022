@@ -2008,7 +2008,6 @@ bool Reducer::mergeTwins(int max_milliseconds) {
                         merge_v(A+B); // this should be he same as merge_v(A) and then apply pie()
                     }
                 }
-
             }
         }
     }
