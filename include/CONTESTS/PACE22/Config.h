@@ -69,7 +69,7 @@ public:
     bool reducer_use_bottleneck2 = false;
     bool reducer_use_recursive_reducer = false;
 
-    //*****************
+    //******************************************************************** ED
     bool reducer_use_ed = false;
 
     /**
@@ -98,7 +98,50 @@ public:
      */
     int ed_U_nodes_sorting_mode = 0;
 
-    //*****************
+    /**
+     * If true, then all detected nodes are moved to the set U simultaneously, in the same iteration, otherise
+     * they are moved one in each iteration.
+     * Similary for the set S.
+     */
+    bool ed_move_nodes_to_U_simultaneously = true;
+    bool ed_move_nodes_to_S_simultaneously = false;
+
+    /**
+     * If true, then nodes are considered to be moved to the set U, even if they do not belong to N(W).
+     * This might considerably speed up the process - and not only speed up, but also increase the areas of
+     * subgraphs searched by the rule.
+     * This should be set to true for best performance (both quality and efficiency).
+     */
+    bool ed_consider_nodes_to_move_outside_NW = false;
+
+    /**
+     * This is the standard concept that must be used.
+     */
+    constexpr static bool use_ed_domination = true;
+
+    /**
+     * If true, then the ``same neighborhood'' appraoch will be used to identify nodes to move to U.
+     * This is just a special case of `deficit1 domination'' and works in the same complexity,
+     * but should be slighly faster in practice (but possibly much weaker).
+     */
+    bool ed_use_same_neigh_domination = false;
+
+    /**
+     * If true, then the ``deficit1'' approach will be used to find nodes to move to U.
+     * This is a GENERALIZATION of the ``same neighborhood'' rule.
+     */
+    bool ed_use_deficit1_domination = false;
+
+    /**
+     * If true, then the ``biset'' approach will be used to find nodes to move to U.
+     * CAUTION! This rules is slower than other rules used to determine nodes to move to U.
+     * It needs to be checked if in practice it is efficient enough, and perhaps limit it to only some special
+     * (smaller) substructures.
+     */
+    bool ed_use_biset_move_checks = false;
+
+
+    //******************************************************************** ED
 
     int reducer_simple_cycle_max_branch_depth = 50; // set this to 1e9 to make full search for simple cycles
 

@@ -16,7 +16,7 @@ public:
         cnt = VI(N,0);
     }
 
-    VI reduce(VVI & V0);
+    VI reduce(VVI V0);
 
 
     VI inf_rules_1, inf_rules_2;
@@ -50,6 +50,12 @@ private:
      *  for which N(u) \setminus W \subseteq N(x)
      */
     void markDominationNodes();
+
+    /**
+     * Finds, using approaches marked in the [cnf], all the nodes that can be moved to U.
+     * Those nodes must be marked earlier in the [marked] array using the [markDominationNodes] function.
+     */
+    VI findNodesToMoveToU();
 
     /**
      * Performs the next step.

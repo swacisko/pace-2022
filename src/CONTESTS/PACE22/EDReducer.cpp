@@ -9,7 +9,7 @@
 #include "CONTESTS/PACE22/Utils.h"
 
 
-VI EDReducer::reduce(VVI& V0) {
+VI EDReducer::reduce(VVI V0) {
     V = V0;
 
     VI nodes(N);
@@ -129,27 +129,91 @@ void EDReducer::moveToS(int u) {
 
 void EDReducer::markDominationNodes() {
 
-    for (int u : U1) for (int w : V[u]) for ( int d : V[w] ) marked[d] = cnt[d] = 0; // clearing marked array
-
-    for (int u : U1) {
-        if (V[u].empty()) continue;
-
-        int _c = 0;
-        for (int w : V[u]) if (!inW[w]) {
-            _c++;
-            for (int d : V[w]) cnt[d]++;
-        }
-
-        for ( int w : V[u] ) if (!inW[w]) {
-            for ( int d : V[w] ) if ( !inW[d] && cnt[d] == _c ) {
-                if (write_logs) clog << "\t\tmarking node d = " << d << " for u = " << u << ", _c: " << _c << endl;
-                marked[d] = true;
-            }
-            break; // we need only 1 node to mark the intersection, so we can break here
-        }
-
-        for (int w : V[u]) for (int d : V[w]) cnt[d] = 0; // clearing cnt array for next node u
+    // for (int u : W) for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear
+    for (int u : U1) for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
+        marked[u] = marked[w] = marked[d] = false;
+        cnt[u] = cnt[w] = cnt[d] = 0;
     }
+
+    if constexpr(cnf.use_ed_domination) { // the standard concept, used always
+        for (int u : U1) {
+            if (V[u].empty()) continue;
+
+            int _c = 0;
+            for (int w : V[u]) if (!inW[w]) {
+                _c++;
+                for (int d : V[w]) cnt[d]++;
+            }
+
+            for ( int w : V[u] ) if (!inW[w]) {
+                for ( int d : V[w] ) if ( !inW[d] && cnt[d] == _c ) {
+                    if (write_logs) clog << "\t\tmarking node d = " << d << " for u = " << u << ", _c: " << _c << endl;
+                    marked[d] = true;
+                }
+                break; // we need only 1 node to mark the intersection, so we can break here
+            }
+
+            for (int w : V[u]) for (int d : V[w]) cnt[d] = 0; // clearing cnt array for next node u
+        }
+    }
+
+    if(cnf.ed_use_same_neigh_domination) {
+        // here we use ``same neighborhood domination'' approach.
+        // we find all nodes w \in N(u) \setminus W such that N(u) \setminus W \subseteq N[w]
+        // we can consider only nodes u \in U_0, that is nodes for which N(u) \cap S = \emptyset
+        for ( int u : U1 ) {
+            bool empty_S_inters = true;
+            for ( int d : V[u] ) empty_S_inters &= !inS[d];
+
+            if ( empty_S_inters ){
+                int neigh_size = 0;
+                for ( int w : V[u] ) if ( !inW[w] ) {
+                    helper[w] = true; // marking N(u) \setminus W
+                    neigh_size++;
+                }
+                for ( int w : V[u] ) if (!inW[w]) {
+                    int c = 1;
+                    for (int d : V[w]) if ( helper[d] ) c++;
+                    assert(c <= neigh_size);
+                    if (c == neigh_size) {
+                        if (write_logs) clog << "\t\t\tmarking node " << w << " to move to U using same-neighborhood-rule for node u = " << u  << endl;
+                        marked[w] = true;
+                    }
+                }
+                for ( int w : V[u] ) if ( !inW[w] ) helper[w] = false; // clearing
+            }
+        }
+    }
+
+    if(cnf.ed_use_deficit1_domination) {
+        // generalization of the ``same neighborhood'' domination
+
+        // TODO:implement deficit1-domination approach
+    }
+
+    if(cnf.ed_use_biset_move_checks) {
+        // ``biset domination'' - might be considerably slower than other approches, but addresses some of the cases
+        // that the other approaches do not
+
+        // TODO:implement biset-domination approach
+    }
+}
+
+VI EDReducer::findNodesToMoveToU() {
+    VI nodes_to_move_to_U;
+    nodes_to_move_to_U.reserve(W.size());
+
+    if(cnf.ed_consider_nodes_to_move_outside_NW) {
+        for ( int u : U1 ) for (int w : V[u]) {
+            if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
+            for( int d : V[w] ) if(!inW[d] && marked[d]) nodes_to_move_to_U.push_back(w);
+        }
+    }else {
+        for ( int u : U1 ) for (int w : V[u]) if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
+    }
+
+    StandardUtils::makeUnique(nodes_to_move_to_U);
+    return nodes_to_move_to_U;
 }
 
 int EDReducer::nextStep() {
@@ -172,35 +236,8 @@ int EDReducer::nextStep() {
         return 1;
     }else if (write_logs) clog << "\t\tdominator does not exist" << endl;
 
-    VI nodes_to_move_to_U;
-    for ( int u : U1 ) for (int w : V[u]) if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
-    { // here we find all nodes w \in N(u) \setminus W such that N(u) \setminus W \subseteq N[w]
-        for ( int u : U1 ) {
-            bool empty_S_inters = true;
-            for ( int d : V[u] ) empty_S_inters &= !inS[d];
-
-            if ( empty_S_inters ){
-                int neigh_size = 0;
-                for ( int w : V[u] ) if ( !inW[w] ) {
-                    helper[w] = true; // marking N(u) \setminus W
-                    neigh_size++;
-                }
-                for ( int w : V[u] ) if (!inW[w]) {
-                    int c = 1;
-                    for (int d : V[w]) if ( helper[d] ) c++;
-                    assert(c <= neigh_size);
-                    if (c == neigh_size) {
-                        if (write_logs) clog << "\t\t\tmarking node " << w << " to move to U using same-neighborhood-rule for node u = " << u  << endl;
-                        nodes_to_move_to_U.push_back(w);
-                    }
-                }
-                for ( int w : V[u] ) if ( !inW[w] ) helper[w] = false; // clearing
-            }
-        }
-    }
-
+    VI nodes_to_move_to_U = findNodesToMoveToU();
     if ( !nodes_to_move_to_U.empty() ) {
-        StandardUtils::makeUnique(nodes_to_move_to_U);
         if (write_logs) clog << "\t\tMoving nodes " << nodes_to_move_to_U << " to U (and creating type-1 constraints)" << endl;
         for (int u : nodes_to_move_to_U) moveToU(u);
         return 0;
