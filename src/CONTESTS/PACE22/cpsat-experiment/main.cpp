@@ -170,6 +170,7 @@ ExpConfig parseArguments(int argc, char ** argv) {
     std::transform(alg.begin(), alg.end(), alg.begin(), [](unsigned char c){ return std::tolower(c); });
     if ( alg == "ihs" ) cnf.alg = IHS; if ( alg == "hs" ) cnf.alg = HS;
     if ( alg == "mtz" ) cnf.alg = MTZ; if ( alg == "diverses") cnf.alg = DIVERSES;
+    if ( alg == "mtz0" ) cnf.alg = MTZ0; if ( alg == "ihs0") cnf.alg = IHS0;
     if ( alg == "div_ihs") cnf.alg = DIV_IHS;
     if ( alg == "fhs") cnf.alg = FHS;
     if ( alg == "dreyfvs") cnf.alg = DREYFVS;
@@ -201,6 +202,19 @@ ExpConfig parseArguments(int argc, char ** argv) {
     ap.findAndAssign("use_ihs_intermittent_cycle_constraints", "bool", &cnf.use_ihs_intermittent_cycle_constraints);
     // ap.findAndAssign("fill_partial_result_using_greedy_fvs", "bool", &cnf.fill_partial_result_using_greedy_fvs);
 
+
+    if (cnf.alg == IHS0) {
+        cnf.max_new_cycles_iter_scale = "unbounded";
+        cnf.use_cycle_trimming = false;
+        cnf.use_ihs_intermittent_cycle_constraints = false;
+        cnf.check_incumbent_cpsat_solutions = false; // we not use advanced incumbent solution filling
+        // cnf.ihs_init_sol_creation_mode = 0; // do not create initial solution
+        cnf.unhit_cycle_enumeration_type = 0; // only slightly optimised DFS with backtracking, not robust as in IHS
+        // cnf.use_init_sol_as_hint_mode = 1; // hint only those values that are in init_sol = prev_res + unhit_cycles_hs;
+    }
+    if (cnf.alg == MTZ0) {
+        cnf.mtz_auxiliary_cycles_mode = 0;
+    }
 
     return cnf;
 }

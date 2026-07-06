@@ -25,7 +25,9 @@ void ExpConfig::setParametersForAlgorithm() {
 string parseAlgorithm(int alg)  {
     if(alg == HS) return "HS";
     if(alg == IHS) return "IHS";
+    if(alg == IHS0) return "IHS0";
     if(alg == MTZ) return "MTZ";
+    if(alg == MTZ0) return "MTZ0";
     if(alg == DIVERSES) return "DiVerSeS";
     if(alg == DIV_IHS) return "DiVerSeS+IHS";
     if(alg == DREYFVS) return "DreyFVS";

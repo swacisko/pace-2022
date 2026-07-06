@@ -15,6 +15,8 @@ enum Algorithm {
     DIV_IHS = 4,
     FHS = 5,
     DREYFVS = 6,
+    IHS0 = 7,
+    MTZ0 = 8
 };
 
 string parseAlgorithm(int alg);

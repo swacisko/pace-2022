@@ -169,11 +169,113 @@ void ExpData::writeToFile(ExpConfig cnf) {
     str.close();
 }
 
+// function used for IHS0 method - not optimized cycle enumeration...
+static VVI getAllSimpleCycles0(VVI &V, VVI &revV, VVI &nonpiV, VVI &revnonpiV, VI A, VB &in_V, VI &marker, VB &is_end,
+                           int max_cycle_length, int max_time_millis) {
+        for(int d : A) in_V[d] = true;
+        int cycle_length = 0;
+
+        int N = V.size();
+        VLL hashes = VLL(N);
+        UniformIntGenerator rnd(0,1'000'000'000ll * 1'000'000'000);
+        for(int i=0; i<N; i++) hashes[i] = rnd.rand();
+
+        /**
+         * Stores only one copy of each cycle by keeping the cycles hash.
+         */
+        unordered_map<LL, VI> found_cycles;
+
+        Stopwatch sw;
+        sw.setLimit("cyc", max_time_millis);
+        sw.start("cyc");
+
+        function<void(int,VI&, LL)> findSimpleCycles = [&](int num, VI & C, LL hash){
+            if( cycle_length+1 >= max_cycle_length) return;
+            if (sw.tle("cyc")) return;
+
+            hash ^= hashes[num];
+            cycle_length++;
+            C.push_back(num);
+
+            for( int d : nonpiV[num] ){
+                if( !in_V[d] ) continue;
+                if( marker[d] == 1 && is_end[d] ){
+                    C.push_back(d);
+                    found_cycles[hash^hashes[d]] = C;
+                    C.pop_back();
+                }
+            }
+
+            for( int d : V[num] ) marker[d]++;
+            for( int d : revV[num] ) marker[d]++;
+
+            for( int d : nonpiV[num] ){
+                if( !in_V[d] ) continue;
+                if( marker[d] == 1 && !is_end[d] ) findSimpleCycles(d, C, hash);
+            }
+
+            for( int d : V[num] ) marker[d]--;
+            for( int d : revV[num] ) marker[d]--;
+
+            cycle_length--;
+            C.pop_back();
+        };
+
+
+        for( int v : A) {
+            if (sw.tle("cyc")) break;
+            if(!in_V[v]) continue;
+
+            {
+                for (int d : revV[v]) is_end[d] = true;
+                for (int d : V[v]) if( in_V[d] && is_end[d]) found_cycles[ hashes[v] ^ hashes[d] ] = {v,d};
+                for (int d : revV[v]) is_end[d] = false;
+            }
+
+            {
+                for (int d : revnonpiV[v]) if (in_V[d]) is_end[d] = true;
+                VI C;
+                assert(cycle_length == 0);
+                findSimpleCycles( v, C, 0 );
+                for (int d : revnonpiV[v]) if (in_V[d]) is_end[d] = false;
+            }
+        }
+
+        for(int d : A) in_V[d] = false;
+        VVI cycles;
+        for( auto & [h,v] : found_cycles ) cycles.push_back(v);
+        return cycles;
+    }
+
 VVI CpsatExp1::getUnhitChordlessCycles(VVI &V, VI &S, int max_l, int max_millis, int enumeration_option, int trees_to_consider_in_tree_enum) {
     // clog << "\t Looking for cycles for at most " << max_millis << " millis" << endl;
     VVI all_cycles;
 
     if (enumeration_option == 3) max_millis /= 2;
+
+    if (enumeration_option == 0) {
+        int N = V.size();
+        auto H = V;
+        auto revH = GraphUtils::reverseGraph(H);
+        auto nonpiH = Utils::getNonPIGraph(H);
+        auto revnonpiH = Utils::getNonPIGraph(revH);
+
+        VB helper(N);
+        Utils::removeNodes(H, revH, S, helper);
+
+        VI A(N); iota(ALL(A),0);
+        IntGenerator rnd;
+        StandardUtils::shuffle(A,rnd);
+
+        VI marker(N,0);
+        VB inV(N,false);
+        VB is_end(N);
+
+        clog << "\tEnumerating all simple cycles of length up to " << max_l << " using getAllSimpleCycles0" << endl;
+        max_millis = 10'000; // not more than 10 seconds for that
+        auto cycles = getAllSimpleCycles0(H, revH, nonpiH, revnonpiH, A, inV, marker, is_end, max_l, max_millis );
+        return cycles;
+    }
 
     if (enumeration_option == 1 || enumeration_option == 3) {
         VVI H = V;
@@ -1066,6 +1168,7 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
         // that length, we do not want that, we want to keep number of cycles used for constraints as small as possible
         // constexpr int MIN_NEW_CYCLES = 100;
         int MIN_NEW_CYCLES = 2*sqrt(GraphUtils::countEdges(V,true));
+        if (cnf.alg == IHS0 || cnf.alg == MTZ0) MIN_NEW_CYCLES = 1;
         if (new_cycles.size() < MIN_NEW_CYCLES && iters_without_new_cycles <= 2 ) {
             new_cycles.clear();
             iters_without_new_cycles++;
@@ -1651,8 +1754,8 @@ ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
 
         auto alg = cnf.alg;
         if (alg == Algorithm::HS) res = solveHS(V,cnf);
-        if (alg == Algorithm::IHS) res = solveIHS(V,cnf);
-        if (alg == Algorithm::MTZ) res = solveMTZ(V,cnf, cnf.mtz_auxiliary_cycles_mode);
+        if (alg == Algorithm::IHS || alg == Algorithm::IHS0) res = solveIHS(V,cnf);
+        if (alg == Algorithm::MTZ || alg == Algorithm::MTZ0) res = solveMTZ(V,cnf, cnf.mtz_auxiliary_cycles_mode);
         if (alg == Algorithm::DIVERSES) res = solveDiVerSeS(V,cnf);
         if (alg == Algorithm::DIV_IHS) {
             cnf.ihs_init_sol_creation_mode = 2;
