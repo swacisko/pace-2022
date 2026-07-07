@@ -11,11 +11,13 @@
 #include "CONTESTS/PACE22/Reducer.h"
 #include "VertexCover/kernelization/KernelizerVC.h"
 #include <ranges>
+#include "IntGenerator.h"
 
 struct ExpData {
     int N0=-1, M0=-1, N1=-1, M1=-1, N2=-1, M2=-1, N3=-1, M3=-1;
-    int type1_constraints = -1;
-    int type2_constraints = -1;
+    int red1_offset, red2_offset = 0, red3_offset = 0;
+    // int type1_constraints = -1;
+    // int type2_constraints = -1;
 
     int red_init_time_millis = -1;
     int red_noned_time_millis = -1;
@@ -27,11 +29,11 @@ struct ExpData {
     VD noned_results;
     VD ed_results;
 
-    int ed_nodes_reduced = 0;
-    int ed_edges_removed = 0;
-    int ed_t1_inference_rules_added = 0;
-    int ed_total_t2_inference_rules_created = 0;
-    int ed_t2_inference_rules_added = 0;
+    int ed_nodes_reduced = -1;
+    int ed_edges_removed = -1;
+    int ed_t1_inference_rules_added = -1;
+    int ed_total_t2_inference_rules_created = -1;
+    int ed_t2_inference_rules_added = -1;
 
     map<string,string> getEntries() {
         map<string,string> res;
@@ -40,8 +42,15 @@ struct ExpData {
         res["N2"] = to_string(N2); res["M2"] = to_string(M2);
         res["N3"] = to_string(N3); res["M3"] = to_string(M3);
 
-        res["type1_constraints"] = to_string(type1_constraints);
-        res["type2_constraints"] = to_string(type2_constraints);
+        res["red1_offset"] = to_string(red1_offset);
+        res["red2_offset"] = to_string(red2_offset);
+        res["red3_offset"] = to_string(red3_offset);
+
+        res["ed_nodes_reduced"] = to_string(ed_nodes_reduced);
+        res["ed_edges_removed"] = to_string(ed_edges_removed);
+        res["ed_t1_inference_rules_added"] = to_string(ed_t1_inference_rules_added);
+        res["ed_total_t2_inference_rules_created"] = to_string(ed_total_t2_inference_rules_created);
+        res["ed_t2_inference_rules_added"] = to_string(ed_t2_inference_rules_added);
 
         res["red_init_time_millis"] = to_string(red_init_time_millis);
         res["red_noned_time_millis"] = to_string(red_noned_time_millis);
@@ -64,10 +73,11 @@ struct ExpData {
     }
 
 
-    void writeToFile(ostream & str) {
+    void writeToFile(ostream & str, bool debug_entries = false) {
         auto mapa = getEntries();
         vector<string> header = { "N0", "M0", "N1", "M1", "N2", "M2", "N3", "M3",
-            "type1_constraints", "type2_constraints",
+            "red1_offset", "red2_offset", "red3_offset", "ed_total_t2_inference_rules_created", "ed_t2_inference_rules_added",
+            "ed_nodes_reduced", "ed_edges_removed", "ed_t1_inference_rules_added",
         "red_init_time_millis", "red_noned_time_millis", "red_ed_time_millis",
         "solver_max_time_sec", "solver_time_granularity", "solver_repeats",
         "noned_results", "ed_results"
@@ -86,6 +96,8 @@ struct ExpData {
         vector<string> line;
         for (auto k : header) line.push_back(mapa[k]); // create entries in the order of the header
         writeLine(line); // write entries
+
+        if (debug_entries) for (auto k : header) clog << k << ": " << mapa[k] << endl;
     }
 };
 
@@ -158,8 +170,8 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
     }
 
 
-
-    if (false){
+    bool run_initial_vc_kernel = true;
+    if (run_initial_vc_kernel){
         Stopwatch sw;
         sw.start("main");
         KernelizerVC kern;
@@ -177,6 +189,7 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
 
         exp_data.N1 = N;
         exp_data.M1 = GraphUtils::countEdges(V);
+        exp_data.red1_offset = kern_nodes.size();
     }
 
 
@@ -208,6 +221,8 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
         exp_data.N2 = indg.V.size();
         exp_data.M2 = GraphUtils::countEdges(indg.V);
         DEBUG(PII(exp_data.N2,exp_data.M2));
+
+        exp_data.red2_offset = exp_data.red1_offset + solution_lift_overhead;
     }
 
 
@@ -220,6 +235,10 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
     cnf.reducer_use_unconfined =  cnf.reducer_use_twins_merge = cnf.reducer_use_domination = true;
     cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10;
     cnf.reducer_use_ed = true;
+    cnf.ed_consider_nodes_to_move_outside_NW = true;
+    cnf.ed_use_same_neigh_domination = true;
+    cnf.ed_use_deficit1_domination = true;
+    cnf.ed_use_biset_move_checks = true;
     Reducer red(V,cnf);
     auto to_lift = red.reduce();
     sw.stop("main");
@@ -257,6 +276,7 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
     auto [res,times] = solveInstanceUsingSatBasedSolver(constraints,solver_max_time_sec,solver_time_granularity, solver_repeats);
     for (auto& d : times) if (d != -1) d += solution_lift_overhead;
     exp_data.ed_results = times;
+    exp_data.red3_offset = exp_data.red1_offset + solution_lift_overhead;
 
 
 
@@ -292,12 +312,30 @@ VVI getTestV1() {
 }
 
 
+VVI getRandomGraph( int N, int M ) {
+    set<PII> zb;
+    IntGenerator rnd;
+    while (zb.size() < M) {
+        int a = rnd.nextInt(N);
+        int b = rnd.nextInt(N);
+        if (a > b) swap(a,b);
+        if (a != b) zb.insert(PII(a,b));
+    }
+
+    VPII edges(ALL(zb));
+    VVI V = GraphUtils::getGraphForEdges(edges,false);
+    return V;
+}
+
 
 int main() {
     ios_base::sync_with_stdio(0);
 
     // VVI V = GraphReader::readGraphStandardEdges(cin);
-    VVI V = getTestV1();
+    // VVI V = GraphReader::readGraphDIMACSWunweighed(cin,true);
+    VVI V = getRandomGraph(1000, 2000);
+    // VVI V = getTestV1();
+
 
 
     int solver_max_time_sec = 300;
@@ -309,7 +347,7 @@ int main() {
 
 
 
-    exp_data.writeToFile(cout);
+    exp_data.writeToFile(cout, true);
 
 
     return 0;

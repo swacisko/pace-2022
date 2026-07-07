@@ -17,7 +17,7 @@ include_directories(
         include/combinatorics
         include/utils
         include/datastructures
-#        include/CONTESTS/PACE22/*
+        include/CONTESTS/PACE22/*
 #        include/CONTESTS/PACE22/*/*
         )
 
@@ -79,5 +79,7 @@ add_executable(EDTests ${SOURCES}
         src/CONTESTS/PACE22/EDReducer.cpp
         src/CONTESTS/PACE22/EDReducer.h
         src/CONTESTS/PACE22/EDTests.cpp
+        src/CONTESTS/PACE22/IntGenerator.h
+        src/CONTESTS/PACE22/IntGenerator.cpp
 )
 target_link_libraries( EDTests stdc++fs )

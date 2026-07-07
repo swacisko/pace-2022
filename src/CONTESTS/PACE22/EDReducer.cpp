@@ -19,13 +19,25 @@ VI EDReducer::reduce(VVI V0) {
 
     VI reducible_nodes;
 
-    DEBUG(V);
+    if (write_logs) DEBUG(V);
 
     for (int v : nodes) {
         if (considerNode(v)) {
             if (write_logs) clog << "Node " << v << " is reducible!!!" << endl << endl << endl;
             reducible_nodes.push_back(v);
             GraphUtils::removeNodeFromGraph(V,v);
+        }
+        else if ( apply_type1_constraints_on_the_fly && !inf_rules_1.empty() ) {
+            for (int d : V[v]) was[d] = true;
+            StandardUtils::makeUnique(inf_rules_1);
+            for ( auto d : inf_rules_1 ) {
+                assert(d != v);
+                if (!was[d]) {
+                    GraphUtils::addEdge(V,v,d);
+                    inf_rules_1_added++;
+                }
+            }
+            for (int d : V[v]) was[d] = false;
         }
     }
 
@@ -99,8 +111,13 @@ void EDReducer::moveToS(int u) {
     inS[u] = inW[u] = true;
 
     for (int d : V[u]) if ( !inW[d] ) {
-        clog << "\t\tmoving neighbor " << d << " of node u=" << u << " to U" << endl;
+        auto t = write_logs;
+        write_logs = false;
+
+        if (write_logs) clog << "\t\tmoving neighbor " << d << " of node u=" << u << " to U" << endl;
         moveToU(d);
+
+        write_logs = t;
     }
 
     for ( int d : U ) { // marking in helper all nodes that should be removed from U1
@@ -206,7 +223,7 @@ VI EDReducer::findNodesToMoveToU() {
     if(cnf.ed_consider_nodes_to_move_outside_NW) {
         for ( int u : U1 ) for (int w : V[u]) {
             if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
-            for( int d : V[w] ) if(!inW[d] && marked[d]) nodes_to_move_to_U.push_back(w);
+            for( int d : V[w] ) if(!inW[d] && marked[d]) nodes_to_move_to_U.push_back(d);
         }
     }else {
         for ( int u : U1 ) for (int w : V[u]) if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
@@ -290,12 +307,17 @@ void EDReducer::clearAll() {
     temp.clear();
     temp2.clear();
     for (int d : W) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = false;
+        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = false;
     }
     for (int d0 : W) for (int d : V[d0]) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = false;
+        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = false;
     }
 
+    if (cnf.ed_consider_nodes_to_move_outside_NW) {
+        for (int d0 : W) for (int d1 : V[d0]) for (int d : V[d1]) {
+            inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = false;
+        }
+    }
     inf_rules_1.clear();
     inf_rules_2.clear();
     S.clear();

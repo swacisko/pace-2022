@@ -26,9 +26,12 @@ public:
      */
     bool apply_type1_constraints_on_the_fly = false;
 
-private:
+    int inf_rules_1_added = 0;
+    int inf_rules_2_created = 0;
 
-    static constexpr bool write_logs = true;
+// private:
+
+    bool write_logs = false;
 
     int N;
     VVI V;
@@ -36,8 +39,8 @@ private:
 
     VB inS, inU, inU1, inW, was, helper, marked;
     VI temp, temp2,S,U,U1,W;
-    VI cnt;
 
+    VI cnt;
 
     /**
      * Checks whether node u can be safely added to the solution.

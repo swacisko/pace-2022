@@ -1133,23 +1133,38 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             }
 
             if (res.empty()) { // now adding edges if possible...
-                int ecnt_0 = GraphUtils::countEdges(V,true);
+                EDReducer edred(V.size(), cnf);
+                if (GraphUtils::countEdges(V) > 500) edred.write_logs = true;
+
                 edred.apply_type1_constraints_on_the_fly = true;
                 res = edred.reduce(V);
                 ed_nodes_reduced += res.size();
                 assert(res.empty() && "if failed then ED rules does not run deterministically...");
                 addKNR(res);
-                Utils::removeNodes(V, revV, res, helper);
-                int ecnt_1 = GraphUtils::countEdges(V,true);
-                assert( (ecnt_1 - ecnt_0) % 2 == 0 ); // this is the number of arcs, and since we add pi-arcs...
-                ed_t1_inference_rules_added += (ecnt_1 - ecnt_0) / 2;
-                if(!modified) modified = (!res.empty() || ecnt_1 != ecnt_0);
+
+                // Utils::removeNodes(V, revV, res, helper);
+                V = edred.V;
+                revV = GraphUtils::reverseGraph(V);
+
+                assert( GraphUtils::isSimple(V) );
+                // DEBUG(GraphUtils::countEdges(V));
+                // DEBUG(modified);
+                // DEBUG(res.size());
+
+                ed_t1_inference_rules_added += edred.inf_rules_1_added;
+                if(!modified) modified = ( (!res.empty()) || (edred.inf_rules_1_added > 0) );
                 if(modified) {
-                    clog << "Considering ED rule at the very end, added " << ecnt_1 - ecnt_0 << " new ARCS" << endl;
+                    clog << "Considering ED rule at the very end, added " << edred.inf_rules_1_added << " new ARCS" << endl;
+                    // DEBUG(GraphUtils::countEdges(V));
+                    // DEBUG(modified);
+                    // DEBUG(res.size());
                     continue;
                 }
             }
+
         }
+
+        // clog << "modified: " << modified << ", should " << (modified ? "continue" : "cease") << " reductions" << endl;
 
 
     }while(modified);
