@@ -359,6 +359,7 @@ int main() {
     // VVI V = GraphReader::readGraphStandardEdges(cin);
     // VVI V = GraphReader::readGraphDIMACSWunweighed(cin,true);
     VVI V = getRandomGraph(10'000, 16'000);
+    // VVI V = getRandomGraph(100'000, 150'000);
     // VVI V = getTestV1();
 
     assert(GraphUtils::isSimple(V));

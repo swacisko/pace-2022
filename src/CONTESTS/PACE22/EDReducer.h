@@ -44,6 +44,9 @@ public:
 
     VI cnt;
 
+
+    bool check_double_ed = false;
+
     /**
      * Checks whether node u can be safely added to the solution.
      * Additionally creates constraints that can be used if it cannot.
@@ -89,6 +92,11 @@ public:
      * Must be u \in N(W)
      */
     void moveToS(int u);
+
+    /**
+     * Removes from U1 all nodes that have more than one neighbor in S.
+     */
+    void updateU1();
 
     /**
      * Clears all arrays to prepare for checking next node.
