@@ -33,6 +33,7 @@ public:
 
     bool write_logs = false;
 
+
     int N;
     VVI V;
     Config cnf;

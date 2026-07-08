@@ -30,8 +30,7 @@ VI EDReducer::reduce(VVI V0) {
         else if ( apply_type1_constraints_on_the_fly && !inf_rules_1.empty() ) {
             for (int d : V[v]) was[d] = true;
             StandardUtils::makeUnique(inf_rules_1);
-            for ( auto d : inf_rules_1 ) {
-                assert(d != v);
+            for ( auto d : inf_rules_1 ) { // in inf_rules we will have N(v), as we add v to S using moveToS(v).
                 if (!was[d]) {
                     GraphUtils::addEdge(V,v,d);
                     inf_rules_1_added++;
@@ -152,7 +151,18 @@ void EDReducer::markDominationNodes() {
         cnt[u] = cnt[w] = cnt[d] = 0;
     }
 
-    if constexpr(cnf.use_ed_domination) { // the standard concept, used always
+    constexpr bool check_slow_assertions_for_correctness = false;
+    if ( check_slow_assertions_for_correctness ) {
+        assert(ranges::all_of(cnt, [&](auto b){return !b;}));
+        assert(ranges::all_of(marked, [&](auto b){return !b;}));
+        assert(ranges::all_of(was, [&](auto b){return !b;}));
+        assert(ranges::all_of(helper, [&](auto b){return !b;}));
+        assert(temp.empty());
+        assert(temp2.empty());
+    }
+
+
+    if constexpr(Config::use_ed_domination) { // the standard concept, used always
         for (int u : U1) {
             if (V[u].empty()) continue;
 
@@ -181,31 +191,82 @@ void EDReducer::markDominationNodes() {
         for ( int u : U1 ) {
             bool empty_S_inters = true;
             for ( int d : V[u] ) empty_S_inters &= !inS[d];
+            if (!empty_S_inters) continue;
 
-            if ( empty_S_inters ){
-                int neigh_size = 0;
-                for ( int w : V[u] ) if ( !inW[w] ) {
-                    helper[w] = true; // marking N(u) \setminus W
-                    neigh_size++;
-                }
-                for ( int w : V[u] ) if (!inW[w]) {
-                    int c = 1;
-                    for (int d : V[w]) if ( helper[d] ) c++;
-                    assert(c <= neigh_size);
-                    if (c == neigh_size) {
-                        if (write_logs) clog << "\t\t\tmarking node " << w << " to move to U using same-neighborhood-rule for node u = " << u  << endl;
-                        marked[w] = true;
-                    }
-                }
-                for ( int w : V[u] ) if ( !inW[w] ) helper[w] = false; // clearing
+            int neigh_size = 0;
+            for ( int w : V[u] ) if ( !inW[w] ) {
+                helper[w] = true; // marking N(u) \setminus W
+                neigh_size++;
             }
+            for ( int w : V[u] ) if (!inW[w]) {
+                int c = 1;
+                for (int d : V[w]) if ( helper[d] ) c++;
+                assert(c <= neigh_size);
+                if (c == neigh_size) {
+                    if (write_logs) clog << "\t\t\tmarking node " << w << " to move to U using same-neighborhood-rule for node u = " << u  << endl;
+                    marked[w] = true;
+                }
+            }
+            for ( int w : V[u] ) if ( !inW[w] ) helper[w] = false; // clearing
         }
     }
 
     if(cnf.ed_use_deficit1_domination) {
-        // generalization of the ``same neighborhood'' domination
+        // generalization of the ``same neighborhood'' domination. Finds all mirrors for nodes in U0
+        VI& T = temp;
+        VI& vis = temp2;
 
-        // TODO:implement deficit1-domination approach
+        for (int u : U1) {
+            bool empty_S_inters = true;
+            for ( int d : V[u] ) empty_S_inters &= !inS[d];
+            if (!empty_S_inters) continue;
+
+            T.clear(); vis.clear();
+            for (int w : V[u]) if (!inW[w]) T.push_back(w); // now T contains N(u) \ W
+
+            for ( int w : T ) for (int d : V[w]) if (!inW[d]) {
+                cnt[d]++;
+                if ( cnt[d] >= T.size()-1 && !was[d] ) {
+                    was[d] = true;
+                    vis.push_back(d);
+                }
+            }
+            for (int d : vis) was[d] = false;
+
+            for ( int w : T ) { // we exclude each node in T in turn and update counters
+                for (int d : V[w]) if (!inW[d]) cnt[d]--;
+
+                for ( int i=(int)vis.size()-1; i>=0; i-- ) {
+                    int d = vis[i];
+                    if ( cnt[d] >= T.size()-1 ) {
+                        // if after excluding node w for node d=vis[i] it still covers all but for one node in T
+                        // then we can add it to U
+                        marked[d] = true;
+                        if (write_logs) {
+                            clog << "\t\tmarking node d: " << d << " for node w: " << w
+                                 << " and u: " << u
+                                 << ", where u is in U0, using deficit1 approach"
+                                 << ", cnt[" << d << "]: " << cnt[d]
+                                 << "\n\t\t\t T.size(): " << T.size()
+                                 << "\n\t\t\t T: " << T
+                                 << "\n\t\t\t V[" << d << "]: " << V[d]
+                                 << "\n\t\t\t V[" << w << "]: " << V[w]
+                                 << "\n\t\t\t V[" << u << "]: " << V[u]
+                                 << endl;
+                        }
+                        swap(vis[i], vis.back());
+                        vis.pop_back();
+                    }
+                }
+
+                for (int d : V[w]) if (!inW[d]) cnt[d]++;
+            }
+
+            for ( int w : T ) for (int d : V[w]) cnt[d] = 0;
+        }
+
+        vis.clear();
+        T.clear();
     }
 
     if(cnf.ed_use_biset_move_checks) {

@@ -1128,13 +1128,13 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             Utils::removeNodes(V, revV, res, helper);
             if(!modified) modified = (!res.empty());
             if(modified) {
-                clog << "Considering ED rule at the very end, found " << res.size() << " reducible nodes" << endl;
+                // clog << "Considering ED rule at the very end, found " << res.size() << " reducible nodes" << endl;
                 continue;
             }
 
             if (res.empty()) { // now adding edges if possible...
                 EDReducer edred(V.size(), cnf);
-                if (GraphUtils::countEdges(V) > 500) edred.write_logs = true;
+                // if (GraphUtils::countEdges(V) > 500) edred.write_logs = true;
 
                 edred.apply_type1_constraints_on_the_fly = true;
                 res = edred.reduce(V);
@@ -1154,7 +1154,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 ed_t1_inference_rules_added += edred.inf_rules_1_added;
                 if(!modified) modified = ( (!res.empty()) || (edred.inf_rules_1_added > 0) );
                 if(modified) {
-                    clog << "Considering ED rule at the very end, added " << edred.inf_rules_1_added << " new ARCS" << endl;
+                    // clog << "Considering ED rule at the very end, added " << edred.inf_rules_1_added << " new ARCS" << endl;
                     // DEBUG(GraphUtils::countEdges(V));
                     // DEBUG(modified);
                     // DEBUG(res.size());

@@ -5,9 +5,9 @@ set(CMAKE_CXX_STANDARD 23)
 
 
 #SET(CMAKE_CXX_FLAGS "-std=c++23 -O0") # profiling
-#SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG -std=c++17 -Wreturn-type -O0") # debugging
+#SET(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG -std=c++23 -Wreturn-type -O0") # debugging
 
-SET(CMAKE_CXX_FLAGS "-std=c++23 -O3 -fopenmp")
+SET(CMAKE_CXX_FLAGS "-std=c++23 -O3")
 
 
 
