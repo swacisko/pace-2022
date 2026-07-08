@@ -138,7 +138,8 @@ public:
      * It needs to be checked if in practice it is efficient enough, and perhaps limit it to only some special
      * (smaller) substructures.
      */
-    bool ed_use_biset_move_checks = false;
+    bool ed_use_double_ed_checks = false;
+    int ed_double_ed_max_candidates = 10;
 
 
     //******************************************************************** ED
@@ -199,7 +200,7 @@ public:
         reducer_use_bottleneck2 = true;
         reducer_use_cycle_folding = true;
 
-        reducer_use_ed = true;
+        // reducer_use_ed = true;
     }
 
     void disableAllNonbasicReductions(){

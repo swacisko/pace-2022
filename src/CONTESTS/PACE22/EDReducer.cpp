@@ -62,7 +62,7 @@ bool EDReducer::considerNode(int v) {
     if (write_logs) clog << "\tStopping ED, nothing more to be done..." << endl;
 }
 
-bool EDReducer::existsExtDominator() {
+bool EDReducer::existsExtDominator(VB & marked) {
     bool exists_ext_dominator = false;
 
     for ( int u : U1 ) {
@@ -143,7 +143,7 @@ void EDReducer::moveToS(int u) {
     if (cnf.ed_U_nodes_sorting_mode == 2) sort(ALL(U1), [&](int a, int b){ return V[a].size() > V[b].size(); });
 }
 
-void EDReducer::markDominationNodes() {
+void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
 
     // for (int u : W) for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear
     for (int u : U1) for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
@@ -151,16 +151,7 @@ void EDReducer::markDominationNodes() {
         cnt[u] = cnt[w] = cnt[d] = 0;
     }
 
-    constexpr bool check_slow_assertions_for_correctness = false;
-    if ( check_slow_assertions_for_correctness ) {
-        assert(ranges::all_of(cnt, [&](auto b){return !b;}));
-        assert(ranges::all_of(marked, [&](auto b){return !b;}));
-        assert(ranges::all_of(was, [&](auto b){return !b;}));
-        assert(ranges::all_of(helper, [&](auto b){return !b;}));
-        assert(temp.empty());
-        assert(temp2.empty());
-    }
-
+    checkEmptyArraysAssertions(check_double_ed, false); // we check all arrays, including the marked array, which should be empty here
 
     if constexpr(Config::use_ed_domination) { // the standard concept, used always
         for (int u : U1) {
@@ -269,11 +260,107 @@ void EDReducer::markDominationNodes() {
         T.clear();
     }
 
-    if(cnf.ed_use_biset_move_checks) {
-        // ``biset domination'' - might be considerably slower than other approches, but addresses some of the cases
-        // that the other approaches do not
+    if(cnf.ed_use_double_ed_checks && check_double_ed) {
+        // ``double-ED domination'' - might be considerably slower than other approches,
+        // but addresses some of the cases that the other approaches do not
 
-        // TODO:implement biset-domination approach
+        checkEmptyArraysAssertions(false,check_double_ed);
+
+        VI candidates;
+        {
+            // create candidates here...
+            for ( int u : U1 ) {
+                int c = 0;
+                for (int w : V[u]) c += !inW[w];
+                if ( c > 7 ) continue;
+                for ( int w : V[u] ) if (!inW[w]) for ( int d : V[w] ) if ( !inW[d] && !was[d] ) {
+                    was[d] = true;
+                    candidates.push_back(d);
+                }
+            }
+            for (int d : candidates) was[d] = false;
+
+            // now sort candidates by their |N(d) \cap N(U1)|
+            for (int u : U1) for (int w : V[u]) if(!inW[w]) was[w] = true;
+            for ( int d : candidates ) for (int w : V[d]) cnt[d] += was[w];
+            sort(ALL(candidates), [&](int a, int b){ return cnt[a] > cnt[b]; });
+            for ( int d : candidates ) for (int w : V[d]) cnt[d] = 0;
+            for (int u : U1) for (int w : V[u]) if(!inW[w]) was[w] = false;
+
+            if (candidates.size() > cnf.ed_double_ed_max_candidates) candidates.resize(cnf.ed_double_ed_max_candidates);
+        }
+
+        if (write_logs) if ( !candidates.empty() ) {
+            clog << "\t\t\t There are " << candidates.size() << " candidates to check for double-ED" << endl;
+        }
+
+        auto clearMarked = [&](VB & marked) {
+            for (int u : W) for (int w : V[u]) for ( int d : V[w] ) marked[u] = marked[w] = marked[d] = false;
+        };
+
+        VI neigh_not_in_W;
+        VI nodes_removed_from_U; // now we remove nodes from the set U - they will be added back later
+        VI nodes_removed_from_U1; // now we remove nodes from the set U - they will be added back later
+        for ( int w : candidates ) {
+            // for candidate w we remove N(w) from the graph. Nodes from U also have to be removed, for we cannot
+            // make any swap with neighbor of w, as we assume that w is not in the solution - that could create an
+            // uncovered edge in the graph.
+            assert(!inW[w]);
+            clearMarked(marked2);
+
+
+            { // removing N[w] from the graph by marking all nodes in the inW bitvector and removing N(w) from U and U1
+                neigh_not_in_W.clear();
+                nodes_removed_from_U.clear();
+                nodes_removed_from_U1.clear();
+
+                neigh_not_in_W.push_back(w);
+                inW[w] = true;
+                for ( int d : V[w] ) if (!inW[d]) {
+                    neigh_not_in_W.push_back(d);
+                    inW[d] = true;
+                    // marking inW[d] way we effectively remove node d from the graph,
+                    // but we still need to remove it from U and U1
+                }
+
+                // now removing V[w] from U and U1
+                for (int d : V[w]) was[d] = true;
+                for (int i=(int)U.size()-1; i>=0; i--) if ( was[U[i]] ) {
+                    nodes_removed_from_U.push_back(U[i]);
+                    swap(U[i], U.back()); U.pop_back();
+                }
+                for (int i=(int)U1.size()-1; i>=0; i--) if ( was[U1[i]] ) {
+                    nodes_removed_from_U1.push_back(U1[i]);
+                    swap(U1[i], U1.back()); U1.pop_back();
+                }
+                for (int d : V[w]) was[d] = false;
+            }
+
+            constexpr bool check_double_ed_again = false; // we do not want to end in endless loop
+            markDominationNodes(marked2,check_double_ed_again);
+            bool exists_ext_dominator = existsExtDominator(marked2);
+
+            { // apply changes back to bring the original state and get ready for the next node
+                U += nodes_removed_from_U;
+                U1 += nodes_removed_from_U1;
+                for (int d : neigh_not_in_W) inW[d] = false;
+            }
+
+
+            if (exists_ext_dominator) {
+                if (write_logs) {
+                    clog << "\n\t\t\t using double-ext-domination, candidate w: " << w << ", W[" << w << "]: " << V[w]
+                         // << "\n\t\t\t nodes_removed: " << nodes_removed
+                         // << "\n\t\t\t edges_removed: " << edges_to_remove
+                         // << "\n\t\t\t exists_ext_dominator: " << exists_ext_dominator
+                         << "\n\t\t\t marking candidate node w: " << w
+                         << endl;
+                }
+                marked[w] = true;
+            }
+        }
+
+        clearMarked(marked2);
     }
 }
 
@@ -301,7 +388,9 @@ int EDReducer::nextStep() {
         clog << "\t\tU1: " << U1 << endl;
     }
 
-    markDominationNodes();
+    checkEmptyArraysAssertions(true, true);
+
+    markDominationNodes(marked);
 
     if (write_logs) {
         VI temp;
@@ -310,12 +399,15 @@ int EDReducer::nextStep() {
         clog << "\t\tnodes in N(U) marked: " << temp << endl;
     }
 
-    if (existsExtDominator()) {
+    if (existsExtDominator(marked)) {
         return 1;
     }else if (write_logs) clog << "\t\tdominator does not exist" << endl;
 
     VI nodes_to_move_to_U = findNodesToMoveToU();
+    for (int u : nodes_to_move_to_U) marked[u] = false;
+
     if ( !nodes_to_move_to_U.empty() ) {
+        if (!cnf.ed_move_nodes_to_U_simultaneously) nodes_to_move_to_U.resize(1);
         if (write_logs) clog << "\t\tMoving nodes " << nodes_to_move_to_U << " to U (and creating type-1 constraints)" << endl;
         for (int u : nodes_to_move_to_U) moveToU(u);
         return 0;
@@ -330,7 +422,7 @@ int EDReducer::nextStep() {
     if (!nodes_to_move_to_S.empty()) {
         StandardUtils::makeUnique(nodes_to_move_to_S);
 
-        bool move_all_simultanously = false;
+        bool move_all_simultanously = cnf.ed_move_nodes_to_S_simultaneously;
 
         // move all nodes in the same time - correct, but don't we lose some possible domination situations here?
         // by moving node to S we might remove some nodes from U1, which might contribute to ext-domination otherwise
@@ -368,15 +460,15 @@ void EDReducer::clearAll() {
     temp.clear();
     temp2.clear();
     for (int d : W) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = false;
+        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
     }
     for (int d0 : W) for (int d : V[d0]) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = false;
+        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
     }
 
     if (cnf.ed_consider_nodes_to_move_outside_NW) {
         for (int d0 : W) for (int d1 : V[d0]) for (int d : V[d1]) {
-            inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = false;
+            inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
         }
     }
     inf_rules_1.clear();
@@ -385,4 +477,21 @@ void EDReducer::clearAll() {
     U.clear();
     U1.clear();
     W.clear();
+}
+
+void EDReducer::checkEmptyArraysAssertions(bool check_marked, bool check_marked2) {
+    constexpr bool check_slow_assertions_for_correctness = false;
+    if constexpr ( check_slow_assertions_for_correctness ) {
+        clog << endl << "CAUTION!! RUNNING VERY SLOW ASSERTIONS TO CHECK IF ARRAYS ARE CORRECTLY CLEARED!!" << endl;
+        assert(ranges::all_of(cnt, [&](auto b){return !b;}));
+        if (check_marked) {
+            for (int i=0; i<N; i++) if (marked[i]) clog << "marked[" << i << "] = " << marked[i] << endl;
+            assert(ranges::all_of(marked, [&](auto b){return !b;}));
+        }
+        if (check_marked2) assert(ranges::all_of(marked2, [&](auto b){return !b;}));
+        assert(ranges::all_of(was, [&](auto b){return !b;}));
+        assert(ranges::all_of(helper, [&](auto b){return !b;}));
+        assert(temp.empty());
+        assert(temp2.empty());
+    }
 }

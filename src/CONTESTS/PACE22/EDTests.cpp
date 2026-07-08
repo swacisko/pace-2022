@@ -196,7 +196,7 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
 
     DEBUG(PII(exp_data.N1,exp_data.M1));
 
-    const double numvc_time_check_sec = 3;
+    const double numvc_time_check_sec = 2;
 
     auto checkByNuMVC = [&](VVI & V, auto to_lift, int additional_offset = 0) {
         if ( GraphUtils::countEdges(V) == 0 ) return VI{};
@@ -206,7 +206,7 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
         clog << "Running NuMVC/FastVC for " << T << " seconds to check size" << endl;
         auto vc = VCUtils::getMinCVUsingFastVC(V, T * 1000);
         DEBUG(vc.size());
-        DEBUG(vc.size() + exp_data.red2_offset);
+        // DEBUG(vc.size() + additional_offset);
         Reducer::liftSolution(V.size(), vc, to_lift);
         clog << "After lifting, vc.size(): " << vc.size() << endl;
         assert(VCUtils::isVertexCover(V,vc));
@@ -262,7 +262,7 @@ pair<VPII,ExpData> runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_
     cnf.ed_consider_nodes_to_move_outside_NW = true;
     cnf.ed_use_same_neigh_domination = true;
     cnf.ed_use_deficit1_domination = true;
-    cnf.ed_use_biset_move_checks = true;
+    cnf.ed_use_double_ed_checks = true;
     Reducer red(V,cnf);
     auto to_lift = red.reduce();
     sw.stop("main");
@@ -358,7 +358,7 @@ int main() {
 
     // VVI V = GraphReader::readGraphStandardEdges(cin);
     // VVI V = GraphReader::readGraphDIMACSWunweighed(cin,true);
-    VVI V = getRandomGraph(10'000, 17'000);
+    VVI V = getRandomGraph(10'000, 16'000);
     // VVI V = getTestV1();
 
     assert(GraphUtils::isSimple(V));

@@ -10,7 +10,8 @@
 
 class EDReducer {
 public:
-    explicit EDReducer( int NN, Config c ) : N(NN), inS(N), inU(N), inU1(N), inW(N), was(N), helper(N), marked(N), cnf(c) {
+    explicit EDReducer( int NN, Config c )
+    : N(NN), inS(N), inU(N), inU1(N), inW(N), was(N), helper(N), marked(N), marked2(N), cnf(c) {
         temp.reserve(N);
         temp2.reserve(N);
         cnt = VI(N,0);
@@ -38,7 +39,7 @@ public:
     VVI V;
     Config cnf;
 
-    VB inS, inU, inU1, inW, was, helper, marked;
+    VB inS, inU, inU1, inW, was, helper, marked, marked2;
     VI temp, temp2,S,U,U1,W;
 
     VI cnt;
@@ -51,9 +52,12 @@ public:
 
     /**
      *  For node u considers all w \in N(u) \setminus W and finds all nodes x
-     *  for which N(u) \setminus W \subseteq N(x)
+     *  for which N(u) \setminus W \subseteq N(x).
+     *
+     *  Uses the provided [marked] bitvector to mark nodes. This is provided to enable easy implementation of the
+     *  double-ED rule.
      */
-    void markDominationNodes();
+    void markDominationNodes(VB& marked, bool check_double_ed = true);
 
     /**
      * Finds, using approaches marked in the [cnf], all the nodes that can be moved to U.
@@ -70,8 +74,9 @@ public:
     int nextStep();
 
     /**
+     * Checks for given marked nodes in the [marked] bitvector, whether an ext-dominator exists.
      */
-    bool existsExtDominator();
+    bool existsExtDominator(VB & marked);
 
     /**
      * Moves node u from N(W) to U.
@@ -89,6 +94,9 @@ public:
      * Clears all arrays to prepare for checking next node.
      */
     void clearAll();
+
+
+    void checkEmptyArraysAssertions(bool check_marked, bool check_marked2);
 };
 
 #endif //ELDREDUCER_H
