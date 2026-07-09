@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD 23)
 
 SET(CMAKE_CXX_FLAGS "-std=c++23 -O3")
 
+#include(cmake/DownloadCPSAT.cmake)
+#include(cmake/cpsat_minimal.cmake)
 
 
 include_directories(
@@ -82,4 +84,11 @@ add_executable(EDTests ${SOURCES}
         src/CONTESTS/PACE22/IntGenerator.h
         src/CONTESTS/PACE22/IntGenerator.cpp
 )
-target_link_libraries( EDTests stdc++fs )
+
+target_compile_features(EDTests PRIVATE cxx_std_23)
+
+find_package(ortools CONFIG REQUIRED)
+find_package(OpenMP)
+#target_link_libraries( EDTests stdc++fs)
+target_link_libraries( EDTests stdc++fs ortools::ortools OpenMP::OpenMP_CXX)
+#target_link_libraries( EDTests stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX ortools::ortools)

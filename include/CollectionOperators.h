@@ -22,11 +22,17 @@ void operator+=(unordered_set<_T>& v, _E w){
     v.insert( ALL(w) );
 }
 
-template<class _T, class _E>
-_T operator+(_T v, _E w){
+template<class _T>
+vector<_T> operator+(vector<_T> v, vector<_T> w){
     v += w;
     return v;
 }
+
+// template<class _T>
+// VVI operator+(VVI v, VVI w){
+    // v += w;
+    // return v;
+// }
 
 template<class _T>
 vector<_T> operator-(vector<_T> v){

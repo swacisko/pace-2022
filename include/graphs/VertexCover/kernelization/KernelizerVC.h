@@ -23,6 +23,8 @@ public:
 
     pair<VI, VPII> degree1Kernelization( VVI & V );
 
+    bool use_crown_and_lp_checks = true;
+
 private:
 
     VPII removeNodesFromGraph(VVI &G, VI &toRemove, set<PII> &nodeDegrees);

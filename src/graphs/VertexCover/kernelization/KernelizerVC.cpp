@@ -79,7 +79,7 @@ pair<VI, VPII> KernelizerVC::initialKernelization(VVI &G) {
         if( kernel.first.size() > 0 ) continue;
 
         crownAndLPChecks++;
-        if( crownAndLPChecks <= 1 ){
+        if( use_crown_and_lp_checks && crownAndLPChecks <= 1 ){
 
             kernel = crownDecomposition(G); // CROWN
             if( kernel.first.size() > 0 ) iter = 0;

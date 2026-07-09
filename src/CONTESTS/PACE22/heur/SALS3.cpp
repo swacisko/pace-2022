@@ -391,7 +391,8 @@ void SALS3::insertIntoOrder(int v, int pos) {
 
     if(!use_metropolis_sa){ // updating all invalidated nodes and inserting new values to prs_dfvs
         VI temp = {v};
-        temp += V[v] + revV[v];
+        temp += V[v];
+        temp += revV[v];
         for( int u : temp ){
 //            if( in_order[u] == -1 && !is_valid_delta[u] ){
 //            if( !is_valid_delta[u] ){
@@ -491,7 +492,8 @@ void SALS3::removeFromOrder(int v) {
 
     if(!use_metropolis_sa){ // updating all invalidated nodes and inserting new values to prs_dfvs
         VI temp = {v};
-        temp += V[v] + revV[v];
+        temp += V[v];
+        temp += revV[v];
         for( int u : temp ){
 //            if( in_order[u] == -1 && !is_valid_delta[u] ){
 //            if( !is_valid_delta[u] ){

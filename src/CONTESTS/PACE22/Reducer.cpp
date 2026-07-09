@@ -280,7 +280,8 @@ VVI Reducer::pathCompression(VVI & revV) {
 
         reverse(ALL(pth_prev));
         pth_prev.pop_back();
-        VI pth = pth_prev + pth_succ;
+        VI pth = pth_prev;
+        pth += pth_succ;
 
         if( pth.size() >= 2 && pth[0] == pth.back() ) pth.pop_back();
 
