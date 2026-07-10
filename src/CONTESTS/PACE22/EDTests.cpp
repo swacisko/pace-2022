@@ -458,12 +458,15 @@ VVI getRandomGraph( int N, int M ) {
 int main() {
     ios_base::sync_with_stdio(0);
 
+
+    int N0 = 18'000, M0 = 28'800;
+    double C = 1;
+    N0 *= C; M0 *= C;
+
     // VVI V = GraphReader::readGraphStandardEdges(cin);
     // VVI V = GraphReader::readGraphDIMACSWunweighed(cin,true);
-    // VVI V = getRandomGraph(9'000, 14'400);
-    VVI V = getRandomGraph(18'000, 28'800);
-    // VVI V = getRandomGraph(100'000, 150'000);
     // VVI V = getTestV1();
+    VVI V = getRandomGraph(N0, M0);
 
     assert(GraphUtils::isSimple(V));
 
@@ -473,6 +476,7 @@ int main() {
     int solver_time_granularity = 1;
     int solver_repeats = 3;
     string alg = "cpsat";
+
     auto exp_data = runVCTestforGraph(V,  solver_max_time_sec, solver_time_granularity,solver_repeats, alg);
 
 
