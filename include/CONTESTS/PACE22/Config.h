@@ -141,6 +141,35 @@ public:
     bool ed_use_double_ed_checks = false;
     int ed_double_ed_max_candidates = 10;
 
+    /**
+     * If true, then apart from nodes to add to the kernel, edges will be checked for possible removal.
+    For each edge {a,b}, consider({a,b}) will be run, and the edge will be removed if it returns true.
+     * #CAUTION! This requires careful handling for solution lifting...
+     */
+    bool ed_use_edge_removal = false;
+
+    /**
+     * If true, then type-1 cnstraints will be added on the fly, as the reduction rule executes.
+     */
+    bool ed_apply_type1_constraints_on_the_fly = false;
+
+    /**
+     * If true, then initial sets S of the form {v} will be checked for each node in the graph.
+     * This is the default check and should be set to true, unless you really need to disable that for some reason.
+     */
+    bool ed_use_node_removal = true;
+
+    /**
+     * If true, then in the Reducer there will be at the very end considered adding edges to the graph on the fly
+     */
+    bool ed_use_edge_insertion = true;
+
+    /**
+     * If true, then extensive edge insertion will be used.
+     * Many candidate nodes x will be considered for each node v, and pairs {v,x} will be checked using consider({v,x}).
+     * If it returns true, then edge {v,x} will be added to the graph.
+     */
+    bool ed_use_extended_edges_insertion = false;
 
     //******************************************************************** ED
 

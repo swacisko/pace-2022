@@ -17,41 +17,70 @@ public:
         cnt = VI(N,0);
     }
 
+    /**
+     * Uses techniques specified in the [cnf] object to reduce/apply changes to the graph.
+     *
+     * The most standard approach is node removal - checking initS = {v} for all nodes v.
+     *
+     * Another approach is edge removal - checking initS = {u,v} for edges in the graph. This requires complicated
+     * solution lifting though.
+     *
+     * It is also possible to use edge insertion - for given initial single-nide set S = {v},
+     * whenever a node x is moved to the set U, we can add edge {v,x} to the graph.
+     *
+     * We can also use extended edge insertion - for some set of candidates C (usually N^3(v)),
+     * we check whether initS = {v,x} will yield true, for x \in C. If so, then we can add edge {v,x} to the graph.
+     */
     VI reduce(VVI V0);
+
+    /**
+     * True, if recent call to [reduce] made any changes to the processed graph.
+     * @return
+     */
+    bool madeChangesInLastReduce();
+
+    /**
+     * Resets all techniques that might be used in [reduce].
+     * After this, used techniques need to be set manually, via this->cnf object.
+     * Without setting it manually, the [reduce] function will do nothing, as all techniques are disabled.
+     */
+    void resetAllUsedTechniques();
 
 
     VI inf_rules_1, inf_rules_2;
 
-    /**
-     * If true, then edges will be added on the fly...
-     */
-    bool apply_type1_constraints_on_the_fly = false;
+    int last_reduce_inf_rules_1_added = 0;
+    int last_reduce_inf_rules_2_created = 0;
 
-    int inf_rules_1_added = 0;
-    int inf_rules_2_created = 0;
+    int last_reduce_edges_removed = 0;
+    int last_reduce_nodes_removed = 0;
 
-// private:
+    VVI getV(){return V;}
+    Config cnf;
 
     bool write_logs = false;
 
 
+private:
+
+
     int N;
     VVI V;
-    Config cnf;
 
     VB inS, inU, inU1, inW, was, helper, marked, marked2;
     VI temp, temp2,S,U,U1,W;
-
     VI cnt;
 
-
     bool check_double_ed = false;
+
+
+
 
     /**
      * Checks whether node u can be safely added to the solution.
      * Additionally creates constraints that can be used if it cannot.
      */
-    bool considerNode(int v);
+    bool consider(VI initS);
 
     /**
      *  For node u considers all w \in N(u) \setminus W and finds all nodes x
@@ -101,7 +130,7 @@ public:
     /**
      * Clears all arrays to prepare for checking next node.
      */
-    void clearAll();
+    void clearAllForConsider();
 
 
     void checkEmptyArraysAssertions(bool check_marked, bool check_marked2);

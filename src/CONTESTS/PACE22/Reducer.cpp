@@ -598,15 +598,28 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
 
         bool is_pi_graph = Utils::isPIGraph(V, revV, helper);
-        if(cnf.reducer_use_ed && is_pi_graph
+
+        // standard node-removal version
+        if( is_pi_graph &&
+            cnf.reducer_use_ed && cnf.ed_use_node_removal
             && ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) )){
             ed_rules_checked++;
+
             EDReducer edred(V.size(), cnf);
+            edred.resetAllUsedTechniques();
+            edred.cnf.ed_use_node_removal = true;
+
             VI res = edred.reduce(V);
-            ed_nodes_reduced += res.size();
+            assert(res.size() == edred.last_reduce_nodes_removed);
+            ed_nodes_reduced += edred.last_reduce_nodes_removed;
+            ed_edges_removed += edred.last_reduce_edges_removed;
+            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+
             addKNR(res);
-            Utils::removeNodes(V, revV, res, helper);
-            if(!modified) modified = (!res.empty());
+            if (edred.madeChangesInLastReduce())  V = revV = edred.getV();
+            if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
+            modified |= edred.madeChangesInLastReduce();
+
             if(modified) continue;
         }
 
@@ -1118,54 +1131,53 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if(modified) continue;
         }
 
-
         is_pi_graph = Utils::isPIGraph(V, revV, helper);
-        if(cnf.reducer_use_ed && is_pi_graph){
+
+        // standard node-removal version
+        if(is_pi_graph && cnf.reducer_use_ed && cnf.ed_use_node_removal){
             ed_rules_checked++;
+
             EDReducer edred(V.size(), cnf);
+            edred.resetAllUsedTechniques();
+            edred.cnf.ed_use_node_removal = true;
+
             VI res = edred.reduce(V);
-            ed_nodes_reduced += res.size();
+            assert(res.size() == edred.last_reduce_nodes_removed);
+            ed_nodes_reduced += edred.last_reduce_nodes_removed;
+            ed_edges_removed += edred.last_reduce_edges_removed;
+            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
             addKNR(res);
-            Utils::removeNodes(V, revV, res, helper);
-            if(!modified) modified = (!res.empty());
-            if(modified) {
-                // clog << "Considering ED rule at the very end, found " << res.size() << " reducible nodes" << endl;
-                continue;
-            }
 
-            if (res.empty()) { // now adding edges if possible...
-                EDReducer edred(V.size(), cnf);
-                // if (GraphUtils::countEdges(V) > 500) edred.write_logs = true;
+            if (edred.madeChangesInLastReduce())  V = revV = edred.getV();
+            modified |= edred.madeChangesInLastReduce();
 
-                edred.apply_type1_constraints_on_the_fly = true;
-                res = edred.reduce(V);
-                ed_nodes_reduced += res.size();
-                assert(res.empty() && "if failed then ED rules does not run deterministically...");
-                addKNR(res);
-
-                // Utils::removeNodes(V, revV, res, helper);
-                V = edred.V;
-                revV = GraphUtils::reverseGraph(V);
-
-                assert( GraphUtils::isSimple(V) );
-                // DEBUG(GraphUtils::countEdges(V));
-                // DEBUG(modified);
-                // DEBUG(res.size());
-
-                ed_t1_inference_rules_added += edred.inf_rules_1_added;
-                if(!modified) modified = ( (!res.empty()) || (edred.inf_rules_1_added > 0) );
-                if(modified) {
-                    // clog << "Considering ED rule at the very end, added " << edred.inf_rules_1_added << " new ARCS" << endl;
-                    // DEBUG(GraphUtils::countEdges(V));
-                    // DEBUG(modified);
-                    // DEBUG(res.size());
-                    continue;
-                }
-            }
-
+            if(modified) continue;
         }
 
-        // clog << "modified: " << modified << ", should " << (modified ? "continue" : "cease") << " reductions" << endl;
+
+        // standard edge-insertion - those edges that are found using consider(v) for single-node initial sets S
+        if (is_pi_graph && cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
+            ed_rules_checked++;
+
+            EDReducer edred(V.size(), cnf);
+            edred.resetAllUsedTechniques();
+            edred.cnf.ed_use_node_removal = true;
+            edred.cnf.ed_apply_type1_constraints_on_the_fly = true;
+
+            VI res = edred.reduce(V);
+            assert(res.size() == edred.last_reduce_nodes_removed);
+            ed_nodes_reduced += edred.last_reduce_nodes_removed;
+            ed_edges_removed += edred.last_reduce_edges_removed;
+            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+
+            addKNR(res);
+            if (edred.madeChangesInLastReduce())  V = revV = edred.getV();
+            assert( GraphUtils::isSimple(V) );
+
+            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+            modified |= edred.madeChangesInLastReduce();
+            if(modified) continue;
+        }
 
 
     }while(modified);
@@ -2386,6 +2398,12 @@ void Reducer::writeTotals() {
     DEBUG(total_bottlenecks_applied);
     DEBUG(total_bottleneck2_nodes_removed);
     DEBUG(total_recursive_reducer_nodes_removed);
+
+    DEBUG(ed_nodes_reduced);
+    DEBUG(ed_edges_removed);
+    DEBUG(ed_t1_inference_rules_added);
+    DEBUG(ed_total_t2_inference_rules_created);
+    DEBUG(ed_t2_inference_rules_added);
 }
 
 VPII Reducer::nonSimpleCycleArcFull() {

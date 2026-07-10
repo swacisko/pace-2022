@@ -218,6 +218,7 @@ pair<VI,VD> solveInstanceUsingSolver(VPII constraints, int max_time_sec, int res
         };
 
         auto [iter_res, iter_res_times] = solve();
+        if (res.empty() || iter_res.size() < res.size()) res = iter_res;
         assert(iter_res_times.size() == I);
         for ( int i=0; i<I; i++ ) {
             assert(i < iter_res_times.size());
@@ -361,6 +362,9 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.ed_use_same_neigh_domination = true;
         cnf.ed_use_deficit1_domination = true;
         cnf.ed_use_double_ed_checks = true;
+
+        // cnf.ed_use_edge_removal = true;
+
         Reducer red(V,cnf);
         auto to_lift = red.reduce();
         sw.stop("main");
@@ -456,7 +460,8 @@ int main() {
 
     // VVI V = GraphReader::readGraphStandardEdges(cin);
     // VVI V = GraphReader::readGraphDIMACSWunweighed(cin,true);
-    VVI V = getRandomGraph(30'000, 46'000);
+    // VVI V = getRandomGraph(9'000, 14'400);
+    VVI V = getRandomGraph(18'000, 28'800);
     // VVI V = getRandomGraph(100'000, 150'000);
     // VVI V = getTestV1();
 
@@ -464,7 +469,7 @@ int main() {
 
     // int solver_max_time_sec = 300;
     // int solver_time_granularity = 10;
-    int solver_max_time_sec = 15;
+    int solver_max_time_sec = 10;
     int solver_time_granularity = 1;
     int solver_repeats = 3;
     string alg = "cpsat";
