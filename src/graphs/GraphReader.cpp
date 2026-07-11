@@ -11,12 +11,14 @@ namespace GraphReader{
     VVI readGraphStandardEdges(istream &cin, bool directed ) {
         int N,M;
         cin >> N >> M;
+        DEBUG(PII(N,M));
+
         VVI V(N);
         for(int i=0; i<M; i++){
             int a,b;
             cin >> a >> b;
 
-            clog << "CATUION - changed readGraphStandardEdges()" << endl;
+            // clog << "CATUION - changed readGraphStandardEdges()" << endl;
             a++, b++; // #TEST!!
 
             V[a-1].push_back(b-1);

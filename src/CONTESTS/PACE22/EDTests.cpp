@@ -12,6 +12,7 @@
 #include "VertexCover/kernelization/KernelizerVC.h"
 #include <ranges>
 #include "IntGenerator.h"
+#include "components/ConnectedComponents.h"
 #include "VertexCover/VCUtils.h"
 
 #include "ortools/sat/cp_model.h"
@@ -140,7 +141,8 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_s
 
     Model solver_model;
     CpModelBuilder model;
-    solver_model.Add(NewSatParameters(params));
+    auto sat_params = NewSatParameters(params);
+    solver_model.Add(sat_params);
 
     vector<BoolVar> nodes;
     for (int i=0; i<N+1; i++) nodes.push_back(model.NewBoolVar());
@@ -251,6 +253,16 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
     DEBUG(PII(exp_data.N0,exp_data.M0));
 
 
+
+    auto writeConnCompInfo = [&](VVI & V, string msg = "") {
+        if (msg != "") clog << msg << endl;
+        auto [cmp_cnt, sizes] = GraphUtils::getConnectedcomponentsInfo(V);
+        clog << "There are " << cmp_cnt << " nontrivial connected components, with the following size distribution" << endl;
+        for (auto [k,v] : sizes) clog << k << ": " << v << endl;
+        ENDL(1);
+    };
+
+
     constexpr bool run_ed_test = false;
     if (run_ed_test){
         Config cnf;
@@ -283,6 +295,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         exp_data.N1 = N;
         exp_data.M1 = GraphUtils::countEdges(V);
         exp_data.red1_offset = kern_nodes.size();
+
+        writeConnCompInfo(V, "Connected components after init-kernelization");
     }
 
 
@@ -291,7 +305,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
     const double numvc_time_check_sec = 2;
 
-    auto checkByNuMVC = [&](VVI & V, auto to_lift, int additional_offset = 0) {
+    auto checkByNuMVC = [&](VVI & V, int additional_offset = 0) {
         if ( GraphUtils::countEdges(V) == 0 ) return VI{};
 
         double T = numvc_time_check_sec;
@@ -299,18 +313,17 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         clog << "Running NuMVC/FastVC for " << T << " seconds to check size" << endl;
         auto vc = VCUtils::getMinCVUsingFastVC(V, T * 1000);
         DEBUG(vc.size());
-        // DEBUG(vc.size() + additional_offset);
-        // Reducer::liftSolution(V.size(), vc, to_lift);
-        // clog << "After lifting, vc.size(): " << vc.size() << endl;
-        // assert(VCUtils::isVertexCover(V,vc));
         clog << "Solution size with additional offset: " << vc.size() + additional_offset << endl;
         clog << "********************** NUMVC CHECK" << endl << endl;
 
         return vc;
     };
 
+
     constexpr bool test_noned_vc_rules = true;
     if (test_noned_vc_rules){ // measuring just the VC reduction time WITHOUT ED rule, and the solver results for the non-ed reduced graph
+        clog << endl << "***************** CHECKING FULL NON-ED RULES" << endl;
+
         Stopwatch sw;
         sw.start("main");
         Config cnf;
@@ -321,6 +334,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         Reducer red(V,cnf);
         auto to_lift = red.reduce();
         sw.stop("main");
+        red.writeTotals();
 
         exp_data.red_noned_time_millis = exp_data.red_init_time_millis + sw.getTime("main");
 
@@ -343,16 +357,24 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
         exp_data.red2_offset = exp_data.red1_offset + noned_solution_lift_overhead;
 
-        auto lifted_solution = checkByNuMVC(red.V, to_lift, exp_data.red1_offset);
+        auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red2_offset);
+        indg.remapNodes(fastvc_sol);
+        Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift);
+        assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
+
+        writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
     }
 
 
     constexpr bool test_ed_vc_rules = true;
     if (test_ed_vc_rules) {
+        clog << endl << "***************** CHECKING FULL ED RULES" << endl;
+
         // now measuring VC reduction time WITH ED rule
         Stopwatch sw;
         sw.start("main");
         Config cnf;
+        cnf.reducer_max_time_millis = 1e9;
         cnf.disableAllNonbasicReductions();
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined =  cnf.reducer_use_twins_merge = cnf.reducer_use_domination = true;
@@ -361,13 +383,14 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.ed_consider_nodes_to_move_outside_NW = true;
         cnf.ed_use_same_neigh_domination = true;
         cnf.ed_use_deficit1_domination = true;
-        cnf.ed_use_double_ed_checks = true;
 
+        cnf.ed_use_double_ed_checks = false; // time-consuming, especially for denser graphs...
         // cnf.ed_use_edge_removal = true;
 
         Reducer red(V,cnf);
         auto to_lift = red.reduce();
         sw.stop("main");
+        red.writeTotals();
 
         exp_data.red_ed_time_millis = exp_data.red_init_time_millis + sw.getTime("main");
 
@@ -383,10 +406,16 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         exp_data.N3 = N;
         exp_data.M3 = GraphUtils::countEdges(V);
         DEBUG(PII(exp_data.N3,exp_data.M3));
+        writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
 
         int ed_solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
         DEBUG(ed_solution_lift_overhead);
-        auto lifted_solution = checkByNuMVC(red.V, to_lift, exp_data.red1_offset);
+        exp_data.red3_offset = exp_data.red1_offset + ed_solution_lift_overhead;
+
+        auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red3_offset);
+        indg.remapNodes(fastvc_sol);
+        Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift);
+        assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
 
 
         // now solve the reduced problem using constraints...
@@ -401,7 +430,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         DEBUG(times);
         for (auto& d : times) if (d != -1) d += ed_solution_lift_overhead;
         exp_data.ed_results = times;
-        exp_data.red3_offset = exp_data.red1_offset + ed_solution_lift_overhead;
+
         DEBUG(res.size());
         DEBUG(exp_data.ed_results);
     }
@@ -457,24 +486,29 @@ VVI getRandomGraph( int N, int M ) {
 
 int main() {
     ios_base::sync_with_stdio(0);
+    cin.tie(0);
+    cout << fixed;
+    clog << fixed;
 
 
-    int N0 = 18'000, M0 = 28'800;
-    double C = 1;
+    int N0 = 3'000, M0 = 4'700;
+    double C = 3;
     N0 *= C; M0 *= C;
 
-    // VVI V = GraphReader::readGraphStandardEdges(cin);
+    VVI V = GraphReader::readGraphStandardEdges(cin);
     // VVI V = GraphReader::readGraphDIMACSWunweighed(cin,true);
     // VVI V = getTestV1();
-    VVI V = getRandomGraph(N0, M0);
+    // VVI V = getRandomGraph(N0, M0);
+
+    V = GraphUtils::makeSimple(V); // making the graph simple, as at the input it might not...
 
     assert(GraphUtils::isSimple(V));
 
     // int solver_max_time_sec = 300;
     // int solver_time_granularity = 10;
-    int solver_max_time_sec = 10;
+    int solver_max_time_sec = 7;
     int solver_time_granularity = 1;
-    int solver_repeats = 3;
+    int solver_repeats = 2;
     string alg = "cpsat";
 
     auto exp_data = runVCTestforGraph(V,  solver_max_time_sec, solver_time_granularity,solver_repeats, alg);

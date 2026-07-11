@@ -1156,8 +1156,10 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
 
         // standard edge-insertion - those edges that are found using consider(v) for single-node initial sets S
+        // if (false)
         if (is_pi_graph && cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
             ed_rules_checked++;
+            clog << "Running ED with edge insertion" << endl;
 
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
@@ -1816,6 +1818,7 @@ bool Reducer::mergeTwins(int max_milliseconds) {
             assert(g.V == gvcp);
 
             DFVSSolverE solver(&g.V, cnf);
+            solver.cnf.reducer_use_ed = false;
             solver.cnf.write_logs = false;
             solver.cnf.disableAllRecursiveReductions();
             solver.cnf.disableAllConditionalReductions();
@@ -2358,52 +2361,53 @@ VI Reducer::domination4(int max_time_millis_per_node) {
 }
 
 void Reducer::writeTotals() {
-    DEBUG(total_pie_edges_removed);
-    DEBUG(total_core_nodes_removed);
-    DEBUG(total_dome_edges_removed);
+    // DEBUG(total_pie_edges_removed);
+    // DEBUG(total_core_nodes_removed);
+    // DEBUG(total_dome_edges_removed);
     DEBUG(total_dominated_nodes1);
-    DEBUG(total_dominated_nodes2);
-    DEBUG(total_dominated_nodes3);
-    DEBUG(total_dominated_nodes4);
-    DEBUG(total_dominated_nodes5);
-    DEBUG(total_domination5_pi_arcs_added);
-    DEBUG(total_dominated_nodes6);
-    DEBUG(total_domination6inserter_nodes_removed);
-    DEBUG(total_domination6inserter_pi_edges_inserted);
-    DEBUG(total_reverse_triangle_gadgets_applied);
-    DEBUG(total_reverse_triangle_gadget_dom6_cases);
-    DEBUG(mixed_domination_nodes_excluded);
-    DEBUG(mixed_domination_nodes_full_excluded);
-    DEBUG(total_inoutclique_nodes_merged);
+    // DEBUG(total_dominated_nodes2);
+    // DEBUG(total_dominated_nodes3);
+    // DEBUG(total_dominated_nodes4);
+    // DEBUG(total_dominated_nodes5);
+    // DEBUG(total_domination5_pi_arcs_added);
+    // DEBUG(total_dominated_nodes6);
+    // DEBUG(total_domination6inserter_nodes_removed);
+    // DEBUG(total_domination6inserter_pi_edges_inserted);
+    // DEBUG(total_reverse_triangle_gadgets_applied);
+    // DEBUG(total_reverse_triangle_gadget_dom6_cases);
+    // DEBUG(mixed_domination_nodes_excluded);
+    // DEBUG(mixed_domination_nodes_full_excluded);
+    // DEBUG(total_inoutclique_nodes_merged);
     DEBUG(total_folds_done);
     DEBUG(total_general_folds_done);
     DEBUG(total_twin_folds_done);
-    DEBUG(total_full_bipartite_blockers);
-    DEBUG(total_edge_neighborhood_blocker_edges_added);
+    // DEBUG(total_full_bipartite_blockers);
+    // DEBUG(total_edge_neighborhood_blocker_edges_added);
     DEBUG(total_desk_folds);
     DEBUG(total_desk_dominations);
     DEBUG(total_unconfined_nodes);
-    DEBUG(total_desk_arcs_added);
-    DEBUG(total_funnels_done);
-    DEBUG(total_cycle_folds_done);
+    // DEBUG(total_desk_arcs_added);
+    // DEBUG(total_funnels_done);
+    // DEBUG(total_cycle_folds_done);
     DEBUG(total_twins_merged);
-    DEBUG(total_nonsimple_cycle_arcs_removed);
-    DEBUG(total_nonsimple_cycle_arcs_full_removed);
-    DEBUG(total_spiderweb_gadgets_applied);
-    DEBUG(total_spiderweb_nodes_added);
-    DEBUG(total_spiderweb_edges_added);
-    DEBUG(total_spiderweb_fill_edges_added);
-    DEBUG(total_spiderweb_arcs_removed);
-    DEBUG(total_bottleneck_nodes);
-    DEBUG(total_bottlenecks_applied);
-    DEBUG(total_bottleneck2_nodes_removed);
-    DEBUG(total_recursive_reducer_nodes_removed);
+    // DEBUG(total_nonsimple_cycle_arcs_removed);
+    // DEBUG(total_nonsimple_cycle_arcs_full_removed);
+    // DEBUG(total_spiderweb_gadgets_applied);
+    // DEBUG(total_spiderweb_nodes_added);
+    // DEBUG(total_spiderweb_edges_added);
+    // DEBUG(total_spiderweb_fill_edges_added);
+    // DEBUG(total_spiderweb_arcs_removed);
+    // DEBUG(total_bottleneck_nodes);
+    // DEBUG(total_bottlenecks_applied);
+    // DEBUG(total_bottleneck2_nodes_removed);
+    // DEBUG(total_recursive_reducer_nodes_removed);
 
     DEBUG(ed_nodes_reduced);
     DEBUG(ed_edges_removed);
     DEBUG(ed_t1_inference_rules_added);
     DEBUG(ed_total_t2_inference_rules_created);
     DEBUG(ed_t2_inference_rules_added);
+    ENDL(1);
 }
 
 VPII Reducer::nonSimpleCycleArcFull() {

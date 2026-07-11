@@ -8,8 +8,22 @@
 
 #include "combinatorics/CombinatoricUtils.h"
 #include <CONTESTS/PACE22/Utils.h>
+
+#include "StandardUtils.h"
 #include "graphs/cliques/CliqueExtension.h"
 
+
+pair<int, map<int, int>> GraphUtils::getConnectedcomponentsInfo(VVI &V) {
+
+    auto comps = ConnectedComponents::getConnectedComponents(V);
+    map<int,int> sizes;
+    int cnt = 0;
+    for (auto & c : comps) if (c.size() > 1) {
+        cnt++;
+        sizes[c.size()]++;
+    }
+    return make_pair(cnt,sizes);
+}
 
 VI GraphUtils::getComplimentaryNodes( VVI & V, VI & nodes ){
     VB inNodes( V.size(),false );
@@ -184,6 +198,18 @@ VVI GraphUtils::getGraphForEdges(VPII edges, bool directed) {
     for(auto & [a,b] : edges) N = max(N, max(a,b));
     VVI V(N+1);
     for( auto & [a,b] : edges ) addEdge(V,a,b,directed);
+    return V;
+}
+
+VVI GraphUtils::makeSimple(VVI V) {
+    for ( int i=0; i<V.size(); i++ ) {
+        for (int j=(int)V[i].size()-1; j>=0; j--) if ( V[i][j] == i ) {
+            swap(V[i][j], V[i].back());
+            V[i].pop_back();
+        }
+        StandardUtils::makeUnique(V[i]);
+    }
+
     return V;
 }
 

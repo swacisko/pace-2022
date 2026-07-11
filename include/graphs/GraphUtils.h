@@ -10,6 +10,8 @@
 class GraphUtils {
 public:
 
+    static pair<int,map<int,int>> getConnectedcomponentsInfo(VVI & V);
+
     static VI getComplimentaryNodes( VVI & V, VI & nodes );
 
     static int countEdges(VVI & V, const bool directed = false);
@@ -59,6 +61,8 @@ public:
     static void writeGraphHumanReadable(VVI& V);
 
     static bool isSimple(VVI V);
+
+    static VVI makeSimple(VVI V);
 
     static double density( VVI & V, bool directed );
 };

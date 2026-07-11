@@ -68,7 +68,7 @@ file(GLOB SOURCES
         src/CONTESTS/PACE22/Reducer.cpp
         src/CONTESTS/PACE22/exact/DFVSSolverE.cpp
         src/CONTESTS/PACE22/exact/CliqueCoverLS.cpp
-        )
+)
 
 
 #add_executable(DiVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES}

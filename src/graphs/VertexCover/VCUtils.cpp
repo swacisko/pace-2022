@@ -35,7 +35,7 @@ bool VCUtils::isIndependentSet(VVI &V, VI &S) {
     return res;
 }
 
-VI VCUtils::getMinCVUsingFastVC(VVI V, int milliseconds, VI init_vc) {
+VI VCUtils::getMinCVUsingFastVC(VVI V, int milliseconds, VI init_vc, const bool use_basic_kernelization) {
     if( !init_vc.empty() ){
         if( !isVertexCover(V, init_vc) ){
             DEBUG(GraphUtils::countEdges(V));
@@ -51,7 +51,7 @@ VI VCUtils::getMinCVUsingFastVC(VVI V, int milliseconds, VI init_vc) {
     VI mis;
 
     VI kern_vc;
-    const bool use_kernelization = true;
+    const bool use_kernelization = use_basic_kernelization;
     if(use_kernelization) {
         KernelizerVC kern;
         auto[x, y] = kern.initialKernelization(V);

@@ -14,7 +14,7 @@ public:
 
     static bool isIndependentSet( VVI & V, VI & S );
 
-    static VI getMinCVUsingFastVC( VVI V, int milliseconds,  VI init_vc = {}  );
+    static VI getMinCVUsingFastVC( VVI V, int milliseconds,  VI init_vc = {}, const bool use_basic_kernelization = true  );
 
 };
 

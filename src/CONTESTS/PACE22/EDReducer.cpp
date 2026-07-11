@@ -19,7 +19,11 @@ VI EDReducer::reduce(VVI V0) {
 
     VI reducible_nodes;
 
+    clog << "EDReducer - reducing graph with " << V0.size() << " nodes and " << GraphUtils::countEdges(V0) << " edges" << endl;
+
     if (write_logs) DEBUG(V);
+
+    // if (V.size() < 10) { clog << "Considering small graph" << endl; }
 
     { // clear all data for new call to [reduce]
         last_reduce_nodes_removed = last_reduce_edges_removed = 0;
@@ -30,8 +34,10 @@ VI EDReducer::reduce(VVI V0) {
 
     if (cnf.ed_use_node_removal) {
         for (int v : nodes) {
+            // clog << "\rConsidering node " << v << flush;
             if (consider({v})) {
-                if (write_logs) clog << "Node " << v << " is reducible!!!" << endl << endl << endl;
+                // if (write_logs)
+                    clog << "\t\tNode " << v << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
                 reducible_nodes.push_back(v);
                 GraphUtils::removeNodeFromGraph(V,v);
                 last_reduce_nodes_removed++;
@@ -57,7 +63,8 @@ VI EDReducer::reduce(VVI V0) {
             if ( consider({u,v}) ) {
                 clearAllForConsider();
                 GraphUtils::removeEdge(V,u,v);
-                clog << "\tRemoving edge " << PII(u,v) << " using ED for edge removal" << endl;
+                if (write_logs)
+                    clog << "\tRemoving edge " << PII(u,v) << " using ED for edge removal" << endl;
                 last_reduce_edges_removed++;
             }
         }
@@ -442,10 +449,16 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
                 // now removing V[w] from U and U1
                 for (int d : V[w]) was[d] = true;
                 for (int i=(int)U.size()-1; i>=0; i--) if ( was[U[i]] ) {
+                    // int c = 0; for ( int d : V[U1[i]] ) c += inW[d];
+                    // if (c == 0) continue; // #TEST - do not remove from U1 nodes that are in U0 - check if it is correct!!
+
                     nodes_removed_from_U.push_back(U[i]);
                     swap(U[i], U.back()); U.pop_back();
                 }
                 for (int i=(int)U1.size()-1; i>=0; i--) if ( was[U1[i]] ) {
+                    // int c = 0; for ( int d : V[U1[i]] ) c += inW[d];
+                    // if (c == 0) continue; // #TEST - do not remove from U1 nodes that are in U0 - check if it is correct!!
+
                     nodes_removed_from_U1.push_back(U1[i]);
                     swap(U1[i], U1.back()); U1.pop_back();
                 }
