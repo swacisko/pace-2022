@@ -80,7 +80,7 @@ public:
      *
      * When ed is applied at the end and no reducible node is found, edges are added according to type1-constraints
      */
-    int ed_application_mode = 0;
+    int ed_application_mode = 1;
 
     /**
      * Used for order in which nodes are considered by ED rule
