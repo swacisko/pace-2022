@@ -192,6 +192,7 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_s
     else {
         if ( response.status() == CpSolverStatus::INFEASIBLE ) clog << "CPSAT solver status INFEASIBLE" << endl;
         if ( response.status() == CpSolverStatus::MODEL_INVALID ) clog << "CPSAT solver status MODEL_INVALID" << endl;
+        if ( response.status() == CpSolverStatus::UNKNOWN ) clog << "CPSAT solver status UNKNOWN" << endl;
     }
 
     return {res,res_times};
@@ -215,7 +216,7 @@ pair<VI,VD> solveInstanceUsingSolver(VPII constraints, int max_time_sec, int res
             if (alg == "cpsat") return solveByCPSAT(constraints, max_time_sec, res_measure_freq_sec);
             if (alg == "evalmaxsat") return solveByEvalMaxSAT(constraints, max_time_sec, res_measure_freq_sec);
             if (alg == "highs") return solveByHIGHS(constraints, max_time_sec, res_measure_freq_sec);
-            if (alg == "fastvc" || alg == "numvc") return solveByFastVC( constraints, max_time_sec, res_measure_freq_sec);
+            if (alg == "numvc" || alg == "fastvc") return solveByFastVC( constraints, max_time_sec, res_measure_freq_sec);
             return pair<VI,VI>{};
         };
 
@@ -231,6 +232,7 @@ pair<VI,VD> solveInstanceUsingSolver(VPII constraints, int max_time_sec, int res
 
     for (int i=0; i<iteration_res_times.size(); i++ ) {
         const auto & irt = iteration_res_times[i];
+        assert(!irt.empty());
         if ( !irt.empty() ) res_times[i] = accumulate(ALL(irt),0.0) / irt.size();
 
     }
@@ -346,6 +348,14 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
         int noned_solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
         DEBUG(noned_solution_lift_overhead);
+        exp_data.red2_offset = exp_data.red1_offset + noned_solution_lift_overhead;
+
+        { // numvc/fastvc testing
+            auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red2_offset);
+            indg.remapNodes(fastvc_sol);
+            Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift);
+            assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
+        }
 
         VPII constraints = GraphUtils::getGraphEdges(indg.V);
         for (auto & [a,b] : constraints){a++; b++;}
@@ -356,12 +366,6 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         DEBUG(exp_data.noned_results);
         DEBUG(res.size());
 
-        exp_data.red2_offset = exp_data.red1_offset + noned_solution_lift_overhead;
-
-        auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red2_offset);
-        indg.remapNodes(fastvc_sol);
-        Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift);
-        assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
 
         writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
     }
@@ -414,10 +418,12 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         DEBUG(ed_solution_lift_overhead);
         exp_data.red3_offset = exp_data.red1_offset + ed_solution_lift_overhead;
 
-        auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red3_offset);
-        indg.remapNodes(fastvc_sol);
-        Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift);
-        assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
+        { // numvc/fastvc testing
+            auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red3_offset);
+            indg.remapNodes(fastvc_sol);
+            Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift);
+            assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
+        }
 
 
         // now solve the reduced problem using constraints...
