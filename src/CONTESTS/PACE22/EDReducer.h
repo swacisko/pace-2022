@@ -74,7 +74,16 @@ private:
     bool check_double_ed = false;
 
 
+    /**
+     * Counts and returns |N(u) \setminus W|
+     */
+    int getNonWNeighborhoodSize(int u);
+    bool hasNonWIntersectionAtMost( int u, int val ){ return getNonWNeighborhoodSize(u) <= val; }
 
+    /**
+     * Coutns and returns |N(u) \cap S|
+     */
+    int getSIntersection(int u);
 
     /**
      * Checks whether node u can be safely added to the solution.

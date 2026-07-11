@@ -329,7 +329,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         Config cnf;
         cnf.disableAllNonbasicReductions();
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
-        cnf.reducer_use_unconfined =  cnf.reducer_use_twins_merge = cnf.reducer_use_domination = true;
+        cnf.reducer_use_unconfined = true;
+        cnf.reducer_use_twins_merge = cnf.reducer_use_domination = true;
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10;
         Reducer red(V,cnf);
         auto to_lift = red.reduce();
@@ -377,7 +378,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.reducer_max_time_millis = 1e9;
         cnf.disableAllNonbasicReductions();
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
-        cnf.reducer_use_unconfined =  cnf.reducer_use_twins_merge = cnf.reducer_use_domination = true;
+        cnf.reducer_use_unconfined = true;
+        cnf.reducer_use_twins_merge = cnf.reducer_use_domination = true;
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10;
         cnf.reducer_use_ed = true;
         cnf.ed_consider_nodes_to_move_outside_NW = true;
@@ -506,9 +508,9 @@ int main() {
 
     // int solver_max_time_sec = 300;
     // int solver_time_granularity = 10;
-    int solver_max_time_sec = 7;
+    int solver_max_time_sec = 10;
     int solver_time_granularity = 1;
-    int solver_repeats = 2;
+    int solver_repeats = 1;
     string alg = "cpsat";
 
     auto exp_data = runVCTestforGraph(V,  solver_max_time_sec, solver_time_granularity,solver_repeats, alg);

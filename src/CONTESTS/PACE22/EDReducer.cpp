@@ -19,7 +19,7 @@ VI EDReducer::reduce(VVI V0) {
 
     VI reducible_nodes;
 
-    clog << "EDReducer - reducing graph with " << V0.size() << " nodes and " << GraphUtils::countEdges(V0) << " edges" << endl;
+    // clog << "EDReducer - reducing graph with " << V0.size() << " nodes and " << GraphUtils::countEdges(V0) << " edges" << endl;
 
     if (write_logs) DEBUG(V);
 
@@ -33,7 +33,7 @@ VI EDReducer::reduce(VVI V0) {
     }
 
     if (cnf.ed_use_node_removal) {
-        for (int v : nodes) {
+        for (int v : nodes) if (!V[v].empty()) {
             // clog << "\rConsidering node " << v << flush;
             if (consider({v})) {
                 // if (write_logs)
@@ -58,7 +58,7 @@ VI EDReducer::reduce(VVI V0) {
     }
 
     if (cnf.ed_use_edge_removal) {
-        for (int u : nodes) for ( int v : V[u] ) {
+        for (int u : nodes)  if (!V[u].empty()) for ( int v : V[u] ) {
             // clog << "Considering edge " << PII(u,v) << " for ED-edge-removal" << endl;
             if ( consider({u,v}) ) {
                 clearAllForConsider();
@@ -85,6 +85,14 @@ void EDReducer::resetAllUsedTechniques() {
     cnf.ed_apply_type1_constraints_on_the_fly = false;
     cnf.ed_use_edge_insertion = false;
     cnf.ed_use_extended_edges_insertion = false;
+}
+
+int EDReducer::getNonWNeighborhoodSize(int u) {
+    return accumulate(ALL(V[u]), 0, [&](int s, auto v) {return s + !inW[v];} );
+}
+
+int EDReducer::getSIntersection(int u) {
+    return accumulate(ALL(V[u]), 0, [&](int s, auto v) {return s + inS[v];} );
 }
 
 bool EDReducer::consider(VI initS) {
@@ -226,9 +234,12 @@ void EDReducer::updateU1() {
 void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
 
     // for (int u : W) for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear
-    for (int u : U1) for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
-        marked[u] = marked[w] = marked[d] = false;
-        cnt[u] = cnt[w] = cnt[d] = 0;
+    // for (int u : U1) {
+    for (int u : U1) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
+        for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
+            marked[u] = marked[w] = marked[d] = false;
+            cnt[u] = cnt[w] = cnt[d] = 0;
+        }
     }
 
     checkEmptyArraysAssertions(check_double_ed, !check_double_ed); // we check all arrays, including the marked array, which should be empty here
@@ -237,15 +248,14 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         for (int u : U1) {
             if (V[u].empty()) continue;
 
-            int _c = 0;
-            for (int w : V[u]) if (!inW[w]) {
-                _c++;
-                for (int d : V[w]) cnt[d]++;
-            }
+            int nonw_neigh_size = getNonWNeighborhoodSize(u);
+            if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
+
+            for (int w : V[u]) if (!inW[w]) for (int d : V[w]) cnt[d]++;
 
             for ( int w : V[u] ) if (!inW[w]) {
-                for ( int d : V[w] ) if ( !inW[d] && cnt[d] == _c ) {
-                    if (write_logs) clog << "\t\tmarking node d = " << d << " for u = " << u << ", _c: " << _c << endl;
+                for ( int d : V[w] ) if ( !inW[d] && cnt[d] == nonw_neigh_size ) {
+                    if (write_logs) clog << "\t\tmarking node d = " << d << " for u = " << u << ", _c: " << nonw_neigh_size << endl;
                     marked[d] = true;
                 }
                 break; // we need only 1 node to mark the intersection, so we can break here
@@ -264,16 +274,16 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
             for ( int d : V[u] ) empty_S_inters &= !inS[d];
             if (!empty_S_inters) continue;
 
-            int neigh_size = 0;
-            for ( int w : V[u] ) if ( !inW[w] ) {
-                helper[w] = true; // marking N(u) \setminus W
-                neigh_size++;
-            }
+            int nonw_neigh_size = getNonWNeighborhoodSize(u);
+            if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
+
+            for ( int w : V[u] ) if ( !inW[w] ) helper[w] = true; // marking N(u) \setminus W
+
             for ( int w : V[u] ) if (!inW[w]) {
                 int c = 1;
                 for (int d : V[w]) if ( helper[d] ) c++;
-                assert(c <= neigh_size);
-                if (c == neigh_size) {
+                assert(c <= nonw_neigh_size);
+                if (c == nonw_neigh_size) {
                     if (write_logs) clog << "\t\t\tmarking node " << w << " to move to U using same-neighborhood-rule for node u = " << u  << endl;
                     marked[w] = true;
                 }
@@ -291,6 +301,9 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
             bool empty_S_inters = true;
             for ( int d : V[u] ) empty_S_inters &= !inS[d];
             if (!empty_S_inters) continue;
+
+            int nonw_neigh_size = getNonWNeighborhoodSize(u);
+            if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
 
             T.clear(); vis.clear();
             for (int w : V[u]) if (!inW[w]) T.push_back(w); // now T contains N(u) \ W
@@ -350,9 +363,8 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         {
             // create candidates here...
             for ( int u : U1 ) {
-                int c = 0;
-                for (int w : V[u]) c += !inW[w];
-                if ( c > 7 ) continue;
+                int nonw_neigh_size = getNonWNeighborhoodSize(u);
+                if (nonw_neigh_size > min(cnf.ed_ext_dom_max_node_neigh,7)  ) continue;
 
                 // enable candidates from N(W)
                 for ( int w : V[u] ) if (!inW[w]) if (!inW[w] && !was[w]) { was[w] = true; candidates.push_back(w); }
@@ -505,12 +517,18 @@ VI EDReducer::findNodesToMoveToU() {
     nodes_to_move_to_U.reserve(W.size());
 
     if(cnf.ed_consider_nodes_to_move_outside_NW) {
-        for ( int u : U1 ) for (int w : V[u]) {
-            if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
-            for( int d : V[w] ) if(!inW[d] && marked[d]) nodes_to_move_to_U.push_back(d);
+        // for ( int u : U1 ) {
+        for ( int u : U1 ) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
+            for (int w : V[u]) {
+                if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
+                for( int d : V[w] ) if(!inW[d] && marked[d]) nodes_to_move_to_U.push_back(d);
+            }
         }
     }else {
-        for ( int u : U1 ) for (int w : V[u]) if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
+        // for ( int u : U1 ) {
+        for ( int u : U1 ) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
+            for (int w : V[u]) if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
+        }
     }
 
     StandardUtils::makeUnique(nodes_to_move_to_U);
@@ -613,8 +631,11 @@ void EDReducer::clearAllForConsider() {
     }
 
     if (cnf.ed_consider_nodes_to_move_outside_NW) {
-        for (int d0 : W) for (int d1 : V[d0]) for (int d : V[d1]) {
-            inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
+        // for (int d0 : W) {
+        for (int d0 : W) if (hasNonWIntersectionAtMost(d0,cnf.ed_ext_dom_max_node_neigh)) {
+            for (int d1 : V[d0]) for (int d : V[d1]) {
+                inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
+            }
         }
     }
     inf_rules_1.clear();

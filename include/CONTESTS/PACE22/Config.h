@@ -88,7 +88,7 @@ public:
      * 1 - sort nodes considered in ED by degrees, largest to smallest
      * 2 - sort nodes considered in ED by degrees, smallest to largest
      */
-    int ed_node_sorting_mode = 0;
+    int ed_node_sorting_mode = 1;
 
     /**
      * Order in which nodes in
@@ -158,6 +158,11 @@ public:
      * This is the default check and should be set to true, unless you really need to disable that for some reason.
      */
     bool ed_use_node_removal = true;
+
+    /**
+     * Only nodes u \in U1 with |N(u) \setminus W| <= ed_ext_dom_max_node_neigh will be considered
+     */
+    int ed_ext_dom_max_node_neigh = 10;
 
     /**
      * If true, then in the Reducer there will be at the very end considered adding edges to the graph on the fly

@@ -605,6 +605,8 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             && ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) )){
             ed_rules_checked++;
 
+            // clog << "Running ED node removal rules in POINT-1" << endl;
+
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
             edred.cnf.ed_use_node_removal = true;
@@ -1136,6 +1138,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         // standard node-removal version
         if(is_pi_graph && cnf.reducer_use_ed && cnf.ed_use_node_removal){
             ed_rules_checked++;
+            clog << "Running ED node removal rules in POINT-2" << endl;
 
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
