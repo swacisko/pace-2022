@@ -386,7 +386,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.ed_use_same_neigh_domination = true;
         cnf.ed_use_deficit1_domination = true;
 
-        cnf.ed_use_double_ed_checks = false; // time-consuming, especially for denser graphs...
+        cnf.ed_use_double_ed_checks = false; // time-consuming, especially for denser graphs... use for sparse graphs only
         // cnf.ed_use_edge_removal = true;
 
         Reducer red(V,cnf);

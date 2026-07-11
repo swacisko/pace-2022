@@ -391,7 +391,10 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         }
 
         auto clearMarked = [&](VB & marked) {
-            for (int u : W) for (int w : V[u]) for ( int d : V[w] ) marked[u] = marked[w] = marked[d] = false;
+            // for (int u : W)
+            for (int u : W) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
+                for (int w : V[u]) for ( int d : V[w] ) marked[u] = marked[w] = marked[d] = false;
+            }
         };
 
         VI neigh_not_in_W;
