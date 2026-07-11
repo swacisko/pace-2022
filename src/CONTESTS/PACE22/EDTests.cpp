@@ -146,6 +146,8 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_s
 
     vector<BoolVar> nodes;
     for (int i=0; i<N+1; i++) nodes.push_back(model.NewBoolVar());
+    model.AddEquality(nodes[0], 0);
+
     for ( auto [a,b] : constraints ) {
         vector<BoolVar> cnstr; cnstr.reserve(2);
 
@@ -171,7 +173,7 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_s
             // clog << "Found new results of size " << cnt << " at time " << t << " seconds " << endl;
 
             int ind = ceil(1.0 * t / res_measure_freq_sec);
-            res_times[ind] = cnt;
+            if ( ind < res_times.size() ) res_times[ind] = cnt;
             log_mutex.unlock();
         }
     ));
@@ -194,6 +196,8 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_s
         if ( response.status() == CpSolverStatus::MODEL_INVALID ) clog << "CPSAT solver status MODEL_INVALID" << endl;
         if ( response.status() == CpSolverStatus::UNKNOWN ) clog << "CPSAT solver status UNKNOWN" << endl;
     }
+
+    clog << "Returning results found by cpsat, res.size() " << res.size() << ", res_times: " << res_times << endl;
 
     return {res,res_times};
 }
@@ -223,6 +227,7 @@ pair<VI,VD> solveInstanceUsingSolver(VPII constraints, int max_time_sec, int res
         auto [iter_res, iter_res_times] = solve();
         if (res.empty() || iter_res.size() < res.size()) res = iter_res;
         assert(iter_res_times.size() == I);
+
         for ( int i=0; i<I; i++ ) {
             assert(i < iter_res_times.size());
             assert(i < iteration_res_times.size());
@@ -516,7 +521,7 @@ int main() {
     // int solver_time_granularity = 10;
     int solver_max_time_sec = 10;
     int solver_time_granularity = 1;
-    int solver_repeats = 1;
+    int solver_repeats = 2;
     string alg = "cpsat";
 
     auto exp_data = runVCTestforGraph(V,  solver_max_time_sec, solver_time_granularity,solver_repeats, alg);
