@@ -87,7 +87,7 @@ def createTablesAndRankings():
 all_tests_commands = []
 
 
-algorithms = ["ihs", "mtz", "diverses", "dreyfvs"]
+algorithms = ["ihs", "mtz", "diverses", "dreyfvs", "ihs0", "mtz0"]
 cycle_enumeration_types = [1,2,3]
 mtz_cycle_augmentation = [0,1,2]
 pi_arcs_percentage = np.arange(0.00, 0.31, 0.05)
