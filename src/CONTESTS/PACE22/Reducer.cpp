@@ -611,6 +611,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             cnf.reducer_use_ed && cnf.ed_use_node_removal
             && ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) )){
             ed_rules_checked++;
+            Stopwatch s; string opt = "ED node removal"; s.start(opt);
 
             // clog << "Running ED node removal rules in POINT-1" << endl;
 
@@ -629,6 +630,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
             modified |= edred.madeChangesInLastReduce();
 
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             if(modified) continue;
         }
 
@@ -1010,7 +1012,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
             if(write_progress_on_the_fly) DEBUG(total_twins_merged);
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-            modified |= true;
+            modified |= mod;
             if(modified) continue;
         }
 
