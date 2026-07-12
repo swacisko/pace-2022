@@ -180,7 +180,8 @@ public:
 
     int reducer_simple_cycle_max_branch_depth = 50; // set this to 1e9 to make full search for simple cycles
 
-    int reducer_max_time_millis = 60'000; // one minute max reduction time
+    // int reducer_max_time_millis = 60'000; // one minute max reduction time
+    int reducer_max_time_millis = 1e9; // no time limit by default
 
 
     int reducer_nonsimple_cycle_arcs_full_max_time_millis_per_arc = 100;

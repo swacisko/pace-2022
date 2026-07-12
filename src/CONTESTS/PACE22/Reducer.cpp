@@ -424,12 +424,18 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
     do{
 
         if(Utils::isPIGraph(V, revV, helper)){
+            Stopwatch s; string opt = "basic_kern"; s.start(opt);
             VVI Vcp = V;
             KernelizerVC kern;
             auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
             addKNR(kern_nodes);
             Utils::removeNodes(V, revV, kern_nodes,helper);
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
         }
+
+
+        // Stopwatch s; string opt = "basic_kern"; s.start(opt);
+        // s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
 
         if(write_progress_on_the_fly){
@@ -586,12 +592,13 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_unconfined && Utils::isPIGraph(V, revV, helper)){
-            //TimeMeasurer::start("Reducer::unconfined");
+            Stopwatch s; string opt = "unconfined"; s.start(opt);
             VI uncon = unconfined();
             addKNR(uncon);
             total_unconfined_nodes += uncon.size();
             Utils::removeNodes(V, revV, uncon, helper);
-            //TimeMeasurer::stop("Reducer::unconfined");
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
             if(!modified) modified = (!uncon.empty());
             if(modified) continue;
         }
@@ -627,11 +634,13 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
 
         if(cnf.reducer_use_folding){
-            //TimeMeasurer::start("Reducer::folding");
+            Stopwatch s; string opt = "folding"; s.start(opt);
             auto folds = folding();
             if(write_progress_on_the_fly) DEBUG(total_folds_done);
             total_folds_done += folds.size();
             if(write_progress_on_the_fly) DEBUG(total_folds_done);
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
             if(!folds.empty()) modified = true;
 
             { // add to resulting kernelization objects
@@ -651,7 +660,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         }
 
         if(cnf.reducer_use_folding_twins) {
-            //TimeMeasurer::start("Reducer::folding_twins");
+            Stopwatch s; string opt = "folding twins"; s.start(opt);
             auto [twin_folds, to_remove] = foldingTwins();
             if (write_progress_on_the_fly) DEBUG(total_twin_folds_done);
             total_twin_folds_done += twin_folds.size() + to_remove.size();
@@ -659,18 +668,18 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             addKNR(to_remove);
             Utils::removeNodes(V, revV, to_remove, helper);
             if(!modified) modified = (!twin_folds.empty() || !to_remove.empty());
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
             { // add to resulting kernelization objects
                 if (knr != nullptr) { res.push_back(knr); knr = nullptr; }
                 for (auto *x : twin_folds) res.push_back(x);
             }
 
-            //TimeMeasurer::stop("Reducer::folding_twins");
             if(modified) continue;
         }
 
         if(cnf.reducer_use_desk){
-            //TimeMeasurer::start("Reducer::desk");
+            Stopwatch s; string opt = "desk"; s.start(opt);
             auto [desk_folds, desk_dominations, arc_diff] = desk();
             total_desk_folds += desk_folds.size();
             total_desk_dominations += desk_dominations.size();
@@ -682,13 +691,15 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             }
             if(!modified) modified = ( !desk_folds.empty() || !desk_dominations.empty() || arc_diff );
 
-            //TimeMeasurer::stop("Reducer::desk");
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             if(modified) continue;
         }
 
         if(cnf.reducer_use_funnel){
+            Stopwatch s; string opt = "funnel"; s.start(opt);
             if(!cnf.reducer_use_domination){
-                clog << "CAUTION! Calling funnel reduction without domination rule before!" << endl;
+                bool is_pi_graph = Utils::isPIGraph(V, revV, helper);
+                if (!is_pi_graph) clog << "CAUTION! Calling funnel reduction without domination rule before!" << endl;
             }
             //TimeMeasurer::start("Reducer::funnel");
             if(write_progress_on_the_fly) DEBUG(total_funnels_done);
@@ -698,14 +709,11 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if(!funnels.empty()) modified = true;
 
             { // add to resulting kernelization objects
-                if(knr != nullptr){
-                    res.push_back(knr);
-                    knr = nullptr;
-                }
+                if(knr != nullptr){ res.push_back(knr); knr = nullptr; }
                 for(auto *x : funnels) res.push_back(x);
             }
 
-            //TimeMeasurer::stop("Reducer::funnel");
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             if(modified) continue;
         }
 
@@ -805,16 +813,16 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
 
 
-        if( Utils::isPIGraph(V, revV, helper) ){
-            //TimeMeasurer::start("Reducer::LP_relaxation");
-            VVI Vcp = V;
-            KernelizerVC kern;
-            auto [kern_nodes, edges_removed] = kern.lpDecomposition(Vcp);
-            addKNR(kern_nodes);
-            Utils::removeNodes(V, revV, kern_nodes,helper);
-            //TimeMeasurer::stop("Reducer::LP_relaxation");
-            if(!modified) modified = (!kern_nodes.empty());
-        }
+        // if( Utils::isPIGraph(V, revV, helper) ){
+        //     //TimeMeasurer::start("Reducer::LP_relaxation");
+        //     VVI Vcp = V;
+        //     KernelizerVC kern;
+        //     auto [kern_nodes, edges_removed] = kern.lpDecomposition(Vcp);
+        //     addKNR(kern_nodes);
+        //     Utils::removeNodes(V, revV, kern_nodes,helper);
+        //     //TimeMeasurer::stop("Reducer::LP_relaxation");
+        //     if(!modified) modified = (!kern_nodes.empty());
+        // }
 
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
@@ -904,7 +912,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         }
 
         if(cnf.reducer_use_general_folding){
-            //TimeMeasurer::start("Reducer::general_folding");
+            Stopwatch s; string opt = "general folding"; s.start(opt);
             auto reductions = generalFolding();
             total_general_folds_done += reductions.size();
             if(!modified) modified = (!reductions.empty());
@@ -914,7 +922,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
                 for(auto *x : reductions) res.push_back(x);
             }
 
-            //TimeMeasurer::stop("Reducer::general_folding");
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             if(modified) continue;
         }
 
@@ -991,7 +999,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
         if(cnf.reducer_use_twins_merge){
-            //TimeMeasurer::start("Reducer::twins");
+            Stopwatch s; string opt = "twins merge"; s.start(opt);
             if(write_progress_on_the_fly) DEBUG(total_twins_merged);
 
             double millis_done = chrono::duration<double, std::milli >
@@ -1001,9 +1009,9 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             bool mod = mergeTwins(millis_left);
 
             if(write_progress_on_the_fly) DEBUG(total_twins_merged);
-            //TimeMeasurer::stop("Reducer::twins");
-            if(mod) modified = true;
-            if(mod) continue;
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+            modified |= true;
+            if(modified) continue;
         }
 
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
@@ -1138,6 +1146,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         // standard node-removal version
         if(is_pi_graph && cnf.reducer_use_ed && cnf.ed_use_node_removal){
             ed_rules_checked++;
+            Stopwatch s; string opt = "ED node removal"; s.start(opt);
             clog << "Running ED node removal rules in POINT-2" << endl;
 
             EDReducer edred(V.size(), cnf);
@@ -1154,6 +1163,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if (edred.madeChangesInLastReduce())  V = revV = edred.getV();
             modified |= edred.madeChangesInLastReduce();
 
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             if(modified) continue;
         }
 
@@ -1162,6 +1172,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         // if (false)
         if (is_pi_graph && cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
             ed_rules_checked++;
+            Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
             clog << "Running ED with edge insertion" << endl;
 
             EDReducer edred(V.size(), cnf);
@@ -1181,6 +1192,8 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
             modified |= edred.madeChangesInLastReduce();
+
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             if(modified) continue;
         }
 
@@ -2410,6 +2423,9 @@ void Reducer::writeTotals() {
     DEBUG(ed_t1_inference_rules_added);
     DEBUG(ed_total_t2_inference_rules_created);
     DEBUG(ed_t2_inference_rules_added);
+
+    clog << "Reduction times (sec.): " << endl;
+    for ( auto [k,v] : reduction_times_millis ) clog << k << " -> " << v / 1000.0 << endl;
     ENDL(1);
 }
 
@@ -3768,14 +3784,14 @@ bool Reducer::mixedDominationFull() {
     return changes_done;
 }
 
-void Reducer::liftSolution(int N, VI &dfvs, vector<DFVSReduction *> &reductions) {
+void Reducer::liftSolution(int N, VI &dfvs, vector<DFVSReduction *> &reductions, bool clear_reductions) {
     VB in_dfvs = StandardUtils::toVB(N, dfvs);
 
     for( int i = (int)reductions.size()-1; i>=0; i-- ){
         reductions[i]->lift(dfvs, in_dfvs);
     }
 
-    clearReductionObjects(reductions);
+    if (clear_reductions) clearReductionObjects(reductions);
 }
 
 void Reducer::clearReductionObjects(vector<DFVSReduction *> &reductions) {

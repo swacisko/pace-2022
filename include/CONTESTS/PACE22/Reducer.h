@@ -489,7 +489,7 @@ public:
 
     void disableAllConditionalReductions();
 
-    static void liftSolution( int N, VI & dfvs, vector<DFVSReduction*> & reductions );
+    static void liftSolution( int N, VI & dfvs, vector<DFVSReduction*> & reductions, bool clear_reductions = true );
 
     static int getReductionsSizeDiff( vector<DFVSReduction*> & reductions );
 
@@ -505,6 +505,8 @@ public:
     VVI revV;
     int N;
     VLL hashes;
+
+    map<string,int> reduction_times_millis;
 
     int total_nonsimple_cycle_arcs_removed = 0;
     int total_nonsimple_cycle_arcs_full_removed = 0;
