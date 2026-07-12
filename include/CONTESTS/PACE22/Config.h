@@ -14,8 +14,7 @@ public:
     //************************************************************************************ REDUCER
 
 
-    bool reducer_use_twins_merge = false;
-    bool reducer_use_inoutclique = false;
+    bool reducer_use_twins = false;
     bool reducer_use_folding = false;
     bool reducer_use_general_folding = false;
     bool reducer_use_folding_twins = false;
@@ -26,6 +25,16 @@ public:
     bool reducer_use_funnel = false;
     bool reducer_use_domination = false;
 
+    /**
+     * If true, then fast primary reduction will be used before the graph is induced by the nonisolated nodes.
+     */
+    bool reducer_use_primary_reduce = true;
+
+
+    /**
+     * Secondary reductions
+     */
+    static constexpr bool reducer_use_secondary_reduce = true;
 
     //******************************************************************** ED
     bool reducer_use_ed = false;
@@ -147,8 +156,7 @@ public:
 
 
     void enableAllReductions(){
-        reducer_use_inoutclique = true;
-        reducer_use_twins_merge = true;
+        reducer_use_twins = true;
         reducer_use_folding = true;
         reducer_use_general_folding = true;
         reducer_use_folding_twins = true;
@@ -161,8 +169,7 @@ public:
     }
 
     void disableAllNonbasicReductions(){
-        reducer_use_inoutclique = false;
-        reducer_use_twins_merge = false;
+        reducer_use_twins = false;
         reducer_use_folding = false;
         reducer_use_general_folding = false;
         reducer_use_folding_twins = false;
@@ -184,14 +191,10 @@ public:
     }
 
     void disableAllRecursiveReductions(){
-        reducer_use_twins_merge = false;
+        reducer_use_twins = false;
         reducer_use_general_folding = false;
     }
 
-
-    Stopwatch sw;
-
-    bool tle(){ return sw.tle("main"); }
 
     bool write_logs = true;
 };

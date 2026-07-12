@@ -14,29 +14,45 @@
 
 using namespace Utils;
 
-Reducer::Reducer(VVI &V, Config c) : origN(V.size()) {
+Reducer::Reducer(VPII edges, Config c) : origN(V.size()) {
     cnf = c;
-    this->V = V;
-    N = V.size();
-
-    hashes = VLL(N);
-    UniformIntGenerator rnd(0,1'000'000'000ll * 1'000'000'000);
-    for(int i=0; i<N; i++) hashes[i] = rnd.rand();
+    primary_edges = edges;
+    primaryN = 0;
+    for ( auto [a,b] : edges ) primaryN = max(primaryN, max(a,b)+1);
 }
 
 
-vector<VCReduction*> Reducer::reduce() {
+ReducedInstance Reducer::reduce() {
+    ReducedInstance reduced_instance;
+    reduced_instance.cnf = cnf;
+    reduced_instance.primaryN = primaryN;
+
+    tie( V, reduced_instance.primary_indg_nodes, reduced_instance.primary_liftables) = primaryReduce(primary_edges);
+    tie( reduced_instance.resV, reduced_instance.secondary_indg_nodes, reduced_instance.secondary_liftables) = secondaryReduce();
+
+    return reduced_instance;
+}
+
+
+tuple<VVI, VI, vector<VCReduction*>> Reducer::primaryReduce(VPII & edges) {
+    assert(false && "Implement fast primaryReduce");
+
+    return {};
+}
+
+
+
+tuple<VVI, VI, vector<VCReduction*>> Reducer::secondaryReduce() {
     constexpr bool debug = false;
     constexpr bool write_progress_on_the_fly = false;
 
-    VVI prevV = V;
     bool modified;
 
 
     auto reducer_start_time = chrono::steady_clock::now();
     VB helper(N,false);
 
-    vector<VCReduction*> res;
+    vector<VCReduction*> secondary_reduce_liftables;
     KernelizedNodesReduction * knr = nullptr;
 
     auto addKNR = [&]( VI nodes ){
@@ -45,14 +61,21 @@ vector<VCReduction*> Reducer::reduce() {
         else knr->addToKer(nodes);
     };
 
+    auto addLiftables = [&]( auto liftables ) {
+        if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr; }
+        for(auto *x : liftables) secondary_reduce_liftables.push_back(x);
+    };
+
     function<void()> applyBasicReductions = [&](){
-        Stopwatch s; string opt = "basic_kern"; s.start(opt);
         VVI Vcp = V;
         KernelizerVC kern;
+
+        Stopwatch s; string opt = "basic_kern"; s.start(opt);
         auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
+        s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
         addKNR(kern_nodes);
         GraphUtils::removeNodes(V, kern_nodes,helper);
-        s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
     };
 
 
@@ -76,11 +99,11 @@ vector<VCReduction*> Reducer::reduce() {
         if(cnf.reducer_use_unconfined){
             Stopwatch s; string opt = "unconfined"; s.start(opt);
             VI uncon = unconfined();
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
             addKNR(uncon);
             total_unconfined_nodes += uncon.size();
-            // Utils::removeNodes(V, revV, uncon, helper);
             GraphUtils::removeNodes(V, uncon, helper);
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
             if(!modified) modified = (!uncon.empty());
             if(modified) continue;
@@ -91,14 +114,16 @@ vector<VCReduction*> Reducer::reduce() {
         bool ed_application_cond =  ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) );
         if( cnf.reducer_use_ed && cnf.ed_use_node_removal && ed_application_cond){
             ed_rules_checked++;
-            Stopwatch s; string opt = "ED node removal"; s.start(opt);
             // clog << "Running ED node removal rules in POINT-1" << endl;
 
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
             edred.cnf.ed_use_node_removal = true;
 
+            Stopwatch s; string opt = "ED node removal"; s.start(opt);
             VI res = edred.reduce(V);
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
             assert(res.size() == edred.last_reduce_nodes_removed);
             ed_nodes_reduced += edred.last_reduce_nodes_removed;
             ed_edges_removed += edred.last_reduce_edges_removed;
@@ -109,7 +134,6 @@ vector<VCReduction*> Reducer::reduce() {
             if (edred.madeChangesInLastReduce())  V = edred.getV();
             modified |= edred.madeChangesInLastReduce();
 
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             if(modified) continue;
         }
 
@@ -117,17 +141,19 @@ vector<VCReduction*> Reducer::reduce() {
         if(cnf.reducer_use_folding){
             Stopwatch s; string opt = "folding"; s.start(opt);
             auto folds = folding();
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
             if(write_progress_on_the_fly) DEBUG(total_folds_done);
             total_folds_done += folds.size();
             if(write_progress_on_the_fly) DEBUG(total_folds_done);
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
             if(!folds.empty()) modified = true;
 
-            { // add to resulting kernelization objects
-                if(knr != nullptr){ res.push_back(knr); knr = nullptr; }
-                for(auto *x : folds) res.push_back(x);
-            }
+            // { // add to resulting kernelization objects
+            //     if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr; }
+            //     for(auto *x : folds) secondary_reduce_liftables.push_back(x);
+            // }
+            addLiftables(folds);
 
             assert( GraphUtils::isSimple(V) );
 
@@ -155,38 +181,35 @@ vector<VCReduction*> Reducer::reduce() {
 
         if(cnf.reducer_use_desk){
             Stopwatch s; string opt = "desk"; s.start(opt);
-            auto [desk_folds, desk_dominations, arc_diff] = desk();
-            total_desk_folds += desk_folds.size();
-            total_desk_dominations += desk_dominations.size();
-            total_desk_arcs_added += arc_diff;
-            addKNR(desk_dominations);
-            { // add to resulting kernelization objects
-                if(knr != nullptr){ res.push_back(knr); knr = nullptr; }
-                for(auto *x : desk_folds) res.push_back(x);
-            }
-            if(!modified) modified = ( !desk_folds.empty() || !desk_dominations.empty() || arc_diff );
-
+            vector<VCReduction*> desk_liftables = desk();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
+            for (auto l : desk_liftables) {
+                if ( l->name() == "desk" ) total_desk_folds++;
+                if ( l->name() == "knr" ) total_desk_dominations += l->offset();
+            }
+            addLiftables(desk_liftables);
+
+            modified |= !desk_liftables.empty();
             if(modified) continue;
         }
 
         if(cnf.reducer_use_funnel){
-            Stopwatch s; string opt = "funnel"; s.start(opt);
             if(!cnf.reducer_use_domination){
                 clog << "CAUTION! Calling funnel reduction without domination rule before!" << endl;
             }
             if(write_progress_on_the_fly) DEBUG(total_funnels_done);
-            auto funnels = funnel();
-            total_funnels_done += funnels.size();
-            if(write_progress_on_the_fly) DEBUG(total_funnels_done);
-            if(!funnels.empty()) modified = true;
 
-            { // add to resulting kernelization objects
-                if(knr != nullptr){ res.push_back(knr); knr = nullptr; }
-                for(auto *x : funnels) res.push_back(x);
-            }
-
+            Stopwatch s; string opt = "funnel"; s.start(opt);
+            auto funnel_liftables = funnel();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
+            total_funnels_done += funnel_liftables.size();
+            if(write_progress_on_the_fly) DEBUG(total_funnels_done);
+
+           addLiftables(funnel_liftables);
+
+            modified |= !funnel_liftables.empty();
             if(modified) continue;
         }
 
@@ -208,8 +231,8 @@ vector<VCReduction*> Reducer::reduce() {
             if(!modified) modified = (!reductions.empty());
 
             { // add to resulting kernelization objects
-                if(knr != nullptr){ res.push_back(knr); knr = nullptr; }
-                for(auto *x : reductions) res.push_back(x);
+                if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr; }
+                for(auto *x : reductions) secondary_reduce_liftables.push_back(x);
             }
 
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
@@ -217,15 +240,16 @@ vector<VCReduction*> Reducer::reduce() {
         }
 
 
-        if(cnf.reducer_use_twins_merge){
+        if(cnf.reducer_use_twins){
             Stopwatch s; string opt = "twins merge"; s.start(opt);
             if(write_progress_on_the_fly) DEBUG(total_twins_merged);
 
-            bool mod = mergeTwins();
+            vector<VCReduction*> liftables = twins();
+            secondary_reduce_liftables += liftables;
 
             if(write_progress_on_the_fly) DEBUG(total_twins_merged);
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-            modified |= mod;
+            modified |= !liftables.empty();
             if(modified) continue;
         }
 
@@ -289,30 +313,22 @@ vector<VCReduction*> Reducer::reduce() {
 
     if(debug){ DEBUG(V);}
 
-    if(knr != nullptr){ res.push_back(knr); knr = nullptr;}
-    return res;
+    if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr;}
+
+    InducedGraph indg = GraphInducer::induceByNonisolatedNodes(V);
+
+    return make_tuple(indg.V, indg.nodes, secondary_reduce_liftables);
 }
 
-
-
-
-
-
-
-
-
-pair<vector<FoldingTwinReduction*>, VI> Reducer::foldingTwins() {
-
-}
-
-bool Reducer::mergeTwins() {
-    assert(false && "Implement twin merging");
-
+vector<VCReduction*> Reducer::twins() {
+    assert(false && "Implement folding twins");
+    return {};
 }
 
 
 vector<FoldingReduction*> Reducer::folding() {
-
+    assert(false && "folding should be implemented in primary reductions");
+    return {};
 }
 
 
@@ -400,7 +416,7 @@ VI Reducer::convertKernelizedReductions(vector<VCReduction *> &reductions) {
 
 int Reducer::getReductionsOffset(vector<VCReduction *> &reductions) {
     int res = 0;
-    for(auto * x : reductions) res += x->sizeOffset();
+    for(auto * x : reductions) res += x->offset();
     return res;
 }
 
@@ -409,10 +425,15 @@ void Reducer::writeReductions(vector<VCReduction *> &reductions) {
     for(auto * x : reductions) clog << x->toString() << endl;
 }
 
+void Reducer::createVFromEdges(VPII & edges) {
+    int N = 0;
+    for (auto [a,b] : edges) N = max(N, max(a,b)+1);
+    V.resize(N);
+    for (auto [a,b] : edges) GraphUtils::addEdge(V,a,b);
+}
 
 
-
-tuple<vector<DeskReduction*>,VI, int> Reducer::desk(){
+vector<VCReduction*> Reducer::desk(){
    assert(false && "Implement desk efficiently for VC - both the desk domination and desk folding");
 }
 

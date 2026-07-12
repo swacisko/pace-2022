@@ -339,23 +339,24 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.disableAllNonbasicReductions();
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined = true;
-        cnf.reducer_use_twins_merge = true;
-        // cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10; // original
+        cnf.reducer_use_twins = true;
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
-        Reducer red(V,cnf);
-        auto to_lift = red.reduce();
+        auto edges = GraphUtils::getGraphEdges(V);
+        Reducer red(edges,cnf);
+        auto reduced_instance = red.reduce();
+
         sw.stop("main");
         red.writeTotals();
         clog << "Full NON-ED graph reduction took " << sw.getTime("main") / 1000 << " seconds" << endl;
 
         exp_data.red_noned_time_millis = exp_data.red_init_time_millis + sw.getTime("main");
 
-        auto indg = GraphInducer::induceByNonisolatedNodes(red.V);
+        auto indg = GraphInducer::induceByNonisolatedNodes(reduced_instance.getV());
         exp_data.N2 = indg.V.size();
         exp_data.M2 = GraphUtils::countEdges(indg.V);
         DEBUG(PII(exp_data.N2,exp_data.M2));
 
-        int noned_solution_lift_overhead = Reducer::getReductionsOffset(to_lift);
+        int noned_solution_lift_overhead = reduced_instance.getReductionsOffset();
         DEBUG(noned_solution_lift_overhead);
         exp_data.red2_offset = exp_data.red1_offset + noned_solution_lift_overhead;
 
@@ -363,8 +364,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
             auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red2_offset);
             assert(VCUtils::isVertexCover( indg.V, fastvc_sol ));
             indg.remapNodes(fastvc_sol);
-            assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
-            Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift, false);
+            assert(VCUtils::isVertexCover( reduced_instance.getV(), fastvc_sol ));
+            fastvc_sol = reduced_instance.liftSolution(fastvc_sol);
             assert(VCUtils::isVertexCover( V, fastvc_sol ));
         }
 
@@ -378,7 +379,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         DEBUG(solver_vc.size());
 
         indg.remapNodes(solver_vc);
-        Reducer::liftSolution(red.V.size(), solver_vc, to_lift, true);
+        // Reducer::liftSolution(red.V.size(), solver_vc, to_lift, true);
+        solver_vc = reduced_instance.liftSolution(solver_vc);
         assert(VCUtils::isVertexCover( V, solver_vc ));
 
         writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
@@ -396,7 +398,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.disableAllNonbasicReductions();
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined = true;
-        cnf.reducer_use_twins_merge = true;
+        cnf.reducer_use_twins = true;
         // cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10; // original
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
         cnf.reducer_use_ed = true;
@@ -407,8 +409,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.ed_use_double_ed_checks = false; // time-consuming, especially for denser graphs... use for sparse graphs only
         // cnf.ed_use_edge_removal = true;
 
-        Reducer red(V,cnf);
-        auto to_lift = red.reduce();
+        Reducer red(GraphUtils::getGraphEdges(V),cnf);
+        auto reduced_instance = red.reduce();
         sw.stop("main");
         red.writeTotals();
         clog << "Full ED graph reduction took " << sw.getTime("main") / 1000 << " seconds" << endl;
@@ -421,13 +423,13 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         exp_data.ed_t2_inference_rules_added = red.ed_t2_inference_rules_added;
         exp_data.ed_total_t2_inference_rules_created = red.ed_total_t2_inference_rules_created;
 
-        auto indg = GraphInducer::induceByNonisolatedNodes(red.V);
+        auto indg = GraphInducer::induceByNonisolatedNodes(reduced_instance.getV());
         exp_data.N3 = N;
         exp_data.M3 = GraphUtils::countEdges(V);
         DEBUG(PII(exp_data.N3,exp_data.M3));
         writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
 
-        int ed_solution_lift_overhead = Reducer::getReductionsOffset(to_lift);
+        int ed_solution_lift_overhead = reduced_instance.getReductionsOffset();
         DEBUG(ed_solution_lift_overhead);
         exp_data.red3_offset = exp_data.red1_offset + ed_solution_lift_overhead;
 
@@ -435,8 +437,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
             auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red3_offset);
             assert(VCUtils::isVertexCover( indg.V, fastvc_sol ));
             indg.remapNodes(fastvc_sol);
-            assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
-            Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift, false);
+            assert(VCUtils::isVertexCover( reduced_instance.getV(), fastvc_sol ));
+            fastvc_sol = reduced_instance.liftSolution(fastvc_sol);
             assert(VCUtils::isVertexCover( V, fastvc_sol ));
         }
 
@@ -458,7 +460,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         DEBUG(exp_data.ed_results);
 
         indg.remapNodes(solver_vc);
-        Reducer::liftSolution(red.V.size(), solver_vc, to_lift, true);
+        solver_vc = reduced_instance.liftSolution(solver_vc);
         assert(VCUtils::isVertexCover( V, solver_vc ));
     }
 

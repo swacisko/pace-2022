@@ -13,8 +13,9 @@ class VCReduction{
 public:
     virtual ~VCReduction(){}
     virtual void lift(VI & dfvs, VB & in_dfvs) = 0;
-    virtual int sizeOffset() = 0;
+    virtual int offset() = 0;
     virtual string toString() = 0;
+    virtual string name() = 0;
 };
 
 class DeskReduction : public VCReduction{
@@ -44,7 +45,7 @@ public:
         in_dfvs[b] = true;
     }
 
-    int sizeOffset() override { return 2; }
+    int offset() override { return 2; }
 
     string toString() override {
         stringstream str;
@@ -52,6 +53,8 @@ public:
             ", else_nodes: " << else_nodes;
         return str.str();
     }
+
+    string name(){return "desk";}
 
 private:
     VI if_nodes;
@@ -72,7 +75,7 @@ public:
     }
 
     virtual ~GeneralFoldingReduction() {}
-    int sizeOffset() override { return W.size() - edges.size(); }
+    int offset() override { return W.size() - edges.size(); }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         PII not_in = {-1,-1};
@@ -114,6 +117,8 @@ public:
         return str.str();
     }
 
+    string name(){return "general folding";}
+
 private:
     int w;
     VI W;
@@ -131,7 +136,7 @@ public:
 
     virtual ~FoldingReduction() {}
 
-    int sizeOffset() override { return 1; }
+    int offset() override { return 1; }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         bool belongs = in_dfvs[if_node];
@@ -155,6 +160,8 @@ public:
         return s;
     }
 
+    string name(){return "folding";}
+
 private:
     int if_node, else_node, folding_node;
 };
@@ -170,7 +177,7 @@ public:
 
     virtual ~FoldingTwinReduction() {}
 
-    int sizeOffset() override { return max(else_nodes.size(), folding_nodes.size() ); }
+    int offset() override { return max(else_nodes.size(), folding_nodes.size() ); }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         bool belongs = in_dfvs[if_node];
@@ -191,6 +198,8 @@ public:
         return str.str();
     }
 
+    string name(){return "twin";}
+
 private:
     int if_node;
     VI else_nodes, folding_nodes;
@@ -205,7 +214,7 @@ public:
     }
 
     virtual ~FunnelReduction() {}
-    int sizeOffset() override { return 1; }
+    int offset() override { return 1; }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         bool belong_all = true;
@@ -226,6 +235,8 @@ public:
         return str.str();
     }
 
+    string name(){return "funnel";}
+
 private:
     VI if_nodes;
     int else_node, funnel_node;
@@ -239,7 +250,7 @@ public:
     KernelizedNodesReduction(VI v) : ker(v) {}
 
     virtual ~KernelizedNodesReduction() {}
-    int sizeOffset() override { return ker.size(); }
+    int offset() override { return ker.size(); }
 
     void lift(VI & dfvs, VB & in_dfvs) override{
         dfvs += ker;
@@ -256,6 +267,8 @@ public:
 
     VI getKer(){ return ker; }
 
+    string name(){return "knr";}
+
 private:
     VI ker;
 };
@@ -268,57 +281,94 @@ class ReducedInstance{
 public:
 
     ~ReducedInstance() {
-        for ( auto l : primary_reductions_to_lift ){ delete l; l = nullptr; }
-        for ( auto l : secondary_reductions_to_lift ){ delete l; l = nullptr; }
+        for ( auto l : primary_liftables ){ delete l; l = nullptr; }
+        for ( auto l : secondary_liftables ){ delete l; l = nullptr; }
     }
 
     /**
      * After reducing the graph and finding the VC for a graph obtained by [getV] function,
      * this function applied all the necessary changes to make the result valid for the initial graph
      */
-    VI liftSolution();
+    VI liftSolution(VI vc) {
+        VB in_vc = StandardUtils::toVB(secondaryN, vc);
+
+        for( int i = (int)secondary_liftables.size()-1; i>=0; i-- ) secondary_liftables[i]->lift(vc, in_vc);
+        for (int & d : vc) d = primary_indg_nodes[d];
+
+        in_vc = StandardUtils::toVB(primaryN, vc);
+        for( int i = (int)primary_liftables.size()-1; i>=0; i-- ) primary_liftables[i]->lift(vc, in_vc);
+
+        return vc;
+    }
 
 
     /**
      * Returns the structure of the reduced graph.
      * For this graph a VC should be calculated, then lifted using liftSolution()
      */
-    VVI getV(){return resV;}
+    VVI& getV(){return resV;}
 
 
-private:
+    int getReductionsOffset() {
+        int res = 0;
+        for (auto ptr : primary_liftables) res += ptr->offset();
+        for (auto ptr : secondary_liftables) res += ptr->offset();
+        return res;
+    }
+
+
     /**
      * Copy of the configuration object used by the Reducer.
      */
     Config cnf;
 
+
     /**
-     * Initial graph size. This is necessary to lift the solution using [primary_reductions_to_lift]
+     * Initial graph size. This is necessary to lift the solution using [primary_liftables]
      */
     int primaryN;
 
     /**
-     * Graph size that is created (induced from nonisolated nodes) after applying basic reduction suite.
+     * Node list from the InducedGraph object used to induce the graph after primary reduction suite is applied.
+     * This is needed to remap the solution after lifting using [secondary_liftables]
+     * and before lifting using [primary_liftables]
      */
-    int secondaryN;
+    VI primary_indg_nodes;
 
-    /**
-     * Resulting structure that is no longer susceptible to any reductions set in the Config object.
-     */
-    VVI resV;
 
 
     /**
      * Vector containing rules to lift that were created in the initial preprocessing,
      * before the graph was remapped to a standard VVI format.
      */
-    vector<VCReduction*> primary_reductions_to_lift;
+    vector<VCReduction*> primary_liftables;
+
+    /**
+     * Graph size that is created (induced from nonisolated nodes) after applying primary reduction suite.
+     */
+    int secondaryN;
+
+    /**
+     * Node list from the InducedGraph object used to induce the graph after secondary reduction suite is applied.
+     * This is needed to remap the solution after lifting using [secondary_liftables]
+     * and before lifting using [primary_liftables]
+     */
+    VI secondary_indg_nodes;
+
 
     /**
      * Vector containing rules to lift that were created in the secondary preprocessing,
-     * for the graph that was induced by nonisolated nodes after applying fast basic preprocessing suite.
+     * for the graph that was induced by nonisolated nodes after applying fast primary preprocessing suite.
      */
-    vector<VCReduction*> secondary_reductions_to_lift;
+    vector<VCReduction*> secondary_liftables;
+
+
+
+
+    /**
+     * Resulting structure that is no longer susceptible to any reductions set in the Config object.
+     */
+    VVI resV;
 
 };
 
@@ -328,13 +378,30 @@ private:
 class Reducer{
 public:
 
-    Reducer(VVI & V, Config c);
+    Reducer(VPII edges, Config c);
 
-    vector<VCReduction*> reduce();
+    ReducedInstance reduce();
 
-    vector<VCReduction*> primaryReduce();
+    /**
+     * Executes the primary reductions.
+     * Uses a set of given edges to create the graph.
+     *
+     * Suppoorts the following reductions (but they must be enabled in the Config object).
+     * - degree 1
+     * - domination
+     * - degree-2 folding
+     * - funnel
+     *
+     * Returns a graph (VVI structure and the inducing nodes used to induce the graph, and needed to lift the solution)
+     * induced by nonisolated nodes, after the graph is preprocessed using the primary reductions suite,
+     * and the primary liftables.
+     */
+    tuple<VVI, VI, vector<VCReduction*>> primaryReduce(VPII & edges);
 
-    bool mergeTwins();
+    /**
+     * Uses iteratively all the designated reduction rules.
+     */
+    tuple<VVI, VI, vector<VCReduction*>> secondaryReduce();
 
     vector<FoldingReduction*> folding();
 
@@ -342,11 +409,16 @@ public:
 
     vector<GeneralFoldingReduction*> generalFolding();
 
-    pair<vector<FoldingTwinReduction*>, VI> foldingTwins();
+    /**
+     * Creates and reruns a list of liftables - either corresponding to folding twins liftable reduction rule,
+     * or simply the KernelizedNodesReduction obtained by adding N(S) for a set S of twins, if applicable.
+     */
+    vector<VCReduction*> twins();
+
 
     vector<FunnelReduction*> funnel();
 
-    tuple< vector<DeskReduction*>, VI,int > desk();
+    vector<VCReduction*> desk();
 
     void writeTotals();
 
@@ -364,16 +436,17 @@ public:
 
     static void writeReductions(vector<VCReduction*> & reductions);
 
-    const int origN; // number of nodes in original graph
     Config cnf;
-    VVI V;
+
+
+    const int origN; // number of nodes in original graph
     int N;
-    VLL hashes;
 
 
     map<string,int> reduction_times_millis;
 
     int total_twins_merged = 0;
+    int total_twin_folds_done = 0;
     int total_folds_done = 0;
     int total_general_folds_done = 0;
     int total_desk_folds = 0;
@@ -381,13 +454,27 @@ public:
     int total_unconfined_nodes = 0;
     int total_desk_arcs_added = 0;
     int total_funnels_done = 0;
-    int total_twin_folds_done = 0;
 
     int ed_nodes_reduced = 0;
     int ed_edges_removed = 0;
     int ed_t1_inference_rules_added = 0;
     int ed_total_t2_inference_rules_created = 0;
     int ed_t2_inference_rules_added = 0;
+
+private:
+
+    void createVFromEdges(VPII & edges);
+
+    /**
+     * List of edges and size of the primary graph passed by a list of edges to the Reducer constructor.
+     */
+    VPII primary_edges;
+    int primaryN;
+
+    /**
+     * Secondary structure, used in the [secondaryReduce].
+     */
+    VVI V;
 };
 
 #endif //ALGORITHMSPROJECT_REDUCER_H
