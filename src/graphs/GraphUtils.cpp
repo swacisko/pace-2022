@@ -93,6 +93,22 @@ void GraphUtils::removeNodeFromGraph(VVI &V, int a) {
     V[a].clear();
 }
 
+void GraphUtils::removeNodes(VVI &V, VI &nodes, VB &helper) {
+    for (int d : nodes) helper[d] = true;
+
+    VI neigh;
+    for (int a : nodes) for ( int b : V[a] ) if (!helper[b]) {
+        neigh.push_back(b);
+        helper[b] = true;
+    }
+    for (int d : neigh) helper[d] = false;
+
+    for (int d : neigh) REMCVAL(V[d], helper); // remove nodes from V[d] for each d in the neighborhood of nodes
+    for (int d : nodes) V[d].clear(); // clear nodes
+
+    for (int d : nodes) helper[d] = false;
+}
+
 int GraphUtils::countEdges(VVI &V, const bool directed) {
     int res = 0;
     for(auto& v : V) res += v.size();
@@ -144,11 +160,18 @@ void GraphUtils::writeGraphHumanReadable(VVI &V) {
     }
 }
 
+void GraphUtils::removeEdges(VVI &V, VPII &edges, VB & helper, bool second_scan ) {
+    if (!is_sorted(ALL(edges))) sort(ALL(edges));
+
+    assert(false && "Implement efficient edge removal");
+
+}
 void GraphUtils::removeEdges(VVI &V, VPII &edges, bool directed) {
 
     if( directed == false ){
         int E = edges.size();
         for( int i=0; i<E; i++ ) edges.emplace_back( edges[i].second, edges[i].first ); // adding reverse edges to remove
+        StandardUtils::makeUnique(edges);
     }
 
     sort( ALL(edges) );
@@ -165,7 +188,6 @@ void GraphUtils::removeEdges(VVI &V, VPII &edges, bool directed) {
         for( int k=(int)V[t].size()-1; k>=0; k-- ){
             int d = V[t][k];
             if( toRemove.count(d) ){
-//                cerr << "Removing edge " << t << " -> " << V[t][k] << endl;
                 swap( V[t][k], V[t].back() );
                 V[t].pop_back();
             }
@@ -173,7 +195,6 @@ void GraphUtils::removeEdges(VVI &V, VPII &edges, bool directed) {
 
         i = p-1;
     }
-
 }
 
 VI GraphUtils::getNeighborhoodExclusive(VVI &V, VI &A, VB &helper) {

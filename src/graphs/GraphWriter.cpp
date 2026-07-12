@@ -6,6 +6,8 @@
 
 #include <graphs/GraphUtils.h>
 
+#include "StandardUtils.h"
+
 namespace GraphWriter {
 
 
@@ -13,7 +15,8 @@ namespace GraphWriter {
         out << V.size() << " " << GraphUtils::countEdges(V) << endl;
         auto edges = GraphUtils::getGraphEdges(V);
 
-        random_shuffle(ALL(edges));
+        // random_shuffle(ALL(edges));
+        StandardUtils::shuffle(edges);
 
         for (auto p : edges) {
             out << p.first + addToId << " " << p.second + addToId << endl;

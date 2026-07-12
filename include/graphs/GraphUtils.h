@@ -52,9 +52,11 @@ public:
 
     static void removeEdge( VVI & V, int a, int b, bool directed = false );
 
+    static void removeEdges(VVI& V, VPII& edges, VB & helper, bool second_scan = false);
     static void removeEdges(VVI& V, VPII& edges, bool directed = false);
 
     static void removeNodeFromGraph(VVI &V, int a);
+    static void removeNodes(VVI &V, VI &nodes, VB &helper);
 
     static VVI sortNodeNeighborhoods( VVI & V );
 

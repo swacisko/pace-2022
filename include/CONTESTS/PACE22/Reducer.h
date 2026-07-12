@@ -406,29 +406,10 @@ class Reducer{
 public:
 
     Reducer(VVI & V, Config c);
-    VI loop();
-
-    VI inOut1();
-
-    VPII pie();
-
-    VPII dome();
-
-    VI core();
-
-    VI strongly_connected();
-
-    VVI pathCompression(VVI & revV);
 
     vector<DFVSReduction*> reduce(VVI _revV = {});
 
-    VI inOutClique();
-
-    bool mergeTwins(int max_milliseconds = 1e9);
-
-    tuple<VI, VI, VI>
-    enhanceTwins(VI &v, VB &in_L, VB &in_Q, VB &in_R, VB &in_Pm, VB &in_Pp, VB &in_Np, VB &in_Nm, VB &in_Npi,
-                 VB &in_N2, VI &neigh_marker);
+    bool mergeTwins();
 
     vector<FoldingReduction*> folding();
 
@@ -438,50 +419,9 @@ public:
 
     pair<vector<FoldingTwinReduction*>, VI> foldingTwins();
 
-    vector<CycleFoldingReduction*> cycleFolding();
-
-    vector<CycleGadgetReduction*> spiderwebGadgets();
-
-    bool nonSimpleCycleArc2();
-
-    VPII nonSimpleCycleArcFull();
-
-    VI domination1();
-
-    VI domination2();
-
-    VI domination3(bool search_for_simple_cycle = false, int max_time_millis_per_node = 100);
-
-    VI domination4(int max_time_millis_per_node = 100);
-
-    pair<VI, VPII> domination5(int max_time_millis_total, int max_time_millis_per_node);
-
-    VI domination6();
-
-    pair<VI, VPII> domination6Inserter();
-
-    tuple<VI,VPII, vector<ReverseTriangleGadgetReduction*>,VI>
-        reverseTriangleGadget(bool use_only_when_mixed_domination_applies = true);
-
-    bool mixedDomination();
-
-    bool mixedDominationFull();
-
-    VI bottleneck(int max_millis = 1e9);
-
-    VI bottleneck2();
-
     vector<FunnelReduction*> funnel();
 
-    vector<FullBipartiteBlockerReduction*> fullBipartiteBlocker();
-
-    VPII edgeNeighborhoodBlocker();
-
     tuple< vector<DeskReduction*>, VI,int > desk();
-
-    VI recursiveReducer();
-
-    static void test();
 
     void writeTotals();
 
@@ -491,7 +431,7 @@ public:
 
     static void liftSolution( int N, VI & dfvs, vector<DFVSReduction*> & reductions, bool clear_reductions = true );
 
-    static int getReductionsSizeDiff( vector<DFVSReduction*> & reductions );
+    static int getReductionsOffset( vector<DFVSReduction*> & reductions );
 
     static void clearReductionObjects( vector<DFVSReduction*> & reductions );
 
@@ -502,52 +442,20 @@ public:
     const int origN; // number of nodes in original graph
     Config cnf;
     VVI V;
-    VVI revV;
     int N;
     VLL hashes;
 
     map<string,int> reduction_times_millis;
 
-    int total_nonsimple_cycle_arcs_removed = 0;
-    int total_nonsimple_cycle_arcs_full_removed = 0;
     int total_twins_merged = 0;
     int total_folds_done = 0;
     int total_general_folds_done = 0;
-    int total_full_bipartite_blockers = 0;
-    int total_edge_neighborhood_blocker_edges_added = 0;
     int total_desk_folds = 0;
     int total_desk_dominations = 0;
     int total_unconfined_nodes = 0;
     int total_desk_arcs_added = 0;
     int total_funnels_done = 0;
-    int total_cycle_folds_done = 0;
     int total_twin_folds_done = 0;
-    int total_dominated_nodes1 = 0;
-    int total_dominated_nodes2 = 0;
-    int total_dominated_nodes3 = 0;
-    int total_dominated_nodes4 = 0;
-    int total_dominated_nodes5 = 0;
-    int total_domination5_pi_arcs_added = 0;
-    int total_dominated_nodes6 = 0;
-    int total_domination6inserter_nodes_removed = 0;
-    int total_domination6inserter_pi_edges_inserted = 0;
-    int total_reverse_triangle_gadgets_applied = 0;
-    int total_reverse_triangle_gadget_dom6_cases = 0;
-    int mixed_domination_nodes_excluded = 0;
-    int mixed_domination_nodes_full_excluded = 0;
-    int total_pie_edges_removed = 0;
-    int total_dome_edges_removed = 0;
-    int total_core_nodes_removed = 0;
-    int total_inoutclique_nodes_merged = 0;
-    int total_spiderweb_gadgets_applied = 0;
-    int total_spiderweb_nodes_added = 0;
-    int total_spiderweb_edges_added = 0;
-    int total_spiderweb_fill_edges_added = 0;
-    int total_spiderweb_arcs_removed = 0;
-    int total_bottleneck_nodes = 0;
-    int total_bottlenecks_applied = 0;
-    int total_bottleneck2_nodes_removed = 0;
-    int total_recursive_reducer_nodes_removed = 0;
 
     int ed_nodes_reduced = 0;
     int ed_edges_removed = 0;

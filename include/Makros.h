@@ -57,6 +57,9 @@ using namespace std;
 #define ENDL(x) REP(crow,(x)) clog << endl;
 #define ENDLS(x,c) REP(crow,(x)) clog << c << flush;
 
+#define REM(vec,ind) {swap(vec[ind], vec.back()); vec.pop_back();}
+#define REMCVAL(vec,tab) for(int _tr=(int)vec.size()-1; _tr>=0; _tr--) if(tab[vec[_tr]]) REM(vec,_tr);
+
 
 typedef long long LL;
 

@@ -4,4 +4,3 @@
 
 #include "CONTESTS/PACE22/Config.h"
 
-volatile sig_atomic_t Config::sigterm_received = 0;

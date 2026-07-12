@@ -6,7 +6,6 @@
 #define ALGORITHMSPROJECT_STANDARDUTILS_H
 
 #include "Makros.h"
-#include "RandomNumberGenerators.h"
 
 namespace StandardUtils{
 
@@ -62,8 +61,10 @@ namespace StandardUtils{
 
     template<class _T>
     void shuffle( vector<_T> & V ){
-        UniformIntGenerator rnd(0,1e9);
-        shuffle(V, rnd.getRNG());
+        // UniformIntGenerator rnd(0,1e9);
+        // shuffle(V, rnd.getRNG());
+        IntGenerator rnd;
+        shuffle(V,rnd);
     }
 
     template<class _t, class _s>

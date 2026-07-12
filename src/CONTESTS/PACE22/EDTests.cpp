@@ -293,7 +293,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         VB helper(N);
 
         auto revV = GraphUtils::reverseGraph(V);
-        Utils::removeNodes(V, revV, kern_nodes, helper);
+        GraphUtils::removeNodes(V, kern_nodes, helper);
 
         V = GraphInducer::induceByNonisolatedNodes(V).V;
         N = V.size();
@@ -355,7 +355,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         exp_data.M2 = GraphUtils::countEdges(indg.V);
         DEBUG(PII(exp_data.N2,exp_data.M2));
 
-        int noned_solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
+        int noned_solution_lift_overhead = Reducer::getReductionsOffset(to_lift);
         DEBUG(noned_solution_lift_overhead);
         exp_data.red2_offset = exp_data.red1_offset + noned_solution_lift_overhead;
 
@@ -427,7 +427,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         DEBUG(PII(exp_data.N3,exp_data.M3));
         writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
 
-        int ed_solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
+        int ed_solution_lift_overhead = Reducer::getReductionsOffset(to_lift);
         DEBUG(ed_solution_lift_overhead);
         exp_data.red3_offset = exp_data.red1_offset + ed_solution_lift_overhead;
 
