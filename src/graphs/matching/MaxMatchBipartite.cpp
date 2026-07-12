@@ -8,7 +8,7 @@
 
 #include "graphs/matching/MaxMatchBipartite.h"
 
-
+#include "StandardUtils.h"
 
 
 VI MaxMatchBipartite::getMaximalMatchingOfMinimalSizeRandom(VVI &G, int iterations) {
@@ -18,7 +18,7 @@ VI MaxMatchBipartite::getMaximalMatchingOfMinimalSizeRandom(VVI &G, int iteratio
 
     for( int ITER = 0; ITER < iterations; ITER++ ){
         VI temp(G.size(),-1);
-        random_shuffle( edges.begin(), edges.end() );
+        StandardUtils::shuffle(edges);
         int M = 0;
         for( PII e : edges ){
             int a = e.first;

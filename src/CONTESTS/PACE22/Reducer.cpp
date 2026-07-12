@@ -3,19 +3,11 @@
 //
 
 #include <graphs/GraphUtils.h>
-#include <graphs/scc/StronglyConnectedComponents.h>
-// #include <utils/TimeMeasurer.h>
 #include <utils/RandomNumberGenerators.h>
 #include <graphs/GraphInducer.h>
-#include <CONTESTS/PACE22/exact/DFVSSolverE.h>
 #include <utils/StandardUtils.h>
 #include <combinatorics/CombinatoricUtils.h>
-#include <graphs/cliques/CliqueUtils.h>
-#include <graphs/components/ConnectedComponents.h>
-#include <graphs/VertexCover/VCUtils.h>
 #include <graphs/VertexCover/kernelization/KernelizerVC.h>
-#include <graphs/cliques/CliqueExtension.h>
-#include <graphs/graphtraversals/BFS.h>
 #include "CONTESTS/PACE22/Reducer.h"
 
 #include "EDReducer.h"
@@ -33,7 +25,7 @@ Reducer::Reducer(VVI &V, Config c) : origN(V.size()) {
 }
 
 
-vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
+vector<VCReduction*> Reducer::reduce() {
     constexpr bool debug = false;
     constexpr bool write_progress_on_the_fly = false;
 
@@ -44,7 +36,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
     auto reducer_start_time = chrono::steady_clock::now();
     VB helper(N,false);
 
-    vector<DFVSReduction*> res;
+    vector<VCReduction*> res;
     KernelizedNodesReduction * knr = nullptr;
 
     auto addKNR = [&]( VI nodes ){
@@ -54,25 +46,19 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
     };
 
     function<void()> applyBasicReductions = [&](){
-
+        Stopwatch s; string opt = "basic_kern"; s.start(opt);
+        VVI Vcp = V;
+        KernelizerVC kern;
+        auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
+        addKNR(kern_nodes);
+        GraphUtils::removeNodes(V, kern_nodes,helper);
+        s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
     };
 
 
     int ed_rules_checked = 0;
 
     do{
-
-        {
-            Stopwatch s; string opt = "basic_kern"; s.start(opt);
-            VVI Vcp = V;
-            KernelizerVC kern;
-            auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
-            addKNR(kern_nodes);
-            // Utils::removeNodes(V, revV, kern_nodes,helper);
-            GraphUtils::removeNodes(V, kern_nodes,helper);
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-        }
-
 
         modified = false;
         helper = VB(N,false);
@@ -84,7 +70,6 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         auto time_total = chrono::duration<double, std::milli >
                 (chrono::steady_clock::now() - reducer_start_time ).count();
         if(time_total > cnf.reducer_max_time_millis) break;
-
 
 
 
@@ -190,7 +175,6 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             if(!cnf.reducer_use_domination){
                 clog << "CAUTION! Calling funnel reduction without domination rule before!" << endl;
             }
-            //TimeMeasurer::start("Reducer::funnel");
             if(write_progress_on_the_fly) DEBUG(total_funnels_done);
             auto funnels = funnel();
             total_funnels_done += funnels.size();
@@ -212,7 +196,6 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
             KernelizerVC kern;
             auto [kern_nodes, edges_removed] = kern.lpDecomposition(Vcp);
             addKNR(kern_nodes);
-            // Utils::removeNodes(V, revV, kern_nodes,helper);
             GraphUtils::removeNodes(V, kern_nodes,helper);
             if(!modified) modified = (!kern_nodes.empty());
         }
@@ -387,7 +370,7 @@ vector<FunnelReduction *> Reducer::funnel() {
 
 
 
-void Reducer::liftSolution(int N, VI &dfvs, vector<DFVSReduction *> &reductions, bool clear_reductions) {
+void Reducer::liftSolution(int N, VI &dfvs, vector<VCReduction *> &reductions, bool clear_reductions) {
     VB in_dfvs = StandardUtils::toVB(N, dfvs);
 
     for( int i = (int)reductions.size()-1; i>=0; i-- ){
@@ -397,14 +380,14 @@ void Reducer::liftSolution(int N, VI &dfvs, vector<DFVSReduction *> &reductions,
     if (clear_reductions) clearReductionObjects(reductions);
 }
 
-void Reducer::clearReductionObjects(vector<DFVSReduction *> &reductions) {
+void Reducer::clearReductionObjects(vector<VCReduction *> &reductions) {
     for(int i=0; i<reductions.size(); i++ ){
         delete reductions[i];
         reductions[i] = nullptr;
     }
 }
 
-VI Reducer::convertKernelizedReductions(vector<DFVSReduction *> &reductions) {
+VI Reducer::convertKernelizedReductions(vector<VCReduction *> &reductions) {
     assert(reductions.size() <= 1);
     VI red_dfvs;
     if(!reductions.empty()){
@@ -415,13 +398,13 @@ VI Reducer::convertKernelizedReductions(vector<DFVSReduction *> &reductions) {
     return red_dfvs;
 }
 
-int Reducer::getReductionsOffset(vector<DFVSReduction *> &reductions) {
+int Reducer::getReductionsOffset(vector<VCReduction *> &reductions) {
     int res = 0;
-    for(auto * x : reductions) res += x->sizeDiffUB();
+    for(auto * x : reductions) res += x->sizeOffset();
     return res;
 }
 
-void Reducer::writeReductions(vector<DFVSReduction *> &reductions) {
+void Reducer::writeReductions(vector<VCReduction *> &reductions) {
     clog << "Reductions: " << endl;
     for(auto * x : reductions) clog << x->toString() << endl;
 }

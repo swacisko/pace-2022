@@ -9,9 +9,6 @@ set(CMAKE_CXX_STANDARD 23)
 
 SET(CMAKE_CXX_FLAGS "-std=c++23 -O3")
 
-#include(cmake/DownloadCPSAT.cmake)
-#include(cmake/cpsat_minimal.cmake)
-
 
 include_directories(
         include
@@ -20,7 +17,6 @@ include_directories(
         include/utils
         include/datastructures
         include/CONTESTS/PACE22/*
-#        include/CONTESTS/PACE22/*/*
         )
 
 file(GLOB SOURCES
@@ -28,42 +24,18 @@ file(GLOB SOURCES
         src/graphs/GraphWriter.cpp
         src/graphs/GraphUtils.cpp
         src/graphs/GraphInducer.cpp
-        src/graphs/graphtraversals/BFS.cpp
-        src/graphs/cycles/CycleCounter.cpp
-
         src/graphs/components/ConnctedComponents.cpp
         src/graphs/cliques/CliqueExtension.cpp
         src/graphs/cliques/CliqueUtils.cpp
-
         src/graphs/VertexCover/VCUtils.cpp
         src/graphs/VertexCover/kernelization/KernelizerVC.cpp
         src/graphs/matching/MaxMatchBipartite.cpp
-
-        src/graphs/toposort/TopoSort.cpp
-        src/graphs/scc/StronglyConnectedComponents.cpp
-
         src/combinatorics/CombinatoricUtils.cpp
-
-        src/datastructures/RandomSelectionSet.cpp
-
         src/utils/RandomNumberGenerators.cpp
         src/utils/StandardUtils.cpp
         src/utils/MemoryUtils.cpp
-        src/utils/TimeMeasurer.cpp
         src/utils/Stopwatch.cpp
 
-        #PACE22
-        src/CONTESTS/PACE22/Config.cpp
-        src/CONTESTS/PACE22/heur/AgentFlow.cpp
-        src/CONTESTS/PACE22/heur/DFVSSolverH.cpp
-        src/CONTESTS/PACE22/heur/VCImprover.cpp
-        src/CONTESTS/PACE22/heur/SALS.cpp
-        src/CONTESTS/PACE22/heur/SALS2.cpp
-        src/CONTESTS/PACE22/heur/SALS3.cpp
-        src/CONTESTS/PACE22/heur/SALS4.cpp
-        src/CONTESTS/PACE22/heur/SALS5.cpp
-        src/CONTESTS/PACE22/heur/DFVSImprover.cpp
-        src/CONTESTS/PACE22/heur/HittingSetLS.cpp
         src/CONTESTS/PACE22/Utils.cpp
         src/CONTESTS/PACE22/Reducer.cpp
         src/CONTESTS/PACE22/exact/DFVSSolverE.cpp
@@ -71,13 +43,7 @@ file(GLOB SOURCES
 )
 
 
-#add_executable(DiVerSeS "src/CONTESTS/PACE22/Pace22.cpp" ${SOURCES}
-#        src/CONTESTS/PACE22/EDReducer.cpp
-#        src/CONTESTS/PACE22/EDReducer.h)
-#target_link_libraries( DiVerSeS stdc++fs )
-
-
-add_executable(EDTests ${SOURCES}
+add_executable(VCReducer ${SOURCES}
         src/CONTESTS/PACE22/EDReducer.cpp
         src/CONTESTS/PACE22/EDReducer.h
         src/CONTESTS/PACE22/EDTests.cpp
@@ -85,10 +51,8 @@ add_executable(EDTests ${SOURCES}
         src/CONTESTS/PACE22/IntGenerator.cpp
 )
 
-target_compile_features(EDTests PRIVATE cxx_std_23)
+target_compile_features(VCReducer PRIVATE cxx_std_23)
 
 find_package(ortools CONFIG REQUIRED)
 find_package(OpenMP)
-#target_link_libraries( EDTests stdc++fs)
-target_link_libraries( EDTests stdc++fs ortools::ortools OpenMP::OpenMP_CXX)
-#target_link_libraries( EDTests stdc++fs cpsat::cpsat OpenMP::OpenMP_CXX ortools::ortools)
+target_link_libraries( VCReducer stdc++fs ortools::ortools OpenMP::OpenMP_CXX)

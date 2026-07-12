@@ -6,6 +6,7 @@
 #define ALGORITHMSPROJECT_STANDARDUTILS_H
 
 #include "Makros.h"
+#include "../../src/CONTESTS/PACE22/IntGenerator.h"
 
 namespace StandardUtils{
 
@@ -54,15 +55,14 @@ namespace StandardUtils{
         std::uniform_int_distribution<long long> unif( 0, 10ll * V.size() );
 
         for( int i=(int)V.size()-1; i>=0; i-- ){
-            int ind = unif(rnd) % (i+1);
+            // int ind = unif(rnd) % (i+1);
+            int ind = rnd.nextInt(i+1);
             if( ind != i ) swap( V[i], V[ind] );
         }
     }
 
     template<class _T>
     void shuffle( vector<_T> & V ){
-        // UniformIntGenerator rnd(0,1e9);
-        // shuffle(V, rnd.getRNG());
         IntGenerator rnd;
         shuffle(V,rnd);
     }

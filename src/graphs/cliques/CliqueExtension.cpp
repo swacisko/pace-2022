@@ -5,6 +5,8 @@
 #include <graphs/cliques/CliqueExtension.h>
 
 #include "graphs/cliques/CliqueExtension.h"
+
+#include "StandardUtils.h"
 #include "graphs/cliques/CliqueUtils.h"
 #include "graphs/GraphUtils.h"
 #include "graphs/GraphInducer.h"
@@ -28,7 +30,7 @@ VI CliqueExtension::maximizeCliqueGreedy(VVI& V, VI clq){
         if( p.second == A.size() ) B.push_back(p.first);
     }
 
-    random_shuffle(ALL(B));
+    StandardUtils::shuffle(B);
 
     VI inducer = A; inducer.insert( inducer.end(), ALL(B) );
 
@@ -97,7 +99,7 @@ VI CliqueExtension::findMaximalNodeCliqueExtension(VVI &V, bool sparse_check) {
     VI to_check(V.size());
     iota(ALL(to_check), 0);
     if(sparse_check){
-        random_shuffle(ALL(to_check));
+        StandardUtils::shuffle(to_check);
         to_check.resize(1 + pow(V.size(),0.66) );
         sort(ALL(to_check));
     }

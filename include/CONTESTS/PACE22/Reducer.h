@@ -9,15 +9,15 @@
 #include "StandardUtils.h"
 #include "Config.h"
 
-class DFVSReduction{
+class VCReduction{
 public:
-    virtual ~DFVSReduction(){}
+    virtual ~VCReduction(){}
     virtual void lift(VI & dfvs, VB & in_dfvs) = 0;
-    virtual int sizeDiffUB() = 0;
+    virtual int sizeOffset() = 0;
     virtual string toString() = 0;
 };
 
-class DeskReduction : public DFVSReduction{
+class DeskReduction : public VCReduction{
 public:
     DeskReduction( VI if_nds, PII then_nds, PII else_nds ){
         if_nodes = if_nds;
@@ -44,9 +44,7 @@ public:
         in_dfvs[b] = true;
     }
 
-    int sizeDiffUB() override {
-        return 2;
-    }
+    int sizeOffset() override { return 2; }
 
     string toString() override {
         stringstream str;
@@ -61,43 +59,10 @@ private:
     PII else_nodes;
 };
 
-class FullBipartiteBlockerReduction : public DFVSReduction{
-public:
-    FullBipartiteBlockerReduction( VI if_nds, int then_nd, int else_nd ){
-        if_nodes = if_nds;
-        then_node = then_nd;
-        else_node = else_nd;
-    }
-
-    void lift(VI &dfvs, VB &in_dfvs) override {
-        bool all_in = true;
-        for(int d : if_nodes) if(!in_dfvs[d]) all_in = false;
-        if(all_in){
-            dfvs.push_back(then_node);
-            in_dfvs[then_node] = true;
-        }else{
-            dfvs.push_back(else_node);
-            in_dfvs[else_node] = true;
-        }
-    }
-
-    int sizeDiffUB() override { return 1; }
-
-    string toString() override {
-        stringstream str;
-        str << "FullBipartiteBlockerReduction, if_nodes: " << if_nodes << ", then_node: " << then_node <<
-            ", else_node: " << else_node;
-        return str.str();
-    }
-
-private:
-    VI if_nodes;
-    int then_node;
-    int else_node;
-};
 
 
-class GeneralFoldingReduction : public DFVSReduction{
+
+class GeneralFoldingReduction : public VCReduction{
 public:
 
     GeneralFoldingReduction( int ww, VI WW, vector<tuple<int,int,int>> & antiedges ){
@@ -107,7 +72,7 @@ public:
     }
 
     virtual ~GeneralFoldingReduction() {}
-    int sizeDiffUB() override { return W.size() - edges.size(); }
+    int sizeOffset() override { return W.size() - edges.size(); }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         PII not_in = {-1,-1};
@@ -155,7 +120,7 @@ private:
     vector< tuple<int,int,int> > edges;
 };
 
-class FoldingReduction : public DFVSReduction{
+class FoldingReduction : public VCReduction{
 public:
 
     FoldingReduction(int ifnode, int elsenode, int foldingnode ){
@@ -166,7 +131,7 @@ public:
 
     virtual ~FoldingReduction() {}
 
-    int sizeDiffUB() override { return 1; }
+    int sizeOffset() override { return 1; }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         bool belongs = in_dfvs[if_node];
@@ -194,7 +159,7 @@ private:
     int if_node, else_node, folding_node;
 };
 
-class FoldingTwinReduction : public DFVSReduction{
+class FoldingTwinReduction : public VCReduction{
 public:
 
     FoldingTwinReduction(int ifnode, VI elses, VI folds ){
@@ -205,7 +170,7 @@ public:
 
     virtual ~FoldingTwinReduction() {}
 
-    int sizeDiffUB() override { return max(else_nodes.size(), folding_nodes.size() ); }
+    int sizeOffset() override { return max(else_nodes.size(), folding_nodes.size() ); }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         bool belongs = in_dfvs[if_node];
@@ -231,7 +196,7 @@ private:
     VI else_nodes, folding_nodes;
 };
 
-class FunnelReduction : public DFVSReduction{
+class FunnelReduction : public VCReduction{
 public:
     FunnelReduction( VI if_nds, int else_nd, int funnel_nd ){
         if_nodes = if_nds;
@@ -240,7 +205,7 @@ public:
     }
 
     virtual ~FunnelReduction() {}
-    int sizeDiffUB() override { return 1; }
+    int sizeOffset() override { return 1; }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         bool belong_all = true;
@@ -267,121 +232,14 @@ private:
 };
 
 
-class CycleFoldingReduction : public DFVSReduction{
-public:
-    CycleFoldingReduction( VI & ifn_nds, VI& else_nds ){
-        if_not_nodes = ifn_nds;
-        else_nodes = else_nds;
-    }
 
-    virtual ~CycleFoldingReduction() {}
-
-    int sizeDiffUB() override { return 1; }
-
-    void lift( VI & dfvs, VB& in_dfvs ) override{
-        int to_add = else_nodes[0];
-        for( int i=0; i<if_not_nodes.size(); i++ ){
-            int a = if_not_nodes[i];
-            if( !in_dfvs[a] ){
-                to_add = else_nodes[i];
-                break;
-            }
-        }
-
-        dfvs.push_back(to_add);
-        in_dfvs[to_add] = true;
-    }
-
-    string toString() override {
-        stringstream str;
-        str << "CycleFoldingReduction, if_not_nodes: " << if_not_nodes << ", else_nodes: " << else_nodes;
-        return str.str();
-    }
-
-private:
-    VI if_not_nodes;
-    VI else_nodes;
-};
-
-class ReverseTriangleGadgetReduction : public DFVSReduction{
-public:
-
-    ReverseTriangleGadgetReduction(VI if_nds, VPII & else_nds){
-        if_nodes = if_nds;
-        else_nodes = else_nds;
-        assert(if_nodes.size() == 3);
-        assert(else_nodes.size() == 3);
-    }
-
-    void lift(VI &dfvs, VB &in_dfvs) override{
-        for(int i=0; i<if_nodes.size(); i++){
-            int a = if_nodes[i];
-            if(in_dfvs[a]){
-                int b = else_nodes[i].first;
-                int c = else_nodes[i].second;
-                dfvs.push_back(b);
-                in_dfvs[b] = true;
-                dfvs.push_back(c);
-                in_dfvs[c] = true;
-                break;
-            }
-        }
-    }
-
-    int sizeDiffUB() override{return 2;}
-
-    string toString() override{
-        stringstream str;
-        str << "ReverseTriangleGadgetReduction, if_nodes: " << if_nodes << ", else_nodes: " << else_nodes;
-        return str.str();
-    }
-
-private:
-    VI if_nodes;
-    VPII else_nodes;
-};
-
-class CycleGadgetReduction : public DFVSReduction{
-public:
-    CycleGadgetReduction( VI if_all_nds, int else_nd ){
-        if_all_nodes = if_all_nds;
-        else_node = else_nd;
-    }
-
-    virtual ~CycleGadgetReduction() {}
-
-    int sizeDiffUB() override { return 1 - if_all_nodes.size(); }
-
-    void lift( VI & dfvs, VB& in_dfvs ) override{
-        bool all_in = true;
-        for(int d : if_all_nodes) if(!in_dfvs[d]) all_in = false;
-
-        if( all_in ){
-            dfvs.push_back(else_node);
-            in_dfvs[else_node] = true;
-        }
-
-        StandardUtils::removeFromArrayInplace(dfvs, if_all_nodes);
-        for(int d : if_all_nodes) in_dfvs[d] = false;
-    }
-
-    string toString() override {
-        stringstream str;
-        str << "CycleGadgetReduction, if_all_nodes: " << if_all_nodes << ", else_node: " << else_node;
-        return str.str();
-    }
-
-    VI if_all_nodes;
-    int else_node;
-};
-
-class KernelizedNodesReduction : public DFVSReduction{
+class KernelizedNodesReduction : public VCReduction{
 public:
 
     KernelizedNodesReduction(VI v) : ker(v) {}
 
     virtual ~KernelizedNodesReduction() {}
-    int sizeDiffUB() override { return ker.size(); }
+    int sizeOffset() override { return ker.size(); }
 
     void lift(VI & dfvs, VB & in_dfvs) override{
         dfvs += ker;
@@ -402,12 +260,79 @@ private:
     VI ker;
 };
 
+
+
+
+
+class ReducedInstance{
+public:
+
+    ~ReducedInstance() {
+        for ( auto l : primary_reductions_to_lift ){ delete l; l = nullptr; }
+        for ( auto l : secondary_reductions_to_lift ){ delete l; l = nullptr; }
+    }
+
+    /**
+     * After reducing the graph and finding the VC for a graph obtained by [getV] function,
+     * this function applied all the necessary changes to make the result valid for the initial graph
+     */
+    VI liftSolution();
+
+
+    /**
+     * Returns the structure of the reduced graph.
+     * For this graph a VC should be calculated, then lifted using liftSolution()
+     */
+    VVI getV(){return resV;}
+
+
+private:
+    /**
+     * Copy of the configuration object used by the Reducer.
+     */
+    Config cnf;
+
+    /**
+     * Initial graph size. This is necessary to lift the solution using [primary_reductions_to_lift]
+     */
+    int primaryN;
+
+    /**
+     * Graph size that is created (induced from nonisolated nodes) after applying basic reduction suite.
+     */
+    int secondaryN;
+
+    /**
+     * Resulting structure that is no longer susceptible to any reductions set in the Config object.
+     */
+    VVI resV;
+
+
+    /**
+     * Vector containing rules to lift that were created in the initial preprocessing,
+     * before the graph was remapped to a standard VVI format.
+     */
+    vector<VCReduction*> primary_reductions_to_lift;
+
+    /**
+     * Vector containing rules to lift that were created in the secondary preprocessing,
+     * for the graph that was induced by nonisolated nodes after applying fast basic preprocessing suite.
+     */
+    vector<VCReduction*> secondary_reductions_to_lift;
+
+};
+
+
+
+
 class Reducer{
 public:
 
     Reducer(VVI & V, Config c);
 
-    vector<DFVSReduction*> reduce(VVI _revV = {});
+    vector<VCReduction*> reduce();
+
+    vector<VCReduction*> primaryReduce();
 
     bool mergeTwins();
 
@@ -429,21 +354,22 @@ public:
 
     void disableAllConditionalReductions();
 
-    static void liftSolution( int N, VI & dfvs, vector<DFVSReduction*> & reductions, bool clear_reductions = true );
+    static void liftSolution( int N, VI & dfvs, vector<VCReduction*> & reductions, bool clear_reductions = true );
 
-    static int getReductionsOffset( vector<DFVSReduction*> & reductions );
+    static int getReductionsOffset( vector<VCReduction*> & reductions );
 
-    static void clearReductionObjects( vector<DFVSReduction*> & reductions );
+    static void clearReductionObjects( vector<VCReduction*> & reductions );
 
-    static VI convertKernelizedReductions(vector<DFVSReduction*> & reductions);
+    static VI convertKernelizedReductions(vector<VCReduction*> & reductions);
 
-    static void writeReductions(vector<DFVSReduction*> & reductions);
+    static void writeReductions(vector<VCReduction*> & reductions);
 
     const int origN; // number of nodes in original graph
     Config cnf;
     VVI V;
     int N;
     VLL hashes;
+
 
     map<string,int> reduction_times_millis;
 
