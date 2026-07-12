@@ -340,6 +340,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined = true;
         cnf.reducer_use_twins_merge = true;
+        // cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10; // original
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
         Reducer red(V,cnf);
         auto to_lift = red.reduce();
@@ -396,6 +397,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined = true;
         cnf.reducer_use_twins_merge = true;
+        // cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10; // original
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
         cnf.reducer_use_ed = true;
         cnf.ed_consider_nodes_to_move_outside_NW = true;

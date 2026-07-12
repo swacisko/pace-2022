@@ -815,16 +815,16 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
 
 
-        // if( Utils::isPIGraph(V, revV, helper) ){
-        //     //TimeMeasurer::start("Reducer::LP_relaxation");
-        //     VVI Vcp = V;
-        //     KernelizerVC kern;
-        //     auto [kern_nodes, edges_removed] = kern.lpDecomposition(Vcp);
-        //     addKNR(kern_nodes);
-        //     Utils::removeNodes(V, revV, kern_nodes,helper);
-        //     //TimeMeasurer::stop("Reducer::LP_relaxation");
-        //     if(!modified) modified = (!kern_nodes.empty());
-        // }
+        if( Utils::isPIGraph(V, revV, helper) ){
+            //TimeMeasurer::start("Reducer::LP_relaxation");
+            VVI Vcp = V;
+            KernelizerVC kern;
+            auto [kern_nodes, edges_removed] = kern.lpDecomposition(Vcp);
+            addKNR(kern_nodes);
+            Utils::removeNodes(V, revV, kern_nodes,helper);
+            //TimeMeasurer::stop("Reducer::LP_relaxation");
+            if(!modified) modified = (!kern_nodes.empty());
+        }
 
         if(check_correspondings) assert(Utils::isCorresponding(V, revV));
 
@@ -2405,7 +2405,7 @@ void Reducer::writeTotals() {
     DEBUG(total_desk_dominations);
     DEBUG(total_unconfined_nodes);
     // DEBUG(total_desk_arcs_added);
-    // DEBUG(total_funnels_done);
+    DEBUG(total_funnels_done);
     // DEBUG(total_cycle_folds_done);
     DEBUG(total_twins_merged);
     // DEBUG(total_nonsimple_cycle_arcs_removed);
