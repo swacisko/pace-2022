@@ -351,7 +351,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
         exp_data.red_noned_time_millis = exp_data.red_init_time_millis + sw.getTime("main");
 
-        auto indg = GraphInducer::induceByNonisolatedNodes(reduced_instance.getV());
+        auto indg = GraphInducer::induceByNonisolatedNodes(reduced_instance.getCoreV());
         exp_data.N2 = indg.V.size();
         exp_data.M2 = GraphUtils::countEdges(indg.V);
         DEBUG(PII(exp_data.N2,exp_data.M2));
@@ -364,7 +364,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
             auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red2_offset);
             assert(VCUtils::isVertexCover( indg.V, fastvc_sol ));
             indg.remapNodes(fastvc_sol);
-            assert(VCUtils::isVertexCover( reduced_instance.getV(), fastvc_sol ));
+            assert(VCUtils::isVertexCover( reduced_instance.getCoreV(), fastvc_sol ));
             fastvc_sol = reduced_instance.liftSolution(fastvc_sol);
             assert(VCUtils::isVertexCover( V, fastvc_sol ));
         }
@@ -423,7 +423,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         exp_data.ed_t2_inference_rules_added = red.ed_t2_inference_rules_added;
         exp_data.ed_total_t2_inference_rules_created = red.ed_total_t2_inference_rules_created;
 
-        auto indg = GraphInducer::induceByNonisolatedNodes(reduced_instance.getV());
+        auto indg = GraphInducer::induceByNonisolatedNodes(reduced_instance.getCoreV());
         exp_data.N3 = N;
         exp_data.M3 = GraphUtils::countEdges(V);
         DEBUG(PII(exp_data.N3,exp_data.M3));
@@ -437,7 +437,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
             auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red3_offset);
             assert(VCUtils::isVertexCover( indg.V, fastvc_sol ));
             indg.remapNodes(fastvc_sol);
-            assert(VCUtils::isVertexCover( reduced_instance.getV(), fastvc_sol ));
+            assert(VCUtils::isVertexCover( reduced_instance.getCoreV(), fastvc_sol ));
             fastvc_sol = reduced_instance.liftSolution(fastvc_sol);
             assert(VCUtils::isVertexCover( V, fastvc_sol ));
         }

@@ -306,7 +306,7 @@ public:
      * Returns the structure of the reduced graph.
      * For this graph a VC should be calculated, then lifted using liftSolution()
      */
-    VVI& getV(){return resV;}
+    VVI& getCoreV(){return coreV;}
 
 
     int getReductionsOffset() {
@@ -368,7 +368,7 @@ public:
     /**
      * Resulting structure that is no longer susceptible to any reductions set in the Config object.
      */
-    VVI resV;
+    VVI coreV;
 
 };
 
@@ -386,22 +386,31 @@ public:
      * Executes the primary reductions.
      * Uses a set of given edges to create the graph.
      *
-     * Suppoorts the following reductions (but they must be enabled in the Config object).
-     * - degree 1
-     * - domination
-     * - degree-2 folding
-     * - funnel
+     * This does the following:
+     * - applies exhaustively **DEGREE-1** rule
+     * - applies exhaustively **DOMINATION** rule
+     * - after the above are applicable no more, it calls the **UNCONFINED** rule _ONCE_ for each node,
+     *  interleaving it with the degree-1 and domination rules for quick pruning.
+     * - after the above are applicable no more, it applies the **FOLDING** rule _ONCE_ to each node with degree 2
+     * - after that, the **FUNNEL** rule is applied _ONCE_ to each edge, if plausible
      *
-     * Returns a graph (VVI structure and the inducing nodes used to induce the graph, and needed to lift the solution)
-     * induced by nonisolated nodes, after the graph is preprocessed using the primary reductions suite,
-     * and the primary liftables.
+     * Note that after the application of the folding rule, the domination rule might (perhaps) trigger again
+     * (unless the unconfined resolves this issue), but since the static graph structure (much more efficient than VVI
+     * for very large graphs) does not allow for reasonable insertion of new edges, we do not do that repeatedly.
+     * Removing edges, however, can be done easily, thus all purely reducible rules can be applied here by simply
+     * masking out the removed nodes and taking that information into account when necessary.
+     * Applying the folding and funnel rule once is also acceptable, as it is done only once :)
+     *
+     * Returns a graph (list of edges) and list of liftables.
+     * From these edges the graph should be induced by nonisolated nodes to obtain V for secondary reductions.
      */
-    tuple<VVI, VI, vector<VCReduction*>> primaryReduce(VPII & edges);
+    pair<VPII, vector<VCReduction*>> primaryReduce(VPII & edges);
+    pair<VVI, vector<VCReduction*>> primaryReduce(VVI & V);
 
     /**
      * Uses iteratively all the designated reduction rules.
      */
-    tuple<VVI, VI, vector<VCReduction*>> secondaryReduce();
+    pair<VVI, vector<VCReduction*>> secondaryReduce();
 
     vector<FoldingReduction*> folding();
 

@@ -27,22 +27,42 @@ ReducedInstance Reducer::reduce() {
     reduced_instance.cnf = cnf;
     reduced_instance.primaryN = primaryN;
 
-    tie( V, reduced_instance.primary_indg_nodes, reduced_instance.primary_liftables) = primaryReduce(primary_edges);
-    tie( reduced_instance.resV, reduced_instance.secondary_indg_nodes, reduced_instance.secondary_liftables) = secondaryReduce();
+    VPII reduced_graph_edges;
+    tie( reduced_graph_edges, reduced_instance.primary_liftables) = primaryReduce(primary_edges);
+    { // #TEST - here should be implemented a more efficient graph inducing than the following...
+        auto indg = GraphInducer::induceByNonisolatedNodes(V);
+        reduced_instance.primary_indg_nodes = indg.nodes;
+        V = indg.V;
+
+        assert(false && "Implement efficient graph inducing");
+    }
+
+    tie( V, reduced_instance.secondary_liftables) = secondaryReduce();
+    {
+        auto indg = GraphInducer::induceByNonisolatedNodes(V);
+        reduced_instance.secondary_indg_nodes = indg.nodes;
+        reduced_instance.coreV = indg.V;
+    }
+
 
     return reduced_instance;
 }
 
 
-tuple<VVI, VI, vector<VCReduction*>> Reducer::primaryReduce(VPII & edges) {
+pair<VPII, vector<VCReduction*>> Reducer::primaryReduce(VPII & edges) {
     assert(false && "Implement fast primaryReduce");
 
     return {};
 }
 
+pair<VVI, vector<VCReduction *>> Reducer::primaryReduce(VVI &V) {
+    auto edges = GraphUtils::getGraphEdges(V);
+    auto [res_edges, liftables] = primaryReduce(edges);
+    return {GraphUtils::getGraphForEdges(res_edges), liftables};
+}
 
 
-tuple<VVI, VI, vector<VCReduction*>> Reducer::secondaryReduce() {
+pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
     constexpr bool debug = false;
     constexpr bool write_progress_on_the_fly = false;
 
@@ -309,15 +329,16 @@ tuple<VVI, VI, vector<VCReduction*>> Reducer::secondaryReduce() {
         }
 
 
-    }while(modified);
+    } while(modified);
 
     if(debug){ DEBUG(V);}
 
     if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr;}
 
-    InducedGraph indg = GraphInducer::induceByNonisolatedNodes(V);
+    // InducedGraph indg = GraphInducer::induceByNonisolatedNodes(V);
+    // return make_pair(indg.V, indg.nodes, secondary_reduce_liftables);
 
-    return make_tuple(indg.V, indg.nodes, secondary_reduce_liftables);
+    return make_pair(V, secondary_reduce_liftables);
 }
 
 vector<VCReduction*> Reducer::twins() {
