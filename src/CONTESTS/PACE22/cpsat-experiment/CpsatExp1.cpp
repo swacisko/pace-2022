@@ -645,7 +645,13 @@ tuple<VI,CpSolverStatus,VI, VVI> CpsatExp1::rerunModelUntilFeasibleOrTle(VVI & V
                         if(!is_large_graph || (is_hs_close_to_init_sol && last_sol_larger)) {
                             last_incumbent_solution_filled_size = temp.size();
                             std::lock_guard<std::mutex> lk(log_mutex);
+
+                            // Stopwatch temp_sw;
+                            // temp_sw.start("incumbent AF overhead");
                             auto unhit_graph_dfvs = getUnhitGraphGreedyFVS(V,temp);
+                            // temp_sw.stop("incumbent AF overhead");
+                            // DEBUG(temp_sw.getTime("incumbent AF overhead"));
+
                             if (temp.size() + unhit_graph_dfvs.size() < inter_fvs.size() ||
                                 (inter_fvs.empty() && temp.size() + unhit_graph_dfvs.size() < init_sol.size())
                                 ) {
@@ -1374,18 +1380,22 @@ ExpData CpsatExp1::solveIHS(VVI V, ExpConfig cnf, VVI & cycles, VI & res) {
     if (!best_fvs.empty()) res = best_fvs;
     else res = prev_res;
 
+    DEBUG(best_fvs.size());
+
     if(exp_data.iterations.empty()) {
         exp_data.iterations.emplace_back();
         exp_data.iterations.back().full_sol_size = best_fvs.size();
         exp_data.iterations.back().hs_valid_fvs = Utils::isFVS(V,best_fvs);
     }
 
-    if(exp_data.iterations.back().full_sol_size < best_fvs.size()) {
+    if(exp_data.iterations.back().full_sol_size > best_fvs.size()) {
         exp_data.iterations.emplace_back();
         exp_data.iterations.back().full_sol_size = best_fvs.size();
         exp_data.iterations.back().hs_size_after_impr = best_fvs.size();
         exp_data.iterations.back().hs_valid_fvs = Utils::isFVS(V,best_fvs);
     }
+
+    DEBUG(exp_data.iterations.back().full_sol_size);
 
     return exp_data;
 }
@@ -1718,30 +1728,38 @@ ExpData CpsatExp1::solve(VVI V, ExpConfig cnf) {
     int initN = V.size();
     int initM = GraphUtils::countEdges(V,true);
 
-    clog << "Starting initial preprocessing" << endl;
-    Config div_cnf{};
-    Reducer red(V, div_cnf);
-    red.disableAllNonbasicReductions();
-    red.cnf.write_logs = false;
-    red.cnf.disableAllRecursiveReductions();
-    red.cnf.disableAllConditionalReductions();
-    red.cnf.reducer_use_core = red.cnf.reducer_use_pie = red.cnf.reducer_use_dome = true;
-    red.cnf.reducer_use_domination = red.cnf.reducer_use_domination_3 = true;
-    red.cnf.reducer_use_unconfined = red.cnf.reducer_use_folding = red.cnf.reducer_use_funnel = true;
-    red.cnf.reducer_use_mixed_domination = red.cnf.reducer_use_inoutclique = true;
-    // red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+    bool use_preprocessing = true;
 
-    // #CAUTION! No conditional reductions can be used here
-    red.cnf.disableAllConditionalReductions();
-    auto reductions = red.reduce();
-    // VI red_dfvs = Reducer::convertKernelizedReductions(reductions);
-    V = red.V;
-    V = GraphInducer::induceByNonisolatedNodes(V).V;
+    bool is_pace_instance = cnf.metadata_filepath.contains("h_");
+    use_preprocessing = is_pace_instance;
+
+    if(use_preprocessing) {
+        clog << "Starting initial preprocessing" << endl;
+        Config div_cnf{};
+        Reducer red(V, div_cnf);
+        red.disableAllNonbasicReductions();
+        red.cnf.write_logs = false;
+        red.cnf.disableAllRecursiveReductions();
+        red.cnf.disableAllConditionalReductions();
+        red.cnf.reducer_use_core = red.cnf.reducer_use_pie = red.cnf.reducer_use_dome = true;
+        red.cnf.reducer_use_domination = red.cnf.reducer_use_domination_3 = true;
+        red.cnf.reducer_use_unconfined = red.cnf.reducer_use_folding = red.cnf.reducer_use_funnel = true;
+        red.cnf.reducer_use_mixed_domination = red.cnf.reducer_use_inoutclique = true;
+        // red.cnf.reducer_use_nonsimple_cycle_arcs = true;
+
+        // #CAUTION! No conditional reductions can be used here
+        red.cnf.disableAllConditionalReductions();
+        auto reductions = red.reduce();
+        // VI red_dfvs = Reducer::convertKernelizedReductions(reductions);
+        V = red.V;
+        V = GraphInducer::induceByNonisolatedNodes(V).V;
+    }
 
     int N = V.size();
     int M = GraphUtils::countEdges(V,true);
     int pi_arcs = Utils::countPiEdges(V);
-    clog << "After reductions graph has " << N << " nodes and " << M << " arcs, from which " << pi_arcs << " pi arcs" << endl;
+    if(use_preprocessing) clog << "After reductions graph has " << N << " nodes and " << M << " arcs, from which " << pi_arcs << " pi arcs" << endl;
+    else clog << "Reductions not run, graph has " << N << " nodes and " << M << " arcs, from which " << pi_arcs << " pi arcs" << endl;
 
     ExpData res{};
 
