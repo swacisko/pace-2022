@@ -10,6 +10,7 @@
 namespace GraphReader {
 
     extern VVI readGraphStandardEdges(istream &cin, bool directed = false);
+    extern VVI readGraphMTX(istream &cin);
 
     extern VVI readGraphDIMACSWunweighed(istream &cin, bool edgeFoolowE = false);
 };

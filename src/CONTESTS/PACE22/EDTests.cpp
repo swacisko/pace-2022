@@ -337,6 +337,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         sw.start("main");
         Config cnf;
         cnf.disableAllNonbasicReductions();
+        cnf.reducer_use_domination = true; // need to have this to make funnel work fast...
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined = true;
         cnf.reducer_use_twins_merge = true;
@@ -394,6 +395,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         sw.start("main");
         Config cnf;
         cnf.disableAllNonbasicReductions();
+        cnf.reducer_use_domination = true; // need to have this to make funnel work fast...
         cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined = true;
         cnf.reducer_use_twins_merge = true;
@@ -522,7 +524,8 @@ int main() {
     double C = 3;
     N0 *= C; M0 *= C;
 
-    VVI V = GraphReader::readGraphStandardEdges(cin);
+    // VVI V = GraphReader::readGraphStandardEdges(cin);
+    VVI V = GraphReader::readGraphMTX(cin);
     // VVI V = GraphReader::readGraphDIMACSWunweighed(cin,true);
     // VVI V = getTestV1();
     // VVI V = getRandomGraph(N0, M0);

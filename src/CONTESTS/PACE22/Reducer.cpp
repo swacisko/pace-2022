@@ -3146,6 +3146,7 @@ vector<FunnelReduction *> Reducer::funnel() {
             for( int a : A ) was[a] = false;
 
             if(cnf.reducer_use_domination && common_intersection) continue;
+            if ( A.size() > cnf.reducer_max_funnel_neigh_size ) continue;
 
             if( isClq(A) ){ // apply funnel reduction
                 if(cnf.reducer_use_domination) assert(!common_intersection);

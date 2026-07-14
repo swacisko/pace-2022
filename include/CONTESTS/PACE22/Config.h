@@ -69,6 +69,9 @@ public:
     bool reducer_use_bottleneck2 = false;
     bool reducer_use_recursive_reducer = false;
 
+
+    int reducer_max_funnel_neigh_size = 10;
+
     //******************************************************************** ED
     bool reducer_use_ed = false;
 

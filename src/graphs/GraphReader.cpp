@@ -4,6 +4,8 @@
 
 #include "graphs/GraphReader.h"
 
+#include "GraphUtils.h"
+
 
 namespace GraphReader{
 
@@ -24,6 +26,28 @@ namespace GraphReader{
             V[a-1].push_back(b-1);
             if( !directed ) V[b-1].push_back(a-1);
         }
+
+        return V;
+    }
+
+    VVI readGraphMTX(istream &cin) {
+        clog << "Caution! Reading from MTX only for tests - reading only and ezactly 1 comment line from top of the file..." << endl;
+        string s;
+        getline(cin,s);
+
+        int N,M;
+        cin >> N >> N >> M;
+        VVI V(N);
+        for (int i=0; i<M; i++) {
+            int a,b;
+            cin >> a >> b;
+            if (a == b) continue;
+            a--; b--;
+            V[a].push_back(b);
+            V[b].push_back(a);
+        }
+
+        V = GraphUtils::makeSimple(V);
 
         return V;
     }
