@@ -267,8 +267,12 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         if (msg != "") clog << msg << endl;
         auto [cmp_cnt, sizes] = GraphUtils::getConnectedcomponentsInfo(V);
         clog << "There are " << cmp_cnt << " nontrivial connected components, with the following size distribution" << endl;
-        for (auto [k,v] : sizes) clog << k << ": " << v << endl;
-        ENDL(1);
+        int cnt = 0;
+        for (auto [k,v] : sizes) {
+            clog << k << ": " << v << "   ";
+            if (cnt++ % 10 == 0) clog << "\n";
+        }
+        ENDL(2);
     };
 
 
@@ -424,8 +428,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         exp_data.ed_total_t2_inference_rules_created = red.ed_total_t2_inference_rules_created;
 
         auto indg = GraphInducer::induceByNonisolatedNodes(red.V);
-        exp_data.N3 = N;
-        exp_data.M3 = GraphUtils::countEdges(V);
+        exp_data.N3 = indg.V.size();
+        exp_data.M3 = GraphUtils::countEdges(indg.V);
         DEBUG(PII(exp_data.N3,exp_data.M3));
         writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
 
