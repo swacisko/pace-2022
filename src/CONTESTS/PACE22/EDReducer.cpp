@@ -30,6 +30,8 @@ VI EDReducer::reduce(VVI V0) {
         last_reduce_inf_rules_1_added = last_reduce_inf_rules_2_created = 0;
         inf_rules_1.clear();
         inf_rules_2.clear();
+        all_inf_rules_1_found.clear();
+        all_inf_rules_2_found.clear();
     }
 
     if (cnf.ed_use_node_removal) {
@@ -50,6 +52,7 @@ VI EDReducer::reduce(VVI V0) {
                     if (!was[d]) {
                         GraphUtils::addEdge(V,v,d);
                         last_reduce_inf_rules_1_added++;
+                        all_inf_rules_1_found.emplace_back(v,d);
                     }
                 }
                 for (int d : V[v]) was[d] = false;

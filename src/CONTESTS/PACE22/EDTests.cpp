@@ -21,26 +21,33 @@
 using namespace operations_research::sat;
 
 struct ExpData {
-    int N0=-1, M0=-1, N1=-1, M1=-1, N2=-1, M2=-1, N3=-1, M3=-1;
-    int red1_offset, red2_offset = 0, red3_offset = 0;
+    int N0=-1, M0=-1, N1=-1, M1=-1, N2=-1, M2=-1, N3=-1, M3=-1, N4=-1, M4=-1;
+    int red1_offset, red_noned_offset = 0, red_ed_offset = 0, red_ed2_offset = 0;
     // int type1_constraints = -1;
     // int type2_constraints = -1;
 
     int red_init_time_millis = -1;
     int red_noned_time_millis = -1;
     int red_ed_time_millis = -1;
+    int red_ed2_time_millis = -1;
 
     int solver_max_time_sec = -1;
     int solver_time_granularity = -1;
     int solver_repeats = -1;
     VD noned_results;
     VD ed_results;
+    VD ed2_results;
 
     int ed_nodes_reduced = -1;
     int ed_edges_removed = -1;
+    int ed2_nodes_reduced = -1;
+    int ed2_edges_removed = -1;
     int ed_t1_inference_rules_added = -1;
+    int ed2_t1_inference_rules_added = -1;
     int ed_total_t2_inference_rules_created = -1;
+    int ed2_total_t2_inference_rules_created = -1;
     int ed_t2_inference_rules_added = -1;
+    int ed2_t2_inference_rules_added = -1;
 
     map<string,string> getEntries() {
         map<string,string> res;
@@ -48,20 +55,28 @@ struct ExpData {
         res["N1"] = to_string(N1); res["M1"] = to_string(M1);
         res["N2"] = to_string(N2); res["M2"] = to_string(M2);
         res["N3"] = to_string(N3); res["M3"] = to_string(M3);
+        res["N4"] = to_string(N4); res["M4"] = to_string(M4);
 
         res["red1_offset"] = to_string(red1_offset);
-        res["red2_offset"] = to_string(red2_offset);
-        res["red3_offset"] = to_string(red3_offset);
+        res["red_noned_offset"] = to_string(red_noned_offset);
+        res["red_ed_offset"] = to_string(red_ed_offset);
+        res["red_ed2_offset"] = to_string(red_ed2_offset);
 
         res["ed_nodes_reduced"] = to_string(ed_nodes_reduced);
+        res["ed2_nodes_reduced"] = to_string(ed2_nodes_reduced);
         res["ed_edges_removed"] = to_string(ed_edges_removed);
+        res["ed2_edges_removed"] = to_string(ed2_edges_removed);
         res["ed_t1_inference_rules_added"] = to_string(ed_t1_inference_rules_added);
+        res["ed2_t1_inference_rules_added"] = to_string(ed2_t1_inference_rules_added);
         res["ed_total_t2_inference_rules_created"] = to_string(ed_total_t2_inference_rules_created);
+        res["ed2_total_t2_inference_rules_created"] = to_string(ed2_total_t2_inference_rules_created);
         res["ed_t2_inference_rules_added"] = to_string(ed_t2_inference_rules_added);
+        res["ed2_t2_inference_rules_added"] = to_string(ed2_t2_inference_rules_added);
 
         res["red_init_time_millis"] = to_string(red_init_time_millis);
         res["red_noned_time_millis"] = to_string(red_noned_time_millis);
         res["red_ed_time_millis"] = to_string(red_ed_time_millis);
+        res["red_ed2_time_millis"] = to_string(red_ed2_time_millis);
 
         res["solver_max_time_sec"] = to_string(solver_max_time_sec);
         res["solver_time_granularity"] = to_string(solver_time_granularity);
@@ -76,6 +91,10 @@ struct ExpData {
         res["ed_results"] = str.str();
         str.clear(); str.str("");
 
+        for (int d : ed2_results) str << d << " ";
+        res["ed2_results"] = str.str();
+        str.clear(); str.str("");
+
         return res;
     }
 
@@ -84,12 +103,21 @@ struct ExpData {
         str.precision(2);
 
         auto mapa = getEntries();
-        vector<string> header = { "N0", "M0", "N1", "M1", "N2", "M2", "N3", "M3",
-            "red1_offset", "red2_offset", "red3_offset", "ed_total_t2_inference_rules_created", "ed_t2_inference_rules_added",
-            "ed_nodes_reduced", "ed_edges_removed", "ed_t1_inference_rules_added",
-        "red_init_time_millis", "red_noned_time_millis", "red_ed_time_millis",
-        "solver_max_time_sec", "solver_time_granularity", "solver_repeats",
-        "noned_results", "ed_results"
+        vector<string> header = { "N0", "M0", "N1", "M1", "N2", "M2", "N3", "M3", "N4", "M4",
+            "red1_offset", "red_noned_offset", "red_ed_offset", "red_ed2_offset",
+            "ed_total_t2_inference_rules_created",
+            "ed_t2_inference_rules_added",
+            "ed_nodes_reduced", "ed2_nodes_reduced",
+            "ed_edges_removed", "ed2_edges_removed",
+            "ed_t1_inference_rules_added", "ed2_t1_inference_rules_added",
+            "red_init_time_millis",
+            "red_noned_time_millis",
+            "red_ed_time_millis", "red_ed2_time_millis",
+            "solver_max_time_sec",
+            "solver_time_granularity",
+            "solver_repeats",
+            "noned_results",
+            "ed_results", "ed2_results"
         };
 
         auto writeLine = [&](vector<string> & l) {
@@ -362,10 +390,10 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
         int noned_solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
         DEBUG(noned_solution_lift_overhead);
-        exp_data.red2_offset = exp_data.red1_offset + noned_solution_lift_overhead;
+        exp_data.red_noned_offset = exp_data.red1_offset + noned_solution_lift_overhead;
 
         { // numvc/fastvc testing
-            auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red2_offset);
+            auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red_noned_offset);
             assert(VCUtils::isVertexCover( indg.V, fastvc_sol ));
             indg.remapNodes(fastvc_sol);
             assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
@@ -389,84 +417,107 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
     }
 
+    VD last_times_temp;
 
-    constexpr bool test_ed_vc_rules = true;
-    if (test_ed_vc_rules) {
-        clog << endl << "***************** CHECKING FULL ED RULES" << endl;
+    auto testEDRules = [&](auto & exp_data, bool add_constraints = false) {
+        constexpr bool test_ed_vc_rules = true;
+        if (test_ed_vc_rules) {
+            clog << endl << "***************** CHECKING FULL ED RULES" << endl;
 
-        // now measuring VC reduction time WITH ED rule
-        Stopwatch sw;
-        sw.start("main");
-        Config cnf;
-        cnf.disableAllNonbasicReductions();
-        cnf.reducer_use_domination = true; // need to have this to make funnel work fast...
-        cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
-        cnf.reducer_use_unconfined = true;
-        cnf.reducer_use_twins_merge = true;
-        // cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10; // original
-        cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
-        cnf.reducer_use_ed = true;
-        cnf.ed_consider_nodes_to_move_outside_NW = true;
-        cnf.ed_use_same_neigh_domination = true;
-        cnf.ed_use_deficit1_domination = true;
+            // now measuring VC reduction time WITH ED rule
+            Stopwatch sw;
+            sw.start("main");
+            Config cnf;
+            cnf.disableAllNonbasicReductions();
+            cnf.reducer_use_domination = true; // need to have this to make funnel work fast...
+            cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
+            cnf.reducer_use_unconfined = true;
+            cnf.reducer_use_twins_merge = true;
+            // cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10; // original
+            cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
+            cnf.reducer_use_ed = true;
+            cnf.ed_consider_nodes_to_move_outside_NW = true;
+            cnf.ed_use_same_neigh_domination = true;
+            cnf.ed_use_deficit1_domination = true;
+            cnf.ed_apply_type1_constraints_on_the_fly = add_constraints;
 
-        cnf.ed_use_double_ed_checks = false; // time-consuming, especially for denser graphs... use for sparse graphs only
-        // cnf.ed_use_edge_removal = true;
+            cnf.ed_use_double_ed_checks = false; // time-consuming, especially for denser graphs... use for sparse graphs only
+            // cnf.ed_use_edge_removal = true;
 
-        Reducer red(V,cnf);
-        auto to_lift = red.reduce();
-        sw.stop("main");
-        red.writeTotals();
-        clog << "Full ED graph reduction took " << sw.getTime("main") / 1000 << " seconds" << endl;
+            Reducer red(V,cnf);
+            auto to_lift = red.reduce();
+            sw.stop("main");
+            red.writeTotals();
+            clog << "Full ED graph reduction took " << sw.getTime("main") / 1000 << " seconds" << endl;
 
-        exp_data.red_ed_time_millis = exp_data.red_init_time_millis + sw.getTime("main");
+            exp_data.red_ed_time_millis = exp_data.red_init_time_millis + sw.getTime("main");
 
-        exp_data.ed_nodes_reduced = red.ed_nodes_reduced;
-        exp_data.ed_edges_removed = red.ed_edges_removed; assert(red.ed_edges_removed == 0);
-        exp_data.ed_t1_inference_rules_added = red.ed_t1_inference_rules_added;
-        exp_data.ed_t2_inference_rules_added = red.ed_t2_inference_rules_added;
-        exp_data.ed_total_t2_inference_rules_created = red.ed_total_t2_inference_rules_created;
+            exp_data.ed_nodes_reduced = red.ed_nodes_reduced;
+            exp_data.ed_edges_removed = red.ed_edges_removed; assert(red.ed_edges_removed == 0);
+            exp_data.ed_t1_inference_rules_added = red.ed_t1_inference_rules_added;
+            exp_data.ed_t2_inference_rules_added = red.ed_t2_inference_rules_added;
+            exp_data.ed_total_t2_inference_rules_created = red.ed_total_t2_inference_rules_created;
 
-        auto indg = GraphInducer::induceByNonisolatedNodes(red.V);
-        exp_data.N3 = indg.V.size();
-        exp_data.M3 = GraphUtils::countEdges(indg.V);
-        DEBUG(PII(exp_data.N3,exp_data.M3));
-        writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
+            auto indg = GraphInducer::induceByNonisolatedNodes(red.V);
+            exp_data.N3 = indg.V.size();
+            exp_data.M3 = GraphUtils::countEdges(indg.V);
+            DEBUG(PII(exp_data.N3,exp_data.M3));
+            writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
 
-        int ed_solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
-        DEBUG(ed_solution_lift_overhead);
-        exp_data.red3_offset = exp_data.red1_offset + ed_solution_lift_overhead;
+            int ed_solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
+            DEBUG(ed_solution_lift_overhead);
+            exp_data.red_edoffset = exp_data.red1_offset + ed_solution_lift_overhead;
 
-        { // numvc/fastvc testing
-            auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red3_offset);
-            assert(VCUtils::isVertexCover( indg.V, fastvc_sol ));
-            indg.remapNodes(fastvc_sol);
-            assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
-            Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift, false);
-            assert(VCUtils::isVertexCover( V, fastvc_sol ));
+            { // numvc/fastvc testing
+                auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red_edoffset);
+                assert(VCUtils::isVertexCover( indg.V, fastvc_sol ));
+                indg.remapNodes(fastvc_sol);
+                assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
+                Reducer::liftSolution(red.V.size(), fastvc_sol, to_lift, false);
+                assert(VCUtils::isVertexCover( V, fastvc_sol ));
+            }
+
+
+            // now solve the reduced problem using constraints...
+
+
+            VPII constraints;
+            auto edges = GraphUtils::getGraphEdges(indg.V);
+            for ( auto [a,b] : edges ) constraints.emplace_back(a+1,b+1);
+
+
+            auto [solver_vc,times] = solveInstanceUsingSolver(constraints,solver_max_time_sec,solver_time_granularity, solver_repeats);
+            DEBUG(times);
+            for (auto& d : times) if (d != -1) d += ed_solution_lift_overhead;
+            exp_data.ed_results = times;
+
+            DEBUG(solver_vc.size());
+            DEBUG(exp_data.ed_results);
+
+            indg.remapNodes(solver_vc);
+            Reducer::liftSolution(red.V.size(), solver_vc, to_lift, true);
+            assert(VCUtils::isVertexCover( V, solver_vc ));
         }
+    };
+
+    // now checking the impact without adding t1-constraints on the fly
+    testEDRules(exp_data, false);
 
 
-        // now solve the reduced problem using constraints...
+    // now checking the impact with adding t1-constraints on the fly
+    ExpData dummy_exp_data;
+    testEDRules( dummy_exp_data, true);
+    exp_data.N4 = dummy_exp_data.N3;
+    exp_data.M4 = dummy_exp_data.M3;
+    exp_data.red_ed2_offset = dummy_exp_data.red_ed_offset;
+    exp_data.ed2_results = dummy_exp_data.ed_results;
+    exp_data.red_ed2_time_millis = dummy_exp_data.red_ed_time_millis;
+    exp_data.ed2_t1_inference_rules_added = dummy_exp_data.ed_t1_inference_rules_added;
+    exp_data.ed2_t2_inference_rules_added = dummy_exp_data.ed_t2_inference_rules_added;
+    exp_data.ed2_total_t2_inference_rules_created = dummy_exp_data.ed_total_t2_inference_rules_created;
 
 
-        VPII constraints;
-        auto edges = GraphUtils::getGraphEdges(indg.V);
-        for ( auto [a,b] : edges ) constraints.emplace_back(a+1,b+1);
-
-
-        auto [solver_vc,times] = solveInstanceUsingSolver(constraints,solver_max_time_sec,solver_time_granularity, solver_repeats);
-        DEBUG(times);
-        for (auto& d : times) if (d != -1) d += ed_solution_lift_overhead;
-        exp_data.ed_results = times;
-
-        DEBUG(solver_vc.size());
-        DEBUG(exp_data.ed_results);
-
-        indg.remapNodes(solver_vc);
-        Reducer::liftSolution(red.V.size(), solver_vc, to_lift, true);
-        assert(VCUtils::isVertexCover( V, solver_vc ));
-    }
+    exp_data.ed2_results = last_times_temp;
 
 
     return exp_data;

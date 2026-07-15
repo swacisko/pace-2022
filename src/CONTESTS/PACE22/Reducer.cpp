@@ -1172,6 +1172,7 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
 
         // standard edge-insertion - those edges that are found using consider(v) for single-node initial sets S
         // if (false)
+        if (cnf.ed_apply_type1_constraints_on_the_fly)
         if (is_pi_graph && cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
             ed_rules_checked++;
             Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
