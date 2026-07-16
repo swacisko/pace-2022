@@ -146,6 +146,17 @@ public:
     //******************************************************************** ED
 
 
+    /**
+     * The maximum size of the neighborhood of a node to be checked for funnel rule.
+     */
+    int reducer_max_funnel_clique_size = 15;
+
+    /**
+     * The maximum size of a clique-neighborhood of each node on the found desk.
+     * Thus, the maximum degree of a node on a desk can be at most 2 + reducer_max_desk_clique_size.
+     */
+    int reducer_max_desk_clique_size = 3;
+
     int reducer_max_time_millis = 1e9; // no time limit by default
 
 

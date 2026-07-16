@@ -41,7 +41,7 @@ ReducedInstance Reducer::reduce() {
         reduced_instance.primary_indg_nodes = indg.nodes;
         V = indg.V;
         N = V.size();
-        was = helper = VB(N);
+        was = was2 = helper = helper2 = VB(N);
     }
 
     reduced_instance.secondaryN = N;
@@ -137,6 +137,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
 
     int ed_rules_checked = 0;
+    int general_folding_rules_checked = 0;
 
     do{
 
@@ -166,7 +167,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
         if(cnf.reducer_use_unconfined){
             Stopwatch s; string opt = "unconfined"; s.start(opt);
-            clog << "Running unconfined" << endl;
+            if(write_progress_on_the_fly) clog << "Running unconfined" << endl;
             VI uncon = unconfined();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
@@ -195,23 +196,17 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
-        if (false)
         if(cnf.reducer_use_funnel){
-            if(!cnf.reducer_use_domination){
-                clog << "CAUTION! Calling funnel reduction without domination rule before!" << endl;
-            }
-            if(write_progress_on_the_fly) DEBUG(total_funnels_done);
+            if(write_progress_on_the_fly) clog << "Running funnel" << endl;
 
             Stopwatch s; string opt = "funnel"; s.start(opt);
-            auto funnel_liftables = funnel();
+            auto liftables = funnel();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
-            total_funnels_done += funnel_liftables.size();
-            if(write_progress_on_the_fly) DEBUG(total_funnels_done);
 
-            addLiftables(funnel_liftables);
+            addLiftables(liftables);
 
-            modified |= !funnel_liftables.empty();
+            modified |= !liftables.empty();
             if(modified) continue;
         }
 
@@ -307,7 +302,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
-        if(cnf.reducer_use_general_folding){
+        if(cnf.reducer_use_general_folding && ++general_folding_rules_checked <= 2){ // at most two times use general folding
             Stopwatch s; string opt = "general folding"; s.start(opt);
             auto reductions = generalFolding();
             total_general_folds_done += reductions.size();
@@ -459,9 +454,205 @@ void Reducer::disableAllConditionalReductions() {
 
 
 
+vector<VCReduction *> Reducer::applyAlternativeSets(VI A, VI B) {
+    vector<VCReduction*> liftables;
 
-vector<FunnelReduction *> Reducer::funnel() {
-    assert(false && "funnel not implemented yet, should be incorporated to the main \'basic workflow\'");
+
+    { // remove nodes from N(A) \cap N(B) and add
+        VI to_remove;
+        for (int a : A) was[a] = true;
+        for (int a : A) for (int d : V[a]) if (!was[d]) helper[d] = true; // N(A) without nodes in A
+
+        for (int b : B) was2[b] = true;
+        for (int b : B) for (int d : V[b]) if (!was2[d] && helper[d] && !helper2[d]) {
+            to_remove.push_back(d);
+            helper2[d] = true;
+        }
+        for (int d : to_remove) helper2[d] = false;
+        for (int b : B) was2[b] = false;
+
+        for (int a : A) for (int d : V[a]) helper[d] = false;
+        for (int a : A) was[a] = false;
+
+        if (!to_remove.empty()) {
+            // clog << "In alternative sets, found nonempty intersection of NA and NB: " << to_remove << endl;
+            liftables.push_back( new KernelizedNodesReduction(to_remove) );
+            GraphUtils::removeNodes(V,to_remove,helper);
+        }
+    }
+
+
+    VI NA, NB;
+    { // add lacking connections
+        for (int a : A) was[a] = true;
+        for (int a : A) for (int d : V[a]) if (!was[d] && !helper[d]) {
+            helper[d] = true;
+            NA.push_back(d);
+        }
+        for (int d : NA) helper[d] = false;
+        for (int a : A) was[a] = false;
+
+        for (int b : B) was[b] = true;
+        for (int b : B) for (int d : V[b]) if (!was[d] && !helper[d]) {
+            helper[d] = true;
+            NB.push_back(d);
+        }
+        for (int d : NB) helper[d] = false;
+        for (int b : B) was[b] = false;
+
+        for ( int b : NB ) {
+            for (int d : V[b]) was[d] = true;
+            for (int d : A) was[d] = true;
+
+            for (int a : NA) if (!was[a]) {
+                // assert(!ranges::contains( V[a],b ));
+                // assert(!ranges::contains( V[b],a ));
+                GraphUtils::addEdge(V,a,b);
+            }
+
+            for (int d : V[b]) was[d] = false;
+            for (int d : A) was[d] = false;
+        }
+    }
+
+    // DEBUG(A); DEBUG(B); DEBUG(NA); DEBUG(NB);
+    NA = StandardUtils::setDifference(NA,B,helper);
+    if ( !NA.empty() && !NB.empty() ) liftables.push_back( new AlternativeSetsReduction(NA,B,A) );
+
+    GraphUtils::removeNodes(V,A,helper);
+    GraphUtils::removeNodes(V,B,helper);
+
+    return liftables;
+}
+
+vector<VCReduction*> Reducer::funnel() {
+    vector<VCReduction*> liftables;
+
+    constexpr bool run_correctness_assertions = false;
+
+    if constexpr(run_correctness_assertions) assert(ranges::none_of(was, std::identity{})); // #TEST #CAUTION - just an assertion for tests
+
+    bool changes = true;
+    constexpr bool run_exhaustively = true;
+
+    // finds a candidate node x for a funnel edge {v,x}
+    auto findIsolatedNodeCandidate = [&](int v) -> pair<int,bool> {
+        int cand = -1;
+
+        if constexpr(run_correctness_assertions) assert(ranges::none_of(was, std::identity{})); // #TEST #CAUTION - just an assertion for tests
+        if constexpr(run_correctness_assertions) assert(ranges::none_of(was2, std::identity{})); // #TEST #CAUTION - just an assertion for tests
+
+        for ( int d : V[v] ) was[d] = true;
+        int a = V[v][0]; // any node from V[v]
+        int cnt = 0;
+        for (int d : V[a]) cnt += was[d];
+        if (cnt >= V[v].size()) { DEBUG(cnt); DEBUG(PII(v,a)); DEBUG(V[v]); DEBUG(V[a]); }
+        assert(cnt <= (int)V[v].size()-1);
+
+        if (cnt == 0) cand = a; // a is isolated from N(v)
+        else if (cnt < (int)V[v].size()-1 ) { // there exists node in V[v] that is not in V[a], we need to find it
+            for (int d : V[a]) was2[d] = true;
+            for (int x : V[v]) if (!was2[x]) cand = x;
+            for (int d : V[a]) was2[d] = false;
+            assert(cand != -1);
+        }else {
+            // node a dominates node v
+            // clog << "Found a dominating node using funnel, a: " << a << ", V[a]: " << V[a] << endl;
+            // clog << "v: " << v << ", V[v]: " << V[v] << endl;
+            for ( int d : V[v] ) was[d] = false;
+            return {a,true};
+        }
+
+        for ( int d : V[v] ) was[d] = false;
+        return {cand,false};
+    };
+
+
+    // checks whether V[v] \setminus {cand} is a clique
+    auto isClq = [&](int v, int cand)-> bool {
+        bool is_clq = true;
+        int clq_size = (int)V[v].size()-1;
+
+        for ( int d : V[v] ) if (d != cand) was[d] = true;
+        for ( int d : V[v] ) if ( d != cand ) {
+            int c = 0;
+            for (int dd : V[d]) c += was[dd];
+            assert(c+1 <= clq_size);
+            if (c+1 < clq_size) { is_clq = false; break; }
+        }
+        for ( int d : V[v] ) was[d] = false;
+
+        return is_clq;
+    };
+
+    constexpr bool allow_separate_domination = true;
+
+    while (changes) {
+        changes = false;
+
+        for (int v=0; v<N; v++) if (!V[v].empty()) if ( (int)V[v].size()-1 <= cnf.reducer_max_funnel_clique_size ) {
+            auto [cand,dominates] = findIsolatedNodeCandidate(v);
+
+            if constexpr(allow_separate_domination) if (dominates) {
+                // continue;
+                liftables += propagateDeg1RuleSlow(cand);
+                if (run_exhaustively) changes = true;
+                continue;
+            }
+
+            bool is_clq = isClq(v,cand);
+            if (!is_clq) continue;
+
+            if constexpr(allow_separate_domination) if (!dominates) {
+                auto neigh = V[v];
+                for (int d : V[v]) if (d != cand) was[d] = true;
+                for ( int d : V[cand] ) if (was[d] && !V[d].empty()) {
+                    dominates = true;
+                    // clog << "Found a dominating node in funnel!" << endl;
+                    liftables += propagateDeg1RuleSlow(d);
+                    if (run_exhaustively) changes = true;
+                }
+                for (int d : neigh) was[d] = false;
+                if (dominates) continue;
+            }
+
+
+
+
+
+            // we found a funnel {v,cand}
+            // clog << endl << "Found a funnel!" << endl;
+            // DEBUG(PII(v,cand));
+            // clog << "V[" << v << "]: " << V[v] << endl;
+            // for (int d : V[v]) clog << "V[" << d << "]: " << V[d] << endl;
+            // clog << "Considered clique: "; for (int d : V[v]) if (d != cand) clog << d << " "; clog << endl;
+
+
+            auto lft = applyAlternativeSets({v}, {cand});
+
+            if constexpr(run_correctness_assertions) assert(ranges::none_of(was, std::identity{})); // #TEST #CAUTION - just an assertion for tests
+            if constexpr(run_correctness_assertions) assert(GraphUtils::isSimple(V)); // #TEST just for debugging
+
+            // DEBUG(lft.size());
+            // assert(lft.size() == 1);
+            total_funnels_done += lft.size();
+            if (run_exhaustively) changes = true;
+
+            for (auto l : lft) {
+                if (auto* derived = dynamic_cast<AlternativeSetsReduction*>(l)) derived->red_name = "funnel";
+                else {
+                    // else this is a kernelized nodes reduction - in case of a funnel it should not exist if
+                    // domination was applied before
+                    if constexpr(allow_separate_domination)
+                    assert(false && "this should not happen, as we distinguish domination case separately,"
+                                    " so no kernelized nodes should be created for found alternative sets");
+                }
+            }
+            liftables += lft;
+        }
+    }
+
+    return liftables;
 }
 
 
@@ -535,7 +726,7 @@ vector<GeneralFoldingReduction *> Reducer::generalFolding() {
 
     VI order(N); iota(ALL(order),0);
     sort(ALL(order), [&](int a, int b){ return V[a].size() < V[b].size(); });
-    reverse(ALL(order)); // #TEST - starting node selection from largest degree in general_folding
+    reverse(ALL(order)); // starting node selection from largest degree in general_folding
 
     for( int w : order ){
         if(V[w].size() <= 1) continue;

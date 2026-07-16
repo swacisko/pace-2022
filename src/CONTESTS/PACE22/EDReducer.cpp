@@ -81,8 +81,7 @@ VI EDReducer::reduce(VVI V0) {
             });
             if ( cnf.ed_node_sorting_mode == 2 ) reverse(ALL(edges));
 
-            // for (int u : nodes)  if (!V[u].empty()) for ( int v : V[u] ) {
-            for ( auto [u,v] : edges ){
+            for ( auto [u,v] : edges ) if ( !V[u].size() <= 1 && !V[v].size() <= 1 ) {
                 // clog << "Considering edge " << PII(u,v) << " for ED-edge-removal" << endl;
                 if ( consider({u,v}) ) {
                     clearAllForConsider();

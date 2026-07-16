@@ -63,6 +63,46 @@ private:
 };
 
 
+class AlternativeSetsReduction : public VCReduction{
+public:
+    AlternativeSetsReduction( VI if_nds, VI then_nds, VI else_nds){
+        if_nodes = if_nds;
+        then_nodes = then_nds;
+        else_nodes = else_nds;
+    }
+
+    void lift(VI &sol, VB &in_sol) override {
+        bool all = true;
+        for(int d : if_nodes) if(!in_sol[d]) all = false;
+
+        if(all){
+            sol += then_nodes;
+            for (int d : then_nodes) in_sol[d] = true;
+        }else{
+            sol += else_nodes;
+            for (int d : else_nodes) in_sol[d] = true;
+        }
+    }
+
+    int offset() override { return then_nodes.size(); }
+
+    string toString() override {
+        stringstream str;
+        str << "AlternativeSets-" << red_name << ", if_nodes: " << if_nodes << ", then_nodes: " << then_nodes <<
+            ", else_nodes: " << else_nodes;
+        return str.str();
+    }
+
+    string name(){return red_name;}
+    string red_name = "unnamed AS reduction";
+
+private:
+    VI if_nodes;
+    VI then_nodes;
+    VI else_nodes;
+};
+
+
 
 
 class GeneralFoldingReduction : public VCReduction{
@@ -409,7 +449,7 @@ public:
 
     /**
      * Starting from node v, it removes v from the graph, then if some of its neighbors has degree 1,
-     * it removed its single neigbor, etc.
+     * it removes its single neighbor, etc.
      * This function might be slow, because when we remove node v, we remove at once v from the neighborhood lists
      * of all of its neighbors. So removing v takes \sum_{u \in N(v)} deg(u)...
      */
@@ -432,8 +472,17 @@ public:
      */
     vector<VCReduction*> twins();
 
+    /**
+     *First, adds N(A) \cap N(B) to the solution and removes it from the graph.
+     * Then adds all possible nonexisting connections between A and B (make G_{A,B} a full bipartite graph).
+     * Then removes A and B from the graph.
+     *
+     * CAUTION! It only creates and returns the KernelizedNodesReduction if N(A) \cap N(B) \neq \emptyset.
+     * The responsibility to create the liftable rule such as funnel or desk lies in the specialised functions.
+     */
+    vector<VCReduction*> applyAlternativeSets(VI A, VI B);
 
-    vector<FunnelReduction*> funnel();
+    vector<VCReduction*> funnel();
 
     vector<VCReduction*> desk();
 
@@ -493,7 +542,7 @@ private:
     VVI V;
 
 
-    VB was, helper;
+    VB was, was2, helper, helper2;
 };
 
 #endif //ALGORITHMSPROJECT_REDUCER_H
