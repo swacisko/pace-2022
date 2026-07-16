@@ -228,13 +228,13 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
             assert(res.size() == edred.last_reduce_nodes_removed);
-            ed_nodes_reduced += edred.last_reduce_nodes_removed;
-            ed_edges_removed += edred.last_reduce_edges_removed;
+            ed_nodes_reduced += edred.ed_node_applied_cnt;
+            ed_edges_removed += edred.ed_edge_applied_cnt;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
             addKNR(res);
             if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
-            if (edred.madeChangesInLastReduce())  V = edred.getV();
+            if (edred.madeChangesInLastReduce()) V = edred.getV();
             modified |= edred.madeChangesInLastReduce();
 
             if(modified) continue;

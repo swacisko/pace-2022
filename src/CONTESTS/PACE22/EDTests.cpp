@@ -148,22 +148,24 @@ static void updateResTimes(auto & res_times) {
 
 
 pair<VI,VI> solveByFastVC(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
-    VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec), -1);
+    VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1);
     return {};
 }
 
 pair<VI,VI> solveByHIGHS(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
-    VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec), -1);
+    VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1);
     return {};
 }
 
 pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
-    VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec), -1 );
+    VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1 );
 
     clog << "Running cpsat for at most " << max_sec << " seconds" << endl;
 
     int N = 0;
     for ( auto [a,b] : constraints ) N = max( N, 1 + max( abs(a), abs(b) ) );
+    Stopwatch sw;
+    sw.start("cpsat");
 
     SatParameters params;
     params.set_num_search_workers(6);
@@ -211,8 +213,8 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_s
     model.Minimize( LinearExpr::Sum(nodes) );
 
     const CpSolverResponse response = SolveCpModel(model.Build(), &solver_model);
-
     updateResTimes(res_times);
+    sw.stop("cpsat");
 
     if (response.status() == CpSolverStatus::OPTIMAL ||
         response.status() == CpSolverStatus::FEASIBLE) {
@@ -227,6 +229,9 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_s
         if ( response.status() == CpSolverStatus::UNKNOWN ) clog << "CPSAT solver status UNKNOWN" << endl;
     }
 
+    int ind = ceil(1.0 * sw.getTime("cpsat") / (1000*res_measure_freq_sec));
+    if ( ind < res_times.size() ) res_times[ind] = res.size();
+
     clog << "Returning results found by cpsat, res.size() " << res.size() << ", res_times: " << res_times << endl;
 
     return {res,res_times};
@@ -239,7 +244,7 @@ pair<VI,VI> solveByEvalMaxSAT(VPII & constraints, int max_sec, int res_measure_f
 
 pair<VI,VD> solveInstanceUsingSolver(VPII constraints, int max_time_sec, int res_measure_freq_sec, int repeats, string alg = "cpsat") {
     // times[i] is the result found by the solver after time (i+1) * granularity seconds
-    const int I = ceil(1.0 * max_time_sec / res_measure_freq_sec);
+    const int I = ceil(1.0 * max_time_sec / res_measure_freq_sec) + 1;
     VVI iteration_res_times(I, VI());
     VD res_times(I, -1);
     VI res; // valid solution for provided constraints

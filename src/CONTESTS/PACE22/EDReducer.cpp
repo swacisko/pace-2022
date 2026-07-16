@@ -34,41 +34,70 @@ VI EDReducer::reduce(VVI V0) {
         all_inf_rules_2_found.clear();
     }
 
-    if (cnf.ed_use_node_removal) {
-        for (int v : nodes) if (!V[v].empty()) {
-            // clog << "\rConsidering node " << v << flush;
-            if (consider({v})) {
-                if (write_logs)
-                    clog << "\t\tNode " << v << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
-                reducible_nodes.push_back(v);
-                GraphUtils::removeNodeFromGraph(V,v);
-                last_reduce_nodes_removed++;
-            }
-            else if ( cnf.ed_apply_type1_constraints_on_the_fly && !inf_rules_1.empty() ) {
-                for (int d : V[v]) was[d] = true;
-                StandardUtils::makeUnique(inf_rules_1);
-                for ( auto d : inf_rules_1 ) { // in inf_rules we will have N(v), as we add v to S using moveToS(v).
-                    assert(d != v);
-                    if (!was[d]) {
-                        GraphUtils::addEdge(V,v,d);
-                        last_reduce_inf_rules_1_added++;
-                        all_inf_rules_1_found.emplace_back(v,d);
-                    }
+    bool changes = true;
+    constexpr bool use_exhaustively = false;
+
+    while (changes) {
+        changes = false;
+
+        if (cnf.ed_use_node_removal) {
+            for (int v : nodes) if (!V[v].empty()) {
+                // clog << "\rConsidering node " << v << flush;
+                if (consider({v})) {
+                    if (write_logs)
+                        clog << "\t\tNode " << v << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
+                    // reducible_nodes.push_back(v);
+                    // GraphUtils::removeNodeFromGraph(V,v);
+                    // last_reduce_nodes_removed++;
+                    auto temp = propagateDeg1RuleSlow(v);
+                    reducible_nodes += temp;
+                    last_reduce_nodes_removed += temp.size();
+                    ed_node_applied_cnt++;
+                    if (use_exhaustively) changes = true;
                 }
-                for (int d : V[v]) was[d] = false;
+                else if ( cnf.ed_apply_type1_constraints_on_the_fly && !inf_rules_1.empty() ) {
+                    for (int d : V[v]) was[d] = true;
+                    StandardUtils::makeUnique(inf_rules_1);
+                    for ( auto d : inf_rules_1 ) { // in inf_rules we will have N(v), as we add v to S using moveToS(v).
+                        assert(d != v);
+                        if (!was[d]) {
+                            GraphUtils::addEdge(V,v,d);
+                            last_reduce_inf_rules_1_added++;
+                            all_inf_rules_1_found.emplace_back(v,d);
+                            if (use_exhaustively) changes = true;
+                        }
+                    }
+                    for (int d : V[v]) was[d] = false;
+                }
             }
         }
-    }
 
-    if (cnf.ed_use_edge_removal) {
-        for (int u : nodes)  if (!V[u].empty()) for ( int v : V[u] ) {
-            // clog << "Considering edge " << PII(u,v) << " for ED-edge-removal" << endl;
-            if ( consider({u,v}) ) {
-                clearAllForConsider();
-                GraphUtils::removeEdge(V,u,v);
-                if (write_logs)
-                    clog << "\tRemoving edge " << PII(u,v) << " using ED for edge removal" << endl;
-                last_reduce_edges_removed++;
+        if (cnf.ed_use_edge_removal) {
+            VPII edges = GraphUtils::getGraphEdges(V);
+            sort(ALL(edges), [&]( PII e1, PII e2 ) {
+                auto [a,b] = e1;
+                auto [c,d] = e2;
+                return V[a].size() + V[b].size() > V[c].size() + V[d].size();
+            });
+            if ( cnf.ed_node_sorting_mode == 2 ) reverse(ALL(edges));
+
+            // for (int u : nodes)  if (!V[u].empty()) for ( int v : V[u] ) {
+            for ( auto [u,v] : edges ){
+                // clog << "Considering edge " << PII(u,v) << " for ED-edge-removal" << endl;
+                if ( consider({u,v}) ) {
+                    clearAllForConsider();
+                    GraphUtils::removeEdge(V,u,v);
+                    if (write_logs)
+                        clog << "\tRemoving edge " << PII(u,v) << " using ED for edge removal" << endl;
+                    last_reduce_edges_removed++;
+
+                    int t = reducible_nodes.size();
+                    if ( V[u].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[u][0]);
+                    if ( V[v].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[v][0]);
+                    last_reduce_nodes_removed += t - reducible_nodes.size();
+
+                    if (use_exhaustively) changes = true;
+                }
             }
         }
     }
@@ -669,4 +698,27 @@ void EDReducer::checkEmptyArraysAssertions(bool check_marked, bool check_marked2
         assert(temp.empty());
         assert(temp2.empty());
     }
+}
+
+VI EDReducer::propagateDeg1RuleSlow(int v) {
+    VI removed_nodes;
+
+    VI q;
+    q.push_back(v);
+
+    while (!q.empty()) {
+        v = q.back();
+        q.pop_back();
+        if (V[v].empty()) continue;
+
+        for ( int d : V[v] ) {
+            GraphUtils::removeEdge(V,d,v);
+            if ( V[d].size() == 1 ) q.push_back(V[d][0]);
+        }
+
+        V[v].clear();
+        removed_nodes.push_back(v);
+    }
+
+    return removed_nodes;
 }

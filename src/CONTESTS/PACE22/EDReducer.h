@@ -54,7 +54,9 @@ public:
     int last_reduce_inf_rules_2_created = 0;
 
     int last_reduce_edges_removed = 0;
-    int last_reduce_nodes_removed = 0;
+    int last_reduce_nodes_removed = 0; // equals ed_node_applied_cnt + the number of nodes removed using deg-1 propagation
+    int ed_node_applied_cnt = 0;
+    int ed_edge_applied_cnt = 0;
 
     VVI getV(){return V;}
     Config cnf;
@@ -144,6 +146,9 @@ private:
 
 
     void checkEmptyArraysAssertions(bool check_marked, bool check_marked2);
+
+
+    VI propagateDeg1RuleSlow(int v);
 };
 
 #endif //ELDREDUCER_H
