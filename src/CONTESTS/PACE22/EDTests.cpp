@@ -368,7 +368,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
     { // numvc/fastvc testing
         int t = numvc_time_check_sec;
-        numvc_time_check_sec *= 2;
+        numvc_time_check_sec *= 1;
         auto fastvc_sol = checkByNuMVC(V, 0);
         assert(VCUtils::isVertexCover( V, fastvc_sol ));
         numvc_time_check_sec = t;

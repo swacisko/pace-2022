@@ -14,7 +14,7 @@ public:
     : N(NN), inS(N), inU(N), inU1(N), inU0(N), inW(N), was(N), helper(N), marked(N), marked2(N), cnf(c) {
         temp.reserve(N);
         temp2.reserve(N);
-        cnt = VI(N,0);
+        cnt = deg_in_S = deg_notin_W = VI(N,0);
     }
 
     /**
@@ -71,6 +71,7 @@ private:
     VVI V;
 
     VB inS, inU, inU1, inU0, inW, was, helper, marked, marked2;
+    VI deg_in_S, deg_notin_W; // those need to be kept correctly for all nodes in W
     VI temp, temp2,S,U,U1,W;
     VI cnt;
 
@@ -89,7 +90,7 @@ private:
     /**
      * Counts and returns |N(u) \cap S|
      */
-    int getSIntersection(int u);
+    int getSIntersectionSize(int u);
 
     /**
      * Checks whether node u can be safely added to the solution.
