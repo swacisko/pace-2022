@@ -146,48 +146,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         if(modified) continue;
         if (sw.tle(reducer_str)) break;
 
-        if(cnf.reducer_use_unconfined){
-            Stopwatch s; string opt = "unconfined"; s.start(opt);
-            clog << "Running unconfined" << endl;
-            VI uncon = unconfined();
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-
-
-            addKNR(uncon);
-            total_unconfined_nodes += uncon.size();
-            GraphUtils::removeNodes(V, uncon, helper);
-
-            modified |= !uncon.empty();
-            if(modified) continue;
-        }
-
-
-        // standard node-removal version
-        bool ed_application_cond =  ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) );
-        if( cnf.reducer_use_ed && cnf.ed_use_node_removal && ed_application_cond){
-            ed_rules_checked++;
-            clog << "Running ED node removal rules in POINT-1" << endl;
-
-            EDReducer edred(V.size(), cnf);
-            edred.resetAllUsedTechniques();
-            edred.cnf.ed_use_node_removal = true;
-
-            Stopwatch s; string opt = "ED node removal"; s.start(opt);
-            VI res = edred.reduce(V);
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-
-            assert(res.size() == edred.last_reduce_nodes_removed);
-            ed_nodes_reduced += edred.last_reduce_nodes_removed;
-            ed_edges_removed += edred.last_reduce_edges_removed;
-            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
-
-            addKNR(res);
-            if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
-            if (edred.madeChangesInLastReduce())  V = edred.getV();
-            modified |= edred.madeChangesInLastReduce();
-
-            if(modified) continue;
-        }
 
         if(cnf.reducer_use_folding){
             Stopwatch s; string opt = "folding"; s.start(opt);
@@ -203,24 +161,21 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
-        // if(cnf.reducer_use_folding_twins) {
-        //     Stopwatch s; string opt = "folding twins"; s.start(opt);
-        //     auto [twin_folds, to_remove] = foldingTwins();
-        //     if (write_progress_on_the_fly) DEBUG(total_twin_folds_done);
-        //     total_twin_folds_done += twin_folds.size() + to_remove.size();
-        //     if (write_progress_on_the_fly) DEBUG(total_twin_folds_done);
-        //     addKNR(to_remove);
-        //     Utils::removeNodes(V, revV, to_remove, helper);
-        //     if(!modified) modified = (!twin_folds.empty() || !to_remove.empty());
-        //     s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-        //
-        //     { // add to resulting kernelization objects
-        //         if (knr != nullptr) { res.push_back(knr); knr = nullptr; }
-        //         for (auto *x : twin_folds) res.push_back(x);
-        //     }
-        //
-        //     if(modified) continue;
-        // }
+
+        if(cnf.reducer_use_unconfined){
+            Stopwatch s; string opt = "unconfined"; s.start(opt);
+            clog << "Running unconfined" << endl;
+            VI uncon = unconfined();
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
+
+            addKNR(uncon);
+            total_unconfined_nodes += uncon.size();
+            GraphUtils::removeNodes(V, uncon, helper);
+
+            modified |= !uncon.empty();
+            if(modified) continue;
+        }
 
         if (false)
         if(cnf.reducer_use_desk){
@@ -252,11 +207,58 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             total_funnels_done += funnel_liftables.size();
             if(write_progress_on_the_fly) DEBUG(total_funnels_done);
 
-           addLiftables(funnel_liftables);
+            addLiftables(funnel_liftables);
 
             modified |= !funnel_liftables.empty();
             if(modified) continue;
         }
+
+        // standard node-removal version
+        bool ed_application_cond = ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) );
+        if( cnf.reducer_use_ed && cnf.ed_use_node_removal && ed_application_cond){
+            ed_rules_checked++;
+            clog << "Running ED node removal rules in POINT-1" << endl;
+
+            EDReducer edred(V.size(), cnf);
+            edred.resetAllUsedTechniques();
+            edred.cnf.ed_use_node_removal = true;
+
+            Stopwatch s; string opt = "ED node removal"; s.start(opt);
+            VI res = edred.reduce(V);
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
+            assert(res.size() == edred.last_reduce_nodes_removed);
+            ed_nodes_reduced += edred.last_reduce_nodes_removed;
+            ed_edges_removed += edred.last_reduce_edges_removed;
+            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+
+            addKNR(res);
+            if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
+            if (edred.madeChangesInLastReduce())  V = edred.getV();
+            modified |= edred.madeChangesInLastReduce();
+
+            if(modified) continue;
+        }
+
+
+        // if(cnf.reducer_use_folding_twins) {
+        //     Stopwatch s; string opt = "folding twins"; s.start(opt);
+        //     auto [twin_folds, to_remove] = foldingTwins();
+        //     if (write_progress_on_the_fly) DEBUG(total_twin_folds_done);
+        //     total_twin_folds_done += twin_folds.size() + to_remove.size();
+        //     if (write_progress_on_the_fly) DEBUG(total_twin_folds_done);
+        //     addKNR(to_remove);
+        //     Utils::removeNodes(V, revV, to_remove, helper);
+        //     if(!modified) modified = (!twin_folds.empty() || !to_remove.empty());
+        //     s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+        //
+        //     { // add to resulting kernelization objects
+        //         if (knr != nullptr) { res.push_back(knr); knr = nullptr; }
+        //         for (auto *x : twin_folds) res.push_back(x);
+        //     }
+        //
+        //     if(modified) continue;
+        // }
 
 
         {
@@ -378,33 +380,40 @@ vector<VCReduction*> Reducer::twins() {
 vector<VCReduction*> Reducer::folding() {
     vector<VCReduction*> liftables;
 
-    for (int i=0; i<N; i++) if (V[i].size() == 2) {
-        int a = V[i][0], b = V[i][1];
-        if( ranges::contains(V[a],b) ) {
-            liftables.push_back(new KernelizedNodesReduction({a,b}));
-            for (int d : V[a]) GraphUtils::removeEdge(V,d,a);
-            for (int d : V[b]) GraphUtils::removeEdge(V,d,b);
+    bool changes = true;
+    while (changes) {
+        changes = false;
 
-            for (int d : V[a]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
-            for (int d : V[b]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
+        for (int i=0; i<N; i++) if (V[i].size() == 2) {
+            int a = V[i][0], b = V[i][1];
+            changes = true;
 
-            V[a].clear();
-            V[b].clear();
+            if( ranges::contains(V[a],b) ) {
+                liftables.push_back(new KernelizedNodesReduction({a,b}));
+                for (int d : V[a]) GraphUtils::removeEdge(V,d,a);
+                for (int d : V[b]) GraphUtils::removeEdge(V,d,b);
 
-            continue;
+                for (int d : V[a]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
+                for (int d : V[b]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
+
+                V[a].clear();
+                V[b].clear();
+
+                continue;
+            }
+            liftables.push_back(new FoldingReduction(a,b,i));
+            GraphUtils::removeNodeFromGraph(V,i);
+            total_folds_done++;
+
+            for (int d : V[a] ) was[d] = true;
+            for ( int d : V[b] ) if (!was[d]) {
+                V[a].push_back(d);
+                V[d].push_back(a);
+            }
+            for (int d : V[a] ) was[d] = false;
+
+            GraphUtils::removeNodeFromGraph(V,b);
         }
-        liftables.push_back(new FoldingReduction(a,b,i));
-        GraphUtils::removeNodeFromGraph(V,i);
-        total_folds_done++;
-
-        for (int d : V[a] ) was[d] = true;
-        for ( int d : V[b] ) if (!was[d]) {
-            V[a].push_back(d);
-            V[d].push_back(a);
-        }
-        for (int d : V[a] ) was[d] = false;
-
-        GraphUtils::removeNodeFromGraph(V,b);
     }
 
     return liftables;
@@ -668,10 +677,18 @@ VI Reducer::unconfined() {
     };
 
     auto getLbNSOutdegForUnexpandedNode = [&](int d) {
+        // // with 'return 0' uncommented the unconfined rule is stronger, but could potentially be much slower.
+        // It should be the same, but there probably must be some hidden bug somewhere...
         // return 0;
 
         if (calculated_NS_outdeg[d]) return deg_out_NS[d];
         return max(0, (int)V[d].size() - deg_in_S[d] - ns_size);
+    };
+
+    auto calculateNSOutdeg = [&](int v) {
+        calculated_NS_outdeg[v] = true;
+        deg_out_NS[v] = 0;
+        for (int d : V[v]) deg_out_NS[v] += !inNS[d];
     };
 
     auto check = [&](int v) {
@@ -683,10 +700,9 @@ VI Reducer::unconfined() {
             deg_in_S[d] = 1;
         }
         cand_NS.clear();
-        // for (int d : V[v]) {
         for (int d : V[v]) if (getLbNSOutdegForUnexpandedNode(d) <= 1) {
             calculated_NS_outdeg[d] = true;
-            for ( int dd : V[d] ) if (!inNS[dd]) deg_out_NS[d]++;
+            for ( int dd : V[d] ) deg_out_NS[d] += !inNS[dd];
             if (deg_out_NS[d] == 1) cand_NS.push_back(d);
         }
 
@@ -712,11 +728,8 @@ VI Reducer::unconfined() {
                     assert((dd == u) || !inS[dd]);
                     if ( inNS[dd] ) {
                         if ( getLbNSOutdegForUnexpandedNode(dd) <= 1 ) {
-                            if ( !calculated_NS_outdeg[dd] ) {
-                                calculated_NS_outdeg[dd] = true;
-                                deg_out_NS[dd] = 0;
-                                for ( int x : V[dd] ) deg_out_NS[dd] += !inNS[x];
-                            }else deg_out_NS[dd]--;
+                            if ( !calculated_NS_outdeg[dd] ) calculateNSOutdeg(dd);
+                            else deg_out_NS[dd]--;
 
                             if (deg_out_NS[dd] == 0) return true;
                             if (deg_out_NS[dd] == 1) cand_NS.push_back(dd);
@@ -725,11 +738,10 @@ VI Reducer::unconfined() {
                         deg_out_NS[d]++;
                     }
                 }
+
+                if (!calculated_NS_outdeg[d]) calculateNSOutdeg(d);
                 if (calculated_NS_outdeg[d] && deg_out_NS[d] == 1) cand_NS.push_back(d);
-
             }
-
-            for (int d : V[u]) inNS[d] = true;
 
         }
 

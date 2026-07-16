@@ -422,6 +422,8 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
             assert(VCUtils::isVertexCover( V, solver_vc ));
         }
 
+        clog << "After lifting, solver_vc.size(): " << solver_vc.size() << endl;
+
         writeConnCompInfo(coreV, "Connected components after full NON-ED reduction");
     }
 
@@ -505,6 +507,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
                 solver_vc = reduced_instance.liftSolution(solver_vc);
                 assert(VCUtils::isVertexCover( V, solver_vc ));
             }
+            clog << "After lifting, solver_vc.size(): " << solver_vc.size() << endl;
         }
     };
 
