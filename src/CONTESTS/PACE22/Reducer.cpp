@@ -14,7 +14,7 @@
 
 using namespace Utils;
 
-Reducer::Reducer(VPII edges, Config c) : origN(V.size()) {
+Reducer::Reducer(VPII edges, Config c) {
     cnf = c;
     primary_edges = edges;
     primaryN = 0;
@@ -27,16 +27,24 @@ ReducedInstance Reducer::reduce() {
     reduced_instance.cnf = cnf;
     reduced_instance.primaryN = primaryN;
 
-    VPII reduced_graph_edges;
-    tie( reduced_graph_edges, reduced_instance.primary_liftables) = primaryReduce(primary_edges);
+    // VPII reduced_graph_edges;
+    // tie( reduced_graph_edges, reduced_instance.primary_liftables) = primaryReduce(primary_edges);
+
+
+    V = GraphUtils::getGraphForEdges(primary_edges);
+    N = V.size();
+
+
+
     { // #TEST - here should be implemented a more efficient graph inducing than the following...
         auto indg = GraphInducer::induceByNonisolatedNodes(V);
         reduced_instance.primary_indg_nodes = indg.nodes;
         V = indg.V;
-
-        assert(false && "Implement efficient graph inducing");
+        N = V.size();
+        was = helper = VB(N);
     }
 
+    reduced_instance.secondaryN = N;
     tie( V, reduced_instance.secondary_liftables) = secondaryReduce();
     {
         auto indg = GraphInducer::induceByNonisolatedNodes(V);
@@ -52,6 +60,8 @@ ReducedInstance Reducer::reduce() {
 pair<VPII, vector<VCReduction*>> Reducer::primaryReduce(VPII & edges) {
     assert(false && "Implement fast primaryReduce");
 
+
+
     return {};
 }
 
@@ -61,6 +71,29 @@ pair<VVI, vector<VCReduction *>> Reducer::primaryReduce(VVI &V) {
     return {GraphUtils::getGraphForEdges(res_edges), liftables};
 }
 
+vector<VCReduction*> Reducer::propagateDeg1RuleSlow(int v) {
+    VI removed_nodes;
+
+    VI q;
+    q.push_back(v);
+
+    while (!q.empty()) {
+        v = q.back();
+        q.pop_back();
+        if (V[v].empty()) continue;
+
+        for ( int d : V[v] ) {
+            GraphUtils::removeEdge(V,d,v);
+            if ( V[d].size() == 1 ) q.push_back(V[d][0]);
+        }
+
+        V[v].clear();
+        removed_nodes.push_back(v);
+    }
+
+    return {static_cast<VCReduction *>(new KernelizedNodesReduction(removed_nodes))};
+}
+
 
 pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
     constexpr bool debug = false;
@@ -68,9 +101,10 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
     bool modified;
 
-
-    auto reducer_start_time = chrono::steady_clock::now();
-    VB helper(N,false);
+    Stopwatch sw;
+    string reducer_str = "reducer";
+    sw.setLimit(reducer_str, cnf.reducer_max_time_millis);
+    sw.start(reducer_str);
 
     vector<VCReduction*> secondary_reduce_liftables;
     KernelizedNodesReduction * knr = nullptr;
@@ -91,6 +125,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         KernelizerVC kern;
 
         Stopwatch s; string opt = "basic_kern"; s.start(opt);
+        // kern.use_crown_and_lp_checks = false;
         auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
         s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
@@ -109,23 +144,20 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         applyBasicReductions();
 
         if(modified) continue;
-
-        auto time_total = chrono::duration<double, std::milli >
-                (chrono::steady_clock::now() - reducer_start_time ).count();
-        if(time_total > cnf.reducer_max_time_millis) break;
-
-
+        if (sw.tle(reducer_str)) break;
 
         if(cnf.reducer_use_unconfined){
             Stopwatch s; string opt = "unconfined"; s.start(opt);
+            clog << "Running unconfined" << endl;
             VI uncon = unconfined();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
 
             addKNR(uncon);
             total_unconfined_nodes += uncon.size();
             GraphUtils::removeNodes(V, uncon, helper);
 
-            if(!modified) modified = (!uncon.empty());
+            modified |= !uncon.empty();
             if(modified) continue;
         }
 
@@ -134,7 +166,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         bool ed_application_cond =  ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) );
         if( cnf.reducer_use_ed && cnf.ed_use_node_removal && ed_application_cond){
             ed_rules_checked++;
-            // clog << "Running ED node removal rules in POINT-1" << endl;
+            clog << "Running ED node removal rules in POINT-1" << endl;
 
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
@@ -157,24 +189,15 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
-
         if(cnf.reducer_use_folding){
             Stopwatch s; string opt = "folding"; s.start(opt);
             auto folds = folding();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
             if(write_progress_on_the_fly) DEBUG(total_folds_done);
-            total_folds_done += folds.size();
-            if(write_progress_on_the_fly) DEBUG(total_folds_done);
 
             if(!folds.empty()) modified = true;
-
-            // { // add to resulting kernelization objects
-            //     if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr; }
-            //     for(auto *x : folds) secondary_reduce_liftables.push_back(x);
-            // }
             addLiftables(folds);
-
             assert( GraphUtils::isSimple(V) );
 
             if(modified) continue;
@@ -199,6 +222,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         //     if(modified) continue;
         // }
 
+        if (false)
         if(cnf.reducer_use_desk){
             Stopwatch s; string opt = "desk"; s.start(opt);
             vector<VCReduction*> desk_liftables = desk();
@@ -214,6 +238,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
+        if (false)
         if(cnf.reducer_use_funnel){
             if(!cnf.reducer_use_domination){
                 clog << "CAUTION! Calling funnel reduction without domination rule before!" << endl;
@@ -259,7 +284,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
-
+        if (false)
         if(cnf.reducer_use_twins){
             Stopwatch s; string opt = "twins merge"; s.start(opt);
             if(write_progress_on_the_fly) DEBUG(total_twins_merged);
@@ -300,34 +325,39 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
 
         // standard edge-insertion - those edges that are found using consider(v) for single-node initial sets S
-        // if (false)
+        if (cnf.ed_apply_type1_constraints_on_the_fly)
         if ( cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
-            ed_rules_checked++;
-            Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
-            clog << "Running ED with edge insertion" << endl;
+            VI res;
+            bool made_changes = false;
+            do {
+                ed_rules_checked++;
+                Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
+                clog << "Running ED with edge insertion" << endl;
 
-            EDReducer edred(V.size(), cnf);
-            edred.resetAllUsedTechniques();
-            edred.cnf.ed_use_node_removal = true;
-            edred.cnf.ed_apply_type1_constraints_on_the_fly = true;
+                EDReducer edred(V.size(), cnf);
+                edred.resetAllUsedTechniques();
+                edred.cnf.ed_use_node_removal = true;
+                edred.cnf.ed_apply_type1_constraints_on_the_fly = true;
 
-            VI res = edred.reduce(V);
-            assert(res.size() == edred.last_reduce_nodes_removed);
-            ed_nodes_reduced += edred.last_reduce_nodes_removed;
-            ed_edges_removed += edred.last_reduce_edges_removed;
-            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+                res = edred.reduce(V);
+                assert(res.size() == edred.last_reduce_nodes_removed);
+                ed_nodes_reduced += edred.last_reduce_nodes_removed;
+                ed_edges_removed += edred.last_reduce_edges_removed;
+                ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
-            addKNR(res);
-            if (edred.madeChangesInLastReduce())  V = edred.getV();
-            assert( GraphUtils::isSimple(V) );
+                addKNR(res);
+                if (edred.madeChangesInLastReduce())  V = edred.getV();
+                assert( GraphUtils::isSimple(V) );
+                made_changes = edred.madeChangesInLastReduce();
 
-            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
-            modified |= edred.madeChangesInLastReduce();
+                ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+                modified |= edred.madeChangesInLastReduce();
 
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+                s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+            }while (res.empty() && made_changes);
+
             if(modified) continue;
         }
-
 
     } while(modified);
 
@@ -335,8 +365,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
     if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr;}
 
-    // InducedGraph indg = GraphInducer::induceByNonisolatedNodes(V);
-    // return make_pair(indg.V, indg.nodes, secondary_reduce_liftables);
 
     return make_pair(V, secondary_reduce_liftables);
 }
@@ -347,9 +375,37 @@ vector<VCReduction*> Reducer::twins() {
 }
 
 
-vector<FoldingReduction*> Reducer::folding() {
-    assert(false && "folding should be implemented in primary reductions");
-    return {};
+vector<VCReduction*> Reducer::folding() {
+    vector<VCReduction*> liftables;
+
+    for (int i=0; i<N; i++) if (V[i].size() == 2) {
+        int a = V[i][0], b = V[i][1];
+        if( ranges::contains(V[a],b) ) {
+            liftables.push_back(new KernelizedNodesReduction({a,b}));
+            for (int d : V[a]) GraphUtils::removeEdge(V,d,a);
+            for (int d : V[b]) GraphUtils::removeEdge(V,d,b);
+
+            for (int d : V[a]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
+            for (int d : V[b]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
+
+            V[a].clear();
+            V[b].clear();
+
+            continue;
+        }
+        liftables.push_back(new FoldingReduction(a,b,i));
+        GraphUtils::removeNodeFromGraph(V,i);
+        total_folds_done++;
+
+        for (int d : V[a] ) was[d] = true;
+        for ( int d : V[b] ) if (!was[d]) {
+            V[a].push_back(d);
+            V[d].push_back(a);
+        }
+        for (int d : V[a] ) was[d] = false;
+    }
+
+    return liftables;
 }
 
 
@@ -487,11 +543,11 @@ vector<GeneralFoldingReduction *> Reducer::generalFolding() {
         }
         if(aff) continue;
 
-        int dfvs_size;
+        int vs_size;
         InducedGraph g = GraphInducer::induce(V, W);
-        dfvs_size = Utils::getMinVcCPSAT(g.V).size();
+        vs_size = Utils::getMinVcCPSAT(g.V).size();
 
-        if( dfvs_size + 2 < W.size() ) continue;
+        if( vs_size + 2 < W.size() ) continue;
 
         if(debug){ ENDL(5); clog << "Found W with DFVS(G[W]) >= W.size()-2" << endl; DEBUG(w); DEBUG(W); }
 
@@ -579,101 +635,114 @@ vector<GeneralFoldingReduction *> Reducer::generalFolding() {
 
 
 VI Reducer::unconfined() {
-    constexpr bool debug = false;
+    VI removed_nodes;
 
-    if(debug) clog << "Starting unconfined" << endl;
+    VB inS(N), inNS(N);
+    VI S;
+    VI deg_in_S(N,0);
+    VI deg_out_NS(N,0);
+    int ns_size = 0;
+    VB calculated_NS_outdeg(N);
 
-    int N = V.size();
-    VB affected(N,false);
-    VB helper(N,false);
-    VB was(N,false);
-    VB in_S(N,false);
-    VB in_NS(N,false);
+    VI cand_NS;
 
-    VI res;
-
-    VVI & G = V;
-
-    VI order = CombinatoricUtils::getRandomPermutation(N);
-    sort(ALL(order), [&](int a, int b){ return G[a].size() > G[b].size(); } );
-
-
-    auto unconfined = [&](int v){
-        VI S = {v};
-        VI ws;  // N(u) \ N[S]
-        VI NS = G[v];
-        in_S[v] = true;
-        for(int d : NS) in_NS[d] = true;
-
-        bool can = true;
-
-        while(can) {
-
-            if(debug){DEBUG(S); DEBUG(NS);}
-
-            int best_u = -1, best_val = 1e9;
-            VI best_ws;
-            for (int u : NS) {
-                int cnt = 0;
-                ws.clear();
-                for( int d : G[u] ){
-                    if( in_S[d] ) cnt++;
-                    if( !in_S[d] && !in_NS[d] ) ws.push_back(d);
-                }
-                if(cnt != 1) continue;
-                if( ws.size() < best_val ){
-                    best_val = ws.size();
-                    best_u = u;
-                    best_ws = ws;
-                }
-            }
-
-            if(debug){ DEBUG(best_u); DEBUG(best_ws); }
-
-            if( best_u == -1 ){ can = false;break; }
-            if( best_ws.empty() ){
-                /* node v is unconfined*/
-                if(debug) clog << "Node v is unconfined!" << endl;
-                can = true;break;
-            }
-            if( best_ws.size() == 1 ){
-                int w = best_ws[0];
-                if(debug) clog << "Pushing node w: " << w << " to S" << endl;
-                S.push_back(w);
-                in_S[w] = true;
-                for( int u : G[w] ){
-                    if(!in_S[u] && !in_NS[u]){
-                        NS.push_back(u);
-                        in_NS[u] = true;
-                    }
-                }
-            }else{ can = false; break; }
+    auto clearForS = [&]() {
+        int ns_size = 0, ns_sumdeg = 0;
+        for ( int s : S ) for (int d : V[s]) if (!was[d]) {
+            was[d] = true;
+            ns_size++;
+            ns_sumdeg += V[d].size();
         }
+        for ( int s : S ) for (int d : V[s]) was[d] = false;
+        // clog << "S.size(): " << S.size() << ", ns_size: " << ns_size << ", ns_sumdeg: " << ns_sumdeg << endl;
 
-        VI X = S + NS;
-        for( int d : X ){
-            in_S[d] = in_NS[d] = false;
-            if( affected[d] ) can = false;
+
+        for (int a : S) {
+            calculated_NS_outdeg[a] = inS[a] = inNS[a] = deg_in_S[a] = deg_out_NS[a] = 0;
+            for (int d : V[a]) calculated_NS_outdeg[d] = inS[d] = inNS[d] = deg_in_S[d] = deg_out_NS[d] = 0;
         }
-
-        return can;
+        S.clear();
+        cand_NS.clear();
     };
 
-    for( int v : order ){
-        if( affected[v] ) continue;
+    auto getLbNSOutdegForUnexpandedNode = [&](int d) {
+        // return 0;
 
-        bool aff = false;
-        for(int d : G[v]) if(affected[d]) aff = true;
-        if(aff) continue;
+        if (calculated_NS_outdeg[d]) return deg_out_NS[d];
+        return max(0, (int)V[d].size() - deg_in_S[d] - ns_size);
+    };
 
-        bool unconf = unconfined(v);
-        if(unconf){
-            res.push_back(v);
-            affected[v] = true;
-            for( int d : G[v] ) affected[d] = true;
+    auto check = [&](int v) {
+        S.clear(); S.push_back(v);
+        inS[v] = inNS[v] = true;
+        ns_size = V[v].size();
+        for (int d : V[v]) {
+            inNS[d] = true;
+            deg_in_S[d] = 1;
         }
+        cand_NS.clear();
+        // for (int d : V[v]) {
+        for (int d : V[v]) if (getLbNSOutdegForUnexpandedNode(d) <= 1) {
+            calculated_NS_outdeg[d] = true;
+            for ( int dd : V[d] ) if (!inNS[dd]) deg_out_NS[d]++;
+            if (deg_out_NS[d] == 1) cand_NS.push_back(d);
+        }
+
+        while ( !cand_NS.empty() ) {
+            int u = cand_NS.back();
+            cand_NS.pop_back();
+            if ( deg_in_S[u] != 1 ) continue;
+            if ( deg_out_NS[u] == 0 ) return true;
+            assert(deg_out_NS[u] == 1);
+
+            inS[u] = inNS[u] = true;
+            S.push_back(u);
+            deg_out_NS[u] = 0;
+
+            for ( int d : V[u] ) deg_in_S[d]++;
+            for (int d : V[u]) if (!inS[d]) { // moving conceptually node d to N(S)
+                if ( inNS[d] ) continue; // we can consider only those nodes that are not in NS, as those in NS have deg_in_S > 1
+                assert(!inNS[d]);
+                inNS[d] = true;
+                ns_size++;
+
+                for ( int dd : V[d] ) {
+                    assert((dd == u) || !inS[dd]);
+                    if ( inNS[dd] ) {
+                        if ( getLbNSOutdegForUnexpandedNode(dd) <= 1 ) {
+                            if ( !calculated_NS_outdeg[dd] ) {
+                                calculated_NS_outdeg[dd] = true;
+                                deg_out_NS[dd] = 0;
+                                for ( int x : V[dd] ) deg_out_NS[dd] += !inNS[x];
+                            }else deg_out_NS[dd]--;
+
+                            if (deg_out_NS[dd] == 0) return true;
+                            if (deg_out_NS[dd] == 1) cand_NS.push_back(dd);
+                        }
+                    }else { // dd is not in NS
+                        deg_out_NS[d]++;
+                    }
+                }
+                if (calculated_NS_outdeg[d] && deg_out_NS[d] == 1) cand_NS.push_back(d);
+
+            }
+
+            for (int d : V[u]) inNS[d] = true;
+
+        }
+
+        return false;
+    };
+
+    for ( int v=0; v<N; v++ ) {
+        if (check(v)) {
+            clearForS();
+            removed_nodes.push_back(v);
+            GraphUtils::removeNodeFromGraph(V,v);
+        }
+        else clearForS();
     }
 
-    return res;
+    return removed_nodes;
 }
 

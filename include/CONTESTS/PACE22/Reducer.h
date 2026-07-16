@@ -290,11 +290,11 @@ public:
      * this function applied all the necessary changes to make the result valid for the initial graph
      */
     VI liftSolution(VI vc) {
+        for (int & d : vc) d = secondary_indg_nodes[d];
         VB in_vc = StandardUtils::toVB(secondaryN, vc);
-
         for( int i = (int)secondary_liftables.size()-1; i>=0; i-- ) secondary_liftables[i]->lift(vc, in_vc);
-        for (int & d : vc) d = primary_indg_nodes[d];
 
+        for (int & d : vc) d = primary_indg_nodes[d];
         in_vc = StandardUtils::toVB(primaryN, vc);
         for( int i = (int)primary_liftables.size()-1; i>=0; i-- ) primary_liftables[i]->lift(vc, in_vc);
 
@@ -408,11 +408,19 @@ public:
     pair<VVI, vector<VCReduction*>> primaryReduce(VVI & V);
 
     /**
+     * Starting from node v, it removes v from the graph, then if some of its neighbors has degree 1,
+     * it removed its single neigbor, etc.
+     * This function might be slow, because when we remove node v, we remove at once v from the neighborhood lists
+     * of all of its neighbors. So removing v takes \sum_{u \in N(v)} deg(u)...
+     */
+    vector<VCReduction*> propagateDeg1RuleSlow(int v);
+
+    /**
      * Uses iteratively all the designated reduction rules.
      */
     pair<VVI, vector<VCReduction*>> secondaryReduce();
 
-    vector<FoldingReduction*> folding();
+    vector<VCReduction*> folding();
 
     VI unconfined();
 
@@ -448,7 +456,6 @@ public:
     Config cnf;
 
 
-    const int origN; // number of nodes in original graph
     int N;
 
 
@@ -484,6 +491,9 @@ private:
      * Secondary structure, used in the [secondaryReduce].
      */
     VVI V;
+
+
+    VB was, helper;
 };
 
 #endif //ALGORITHMSPROJECT_REDUCER_H
