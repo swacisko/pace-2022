@@ -217,7 +217,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         bool ed_application_cond = ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) );
         if( cnf.reducer_use_ed && cnf.ed_use_node_removal && ed_application_cond){
             ed_rules_checked++;
-            clog << "Running ED node removal rules in POINT-1" << endl;
+            clog << "Running ED node removal rules in POINT-1, time: " << sw.getTime(reducer_str) / 1000 << endl;
 
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
@@ -305,7 +305,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         if( cnf.reducer_use_ed && cnf.ed_use_node_removal){
             ed_rules_checked++;
             Stopwatch s; string opt = "ED node removal"; s.start(opt);
-            clog << "Running ED node removal rules in POINT-2" << endl;
+            clog << "Running ED node removal rules in POINT-2, time: " << sw.getTime(reducer_str) / 1000 << endl;
 
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();

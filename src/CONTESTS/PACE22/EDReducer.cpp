@@ -280,6 +280,10 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         for (int u : U1) {
             if (V[u].empty()) continue;
 
+            // int nonw_neigh_size = getNonWNeighborhoodSize(u);
+            // if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
+
+            if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
             int nonw_neigh_size = getNonWNeighborhoodSize(u);
             if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
 
@@ -293,7 +297,8 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
                 break; // we need only 1 node to mark the intersection, so we can break here
             }
 
-            for (int w : V[u]) for (int d : V[w]) cnt[d] = 0; // clearing cnt array for next node u
+            // for (int w : V[u]) for (int d : V[w]) cnt[d] = 0; // clearing cnt array for next node u
+            for (int w : V[u]) if (!inW[w]) for (int d : V[w]) cnt[d] = 0; // clearing cnt array for next node u
         }
     }
 
@@ -302,11 +307,17 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         // we find all nodes w \in N(u) \setminus W such that N(u) \setminus W \subseteq N[w]
         // we can consider only nodes u \in U_0, that is nodes for which N(u) \cap S = \emptyset
         for ( int u : U1 ) {
+            if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
+
+            int nonw_neigh_size = 0;
             bool empty_S_inters = true;
-            for ( int d : V[u] ) empty_S_inters &= !inS[d];
+            for ( int d : V[u] ) {
+                empty_S_inters &= !inS[d];
+                nonw_neigh_size += !inW[d];
+            }
             if (!empty_S_inters) continue;
 
-            int nonw_neigh_size = getNonWNeighborhoodSize(u);
+            // int nonw_neigh_size = getNonWNeighborhoodSize(u);
             if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
 
             for ( int w : V[u] ) if ( !inW[w] ) helper[w] = true; // marking N(u) \setminus W
@@ -330,6 +341,8 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         VI& vis = temp2;
 
         for (int u : U1) {
+             if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
+
             bool empty_S_inters = true;
             for ( int d : V[u] ) empty_S_inters &= !inS[d];
             if (!empty_S_inters) continue;
@@ -436,8 +449,6 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         VI prevS, prevU, prevU1, prevW, nodes_to_remove_from_W;
         // VB prevInS, prevInU, prevInU1, prevInW;
 
-        constexpr int option = 2; // options 2 seems to work, while option 1 seems to be buggy...
-
         for ( int w : candidates ) {
             // we assume that w is not in any optimal solution. Thus we can move it to S
             // if this leads to an existence of an ext-dominator, then we can move w to U.
@@ -448,38 +459,7 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
             assert(!inW[w]);
             clearMarked(marked2);
 
-
-            if constexpr (option == 1){ // removing N[w] from the graph by marking all nodes in the inW bitvector and removing N(w) from U and U1
-                prevS = S; prevU = U; prevU1 = U1; prevW = W;
-                // prevInS = inS; prevInU = inU; prevInW = inW;
-
-                {
-                    S.push_back(w); W.push_back(w); inS[w] = inW[w] = true; // marking node w as in S
-                    nodes_to_remove_from_W.clear();
-
-                    for (int d : V[w]) if ( !inW[d] ) { // equivalent to moveToU, but not adding inference rules
-                        auto t = write_logs; write_logs = false;
-                        U.push_back(d); W.push_back(d); U1.push_back(d); inU[d] = inW[d] = inU1[d] = true;
-                        nodes_to_remove_from_W.push_back(d); // we need that to unmark inW entries without full copies
-                        write_logs = t;
-                    }
-                }
-
-                // // now removing V[w] from U and U1 - it seems that without it the rule is incorrect...
-                for (int d : V[w]) was[d] = true;
-
-                // VB inU0(N); for (int u : U1){ int c = 0; for (int d : V[u]) c += inS[d]; inU0[u] = (c == 0); }
-                // for (int i=(int)U.size()-1; i>=0; i--) if ( was[U[i]] && !inU0[U[i]] ) { swap(U[i], U.back()); U.pop_back(); }
-                // for (int i=(int)U1.size()-1; i>=0; i--) if ( was[U1[i]] && !inU0[U[i]] ) { swap(U1[i], U1.back()); U1.pop_back(); }
-
-                for (int i=(int)U.size()-1; i>=0; i--) if ( was[U[i]] ) { swap(U[i], U.back()); U.pop_back(); }
-                for (int i=(int)U1.size()-1; i>=0; i--) if ( was[U1[i]] ) { swap(U1[i], U1.back()); U1.pop_back(); }
-
-                for (int d : V[w]) was[d] = false;
-
-                updateU1();
-            }
-            else if constexpr (option == 2){ // removing N[w] from the graph by marking all nodes in the inW bitvector and removing N(w) from U and U1
+            { // removing N[w] from the graph by marking all nodes in the inW bitvector and removing N(w) from U and U1
                 neigh_not_in_W.clear();
                 nodes_removed_from_U.clear();
                 nodes_removed_from_U1.clear();
@@ -517,14 +497,7 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
             bool exists_ext_dominator = existsExtDominator(marked2);
 
 
-            if (option == 1){ // apply changes back to bring the original state and get ready for the next node
-                clearMarked(marked2);
-                inS[w] = inW[w] = false;
-                for (int d : nodes_to_remove_from_W) inU[d] = inW[d] = inU1[d] = false;
-                S = prevS; U = prevU; U1 = prevU1; W = prevW;
-                // inS = prevInS; inU = prevInU; inW = prevInW;
-            }
-            else if (option == 2){ // apply changes back to bring the original state and get ready for the next node
+            { // apply changes back to bring the original state and get ready for the next node
                 U += nodes_removed_from_U;
                 U1 += nodes_removed_from_U1;
                 for (int d : neigh_not_in_W) inW[d] = false;
@@ -545,6 +518,10 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
 
         clearMarked(marked2);
     }
+}
+
+int EDReducer::getLowerBoundOnNonWNeighbors(int u) {
+    return max(0, (int)V[u].size() - (int)U.size() - 1);
 }
 
 VI EDReducer::findNodesToMoveToU() {
@@ -659,17 +636,17 @@ void EDReducer::clearAllForConsider() {
     temp.clear();
     temp2.clear();
     for (int d : W) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
+        inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
     }
     for (int d0 : W) for (int d : V[d0]) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
+        inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
     }
 
     if (cnf.ed_consider_nodes_to_move_outside_NW) {
         // for (int d0 : W) {
         for (int d0 : W) if (hasNonWIntersectionAtMost(d0,cnf.ed_ext_dom_max_node_neigh)) {
             for (int d1 : V[d0]) for (int d : V[d1]) {
-                inS[d] = inU[d] = inW[d] = inU1[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
+                inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
             }
         }
     }

@@ -11,7 +11,7 @@
 class EDReducer {
 public:
     explicit EDReducer( int NN, Config c )
-    : N(NN), inS(N), inU(N), inU1(N), inW(N), was(N), helper(N), marked(N), marked2(N), cnf(c) {
+    : N(NN), inS(N), inU(N), inU1(N), inU0(N), inW(N), was(N), helper(N), marked(N), marked2(N), cnf(c) {
         temp.reserve(N);
         temp2.reserve(N);
         cnt = VI(N,0);
@@ -70,7 +70,7 @@ private:
     int N;
     VVI V;
 
-    VB inS, inU, inU1, inW, was, helper, marked, marked2;
+    VB inS, inU, inU1, inU0, inW, was, helper, marked, marked2;
     VI temp, temp2,S,U,U1,W;
     VI cnt;
 
@@ -81,10 +81,13 @@ private:
      * Counts and returns |N(u) \setminus W|
      */
     int getNonWNeighborhoodSize(int u);
-    bool hasNonWIntersectionAtMost( int u, int val ){ return getNonWNeighborhoodSize(u) <= val; }
+    bool hasNonWIntersectionAtMost( int u, int val ) {
+        if ( getLowerBoundOnNonWNeighbors(u) > val ) return false;
+        return getNonWNeighborhoodSize(u) <= val;
+    }
 
     /**
-     * Coutns and returns |N(u) \cap S|
+     * Counts and returns |N(u) \cap S|
      */
     int getSIntersection(int u);
 
@@ -102,6 +105,12 @@ private:
      *  double-ED rule.
      */
     void markDominationNodes(VB& marked, bool check_double_ed = true);
+
+    /**
+     * Finds the lower bound on the number of nonW neighbors of node u.
+     * It must be provided u \in U1. For u not in U1 the obtained bound might not hold.
+     */
+    int getLowerBoundOnNonWNeighbors(int u);
 
     /**
      * Finds, using approaches marked in the [cnf], all the nodes that can be moved to U.
