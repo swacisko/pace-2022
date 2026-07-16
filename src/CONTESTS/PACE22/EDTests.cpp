@@ -342,9 +342,10 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
 
     DEBUG(PII(exp_data.N1,exp_data.M1));
+    DEBUG(exp_data.red1_offset);
     ENDL(3);
 
-    const double numvc_time_check_sec = 4;
+    double numvc_time_check_sec = 4;
 
     auto checkByNuMVC = [&](VVI & V, int additional_offset = 0) {
         if ( GraphUtils::countEdges(V) == 0 ) return VI{};
@@ -359,6 +360,14 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
         return vc;
     };
+
+    { // numvc/fastvc testing
+        int t = numvc_time_check_sec;
+        numvc_time_check_sec *= 2;
+        auto fastvc_sol = checkByNuMVC(V, 0);
+        assert(VCUtils::isVertexCover( V, fastvc_sol ));
+        numvc_time_check_sec = t;
+    }
 
 
     constexpr bool test_noned_vc_rules = true;
@@ -390,7 +399,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
         int noned_solution_lift_overhead = reduced_instance.getReductionsOffset();
         DEBUG(noned_solution_lift_overhead);
-        exp_data.red_noned_offset = exp_data.red1_offset + noned_solution_lift_overhead;
+        exp_data.red_noned_offset = noned_solution_lift_overhead;
 
         { // numvc/fastvc testing
             auto fastvc_sol = checkByNuMVC(coreV, exp_data.red_noned_offset);
@@ -462,7 +471,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
             int ed_solution_lift_overhead = reduced_instance.getReductionsOffset();
             DEBUG(ed_solution_lift_overhead);
-            exp_data.red_ed_offset = exp_data.red1_offset + ed_solution_lift_overhead;
+            exp_data.red_ed_offset = ed_solution_lift_overhead;
 
             { // numvc/fastvc testing
                 auto fastvc_sol = checkByNuMVC(coreV, exp_data.red_ed_offset);

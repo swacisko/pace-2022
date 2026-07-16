@@ -403,6 +403,8 @@ vector<VCReduction*> Reducer::folding() {
             V[d].push_back(a);
         }
         for (int d : V[a] ) was[d] = false;
+
+        GraphUtils::removeNodeFromGraph(V,b);
     }
 
     return liftables;
