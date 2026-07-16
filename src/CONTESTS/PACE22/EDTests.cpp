@@ -417,7 +417,6 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
         writeConnCompInfo(indg.V, "Connected components after full NON-ED reduction");
     }
 
-    VD last_times_temp;
 
     auto testEDRules = [&](auto & exp_data, bool add_constraints = false) {
         constexpr bool test_ed_vc_rules = true;
@@ -466,10 +465,10 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
             int ed_solution_lift_overhead = Reducer::getReductionsSizeDiff(to_lift);
             DEBUG(ed_solution_lift_overhead);
-            exp_data.red_edoffset = exp_data.red1_offset + ed_solution_lift_overhead;
+            exp_data.red_ed_offset = exp_data.red1_offset + ed_solution_lift_overhead;
 
             { // numvc/fastvc testing
-                auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red_edoffset);
+                auto fastvc_sol = checkByNuMVC(indg.V, exp_data.red_ed_offset);
                 assert(VCUtils::isVertexCover( indg.V, fastvc_sol ));
                 indg.remapNodes(fastvc_sol);
                 assert(VCUtils::isVertexCover( red.V, fastvc_sol ));
@@ -484,6 +483,10 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
             VPII constraints;
             auto edges = GraphUtils::getGraphEdges(indg.V);
             for ( auto [a,b] : edges ) constraints.emplace_back(a+1,b+1);
+
+            if (add_constraints) {
+
+            }
 
 
             auto [solver_vc,times] = solveInstanceUsingSolver(constraints,solver_max_time_sec,solver_time_granularity, solver_repeats);
@@ -505,7 +508,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
 
     // now checking the impact with adding t1-constraints on the fly
-    ExpData dummy_exp_data;
+    ExpData dummy_exp_data = exp_data;
     testEDRules( dummy_exp_data, true);
     exp_data.N4 = dummy_exp_data.N3;
     exp_data.M4 = dummy_exp_data.M3;
@@ -515,9 +518,9 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
     exp_data.ed2_t1_inference_rules_added = dummy_exp_data.ed_t1_inference_rules_added;
     exp_data.ed2_t2_inference_rules_added = dummy_exp_data.ed_t2_inference_rules_added;
     exp_data.ed2_total_t2_inference_rules_created = dummy_exp_data.ed_total_t2_inference_rules_created;
+    exp_data.ed2_nodes_reduced = dummy_exp_data.ed_nodes_reduced;
+    exp_data.ed2_edges_removed = dummy_exp_data.ed_edges_removed;
 
-
-    exp_data.ed2_results = last_times_temp;
 
 
     return exp_data;
@@ -568,6 +571,46 @@ VVI getRandomGraph( int N, int M ) {
 }
 
 
+void trimAllDegreeOneNodes(VVI & V) {
+    int N = V.size();
+    VI deg(N,0);
+    for (int i=0; i<N; i++) deg[i] = V[i].size();
+
+    deque<int> q;
+    for (int i=0; i<N; i++) if (deg[i] == 1) {
+        int b = V[i][0];
+        deg[b]--;
+        if (deg[b] == 1) q.push_back(b);
+        GraphUtils::removeNodeFromGraph(V,i);
+        deg[i] = 0;
+        assert(deg[i] == V[i].size());
+
+        while (!q.empty()) {
+            int a = q.back();
+            q.pop_back();
+            if ( deg[a] != 1 ) {
+                if (deg[a] != 0) DEBUG(PII(a,deg[a]));
+                assert(deg[a] == 0);
+                continue;
+            }
+            assert(deg[a] == 1);
+
+            int b = V[a][0];
+            deg[b]--;
+            if (deg[b] == 1) q.push_back(b);
+            GraphUtils::removeNodeFromGraph(V,a);
+            deg[a] = 0;
+
+            if (deg[b] != V[b].size()) {
+                DEBUG(b);
+                DEBUG(PII(deg[b], V[b].size()));
+                assert(deg[b] == V[b].size());
+            }
+        }
+    }
+}
+
+
 int main() {
     ios_base::sync_with_stdio(0);
     cin.tie(0);
@@ -585,7 +628,27 @@ int main() {
     // VVI V = getTestV1();
     // VVI V = getRandomGraph(N0, M0);
 
+    VVI revV = GraphUtils::reverseGraph(V);
+    for (int i=0; i<V.size(); i++) V[i] += revV[i]; // making the graph undirected...
+
     V = GraphUtils::makeSimple(V); // making the graph simple, as at the input it might not...
+    assert(GraphUtils::isSimple(V));
+
+    bool trim_deg1_nodes = false;
+    if (trim_deg1_nodes){
+        V = GraphInducer::induceByNonisolatedNodes(V).V;
+        int N = V.size(), M = GraphUtils::countEdges(V);
+        clog << "Before trimming degree 1 nodes, N:" << N << ", M: " << M << endl;
+
+        trimAllDegreeOneNodes(V);
+        V = GraphInducer::induceByNonisolatedNodes(V).V;
+        N = V.size(), M = GraphUtils::countEdges(V);
+        clog << "After trimming degree 1 nodes, N:" << N << ", M: " << M << endl;
+
+        int c = 0;
+        for (int i=0; i<N; i++) c += (V[i].size() == 1);
+        assert(c == 0);
+    }
 
     assert(GraphUtils::isSimple(V));
 
@@ -599,7 +662,10 @@ int main() {
     auto exp_data = runVCTestforGraph(V,  solver_max_time_sec, solver_time_granularity,solver_repeats, alg);
 
 
+    ENDL(5);
+    clog << "FINISHED TESTS!" << endl;
 
+    DEBUG(exp_data.ed2_results);
 
     exp_data.writeToFile(cout, true);
 

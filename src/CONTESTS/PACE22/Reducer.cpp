@@ -1174,29 +1174,35 @@ vector<DFVSReduction*> Reducer::reduce(VVI _revV) {
         // if (false)
         if (cnf.ed_apply_type1_constraints_on_the_fly)
         if (is_pi_graph && cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
-            ed_rules_checked++;
-            Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
-            clog << "Running ED with edge insertion" << endl;
+            VI res;
+            bool made_changes = false;
+            do {
+                ed_rules_checked++;
+                Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
+                clog << "Running ED with edge insertion" << endl;
 
-            EDReducer edred(V.size(), cnf);
-            edred.resetAllUsedTechniques();
-            edred.cnf.ed_use_node_removal = true;
-            edred.cnf.ed_apply_type1_constraints_on_the_fly = true;
+                EDReducer edred(V.size(), cnf);
+                edred.resetAllUsedTechniques();
+                edred.cnf.ed_use_node_removal = true;
+                edred.cnf.ed_apply_type1_constraints_on_the_fly = true;
 
-            VI res = edred.reduce(V);
-            assert(res.size() == edred.last_reduce_nodes_removed);
-            ed_nodes_reduced += edred.last_reduce_nodes_removed;
-            ed_edges_removed += edred.last_reduce_edges_removed;
-            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+                res = edred.reduce(V);
+                assert(res.size() == edred.last_reduce_nodes_removed);
+                ed_nodes_reduced += edred.last_reduce_nodes_removed;
+                ed_edges_removed += edred.last_reduce_edges_removed;
+                ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
-            addKNR(res);
-            if (edred.madeChangesInLastReduce())  V = revV = edred.getV();
-            assert( GraphUtils::isSimple(V) );
+                addKNR(res);
+                if (edred.madeChangesInLastReduce())  V = revV = edred.getV();
+                assert( GraphUtils::isSimple(V) );
+                made_changes = edred.madeChangesInLastReduce();
 
-            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
-            modified |= edred.madeChangesInLastReduce();
+                ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+                modified |= edred.madeChangesInLastReduce();
 
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+                s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+            }while (res.empty() && made_changes);
+
             if(modified) continue;
         }
 

@@ -38,7 +38,7 @@ VI EDReducer::reduce(VVI V0) {
         for (int v : nodes) if (!V[v].empty()) {
             // clog << "\rConsidering node " << v << flush;
             if (consider({v})) {
-                // if (write_logs)
+                if (write_logs)
                     clog << "\t\tNode " << v << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
                 reducible_nodes.push_back(v);
                 GraphUtils::removeNodeFromGraph(V,v);
