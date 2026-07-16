@@ -71,7 +71,7 @@ public:
      * Similary for the set S.
      */
     bool ed_move_nodes_to_U_simultaneously = true;
-    bool ed_move_nodes_to_S_simultaneously = false;
+    bool ed_move_nodes_to_S_simultaneously = true;
 
     /**
      * If true, then nodes are considered to be moved to the set U, even if they do not belong to N(W).

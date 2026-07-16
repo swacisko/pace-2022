@@ -155,6 +155,14 @@ bool EDReducer::consider(VI initS) {
     //     assert( deg_notin_W[u] == getNonWNeighborhoodSize(u) ); // #TEST just for tests
     // }
 
+
+
+    // // now we exclude from U some nodes that have a very large degree outside W, and thus have a very small chance
+    // // of bringing any changes even when many nodes are moved to S or U.
+    // this should be done at the point of adding nodes to U for the first time to avoid iteration over their neighborhoods.
+    // int max_nonw_deg = 2*cnf.ed_ext_dom_max_node_neigh + 5;
+    // excludeHighDegreeNodesFromU( max_nonw_deg );
+
     while ( true ) {
         if (write_logs) clog << "\tContinuing ED, next step..." << endl;
 
@@ -724,6 +732,16 @@ void EDReducer::clearAllForConsider() {
     W.clear();
 
     check_double_ed = false;
+}
+
+void EDReducer::excludeHighDegreeNodesFromU(int max_nonw_deg) {
+    for ( int i=(int)U.size()-1; i>=0; i-- ) {
+        int u = U[i];
+        if (deg_notin_W[u] > max_nonw_deg) {
+            inU[u] = inU0[u] = false;
+            REM(U,i);
+        }
+    }
 }
 
 void EDReducer::checkEmptyArraysAssertions(bool check_marked, bool check_marked2) {

@@ -120,17 +120,19 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         for(auto *x : liftables) secondary_reduce_liftables.push_back(x);
     };
 
-    function<void()> applyBasicReductions = [&](){
+    function<bool(bool)> applyBasicReductions = [&](bool allow_crown_and_lp){
         VVI Vcp = V;
         KernelizerVC kern;
 
         Stopwatch s; string opt = "basic_kern"; s.start(opt);
-        // kern.use_crown_and_lp_checks = false;
+        kern.use_crown_and_lp_checks = allow_crown_and_lp;
         auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
         s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
         addKNR(kern_nodes);
         GraphUtils::removeNodes(V, kern_nodes,helper);
+
+        return !kern_nodes.empty() || !edges_removed.empty();
     };
 
 
@@ -141,7 +143,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         modified = false;
         helper = VB(N,false);
 
-        applyBasicReductions();
+        auto suppr = applyBasicReductions(false); // the graph can be modified, but is it modified exhaustively, so no need to rerun it
 
         if(modified) continue;
         if (sw.tle(reducer_str)) break;
@@ -261,30 +263,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         // }
 
 
-        {
-            VVI Vcp = V;
-            KernelizerVC kern;
-            auto [kern_nodes, edges_removed] = kern.lpDecomposition(Vcp);
-            addKNR(kern_nodes);
-            GraphUtils::removeNodes(V, kern_nodes,helper);
-            if(!modified) modified = (!kern_nodes.empty());
-        }
 
-
-        if(cnf.reducer_use_general_folding){
-            Stopwatch s; string opt = "general folding"; s.start(opt);
-            auto reductions = generalFolding();
-            total_general_folds_done += reductions.size();
-            if(!modified) modified = (!reductions.empty());
-
-            { // add to resulting kernelization objects
-                if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr; }
-                for(auto *x : reductions) secondary_reduce_liftables.push_back(x);
-            }
-
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-            if(modified) continue;
-        }
 
         if (false)
         if(cnf.reducer_use_twins){
@@ -300,6 +279,9 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
+
+        modified |= applyBasicReductions(true); // use crown and LP in addition to degree-1 and domination
+        if (modified) continue;
 
         // standard node-removal version
         if( cnf.reducer_use_ed && cnf.ed_use_node_removal){
@@ -325,6 +307,20 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
+        if(cnf.reducer_use_general_folding){
+            Stopwatch s; string opt = "general folding"; s.start(opt);
+            auto reductions = generalFolding();
+            total_general_folds_done += reductions.size();
+            if(!modified) modified = (!reductions.empty());
+
+            { // add to resulting kernelization objects
+                if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr; }
+                for(auto *x : reductions) secondary_reduce_liftables.push_back(x);
+            }
+
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+            if(modified) continue;
+        }
 
         // standard edge-insertion - those edges that are found using consider(v) for single-node initial sets S
         if (cnf.ed_apply_type1_constraints_on_the_fly)

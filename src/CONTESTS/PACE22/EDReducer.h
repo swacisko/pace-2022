@@ -164,6 +164,11 @@ private:
      */
     void clearAllForConsider();
 
+    /**
+     * Removes from U all nodes u with |N(u) \setminus W| > max_nonw_deg
+     */
+    void excludeHighDegreeNodesFromU(int max_nonw_deg);
+
 
     void checkEmptyArraysAssertions(bool check_marked, bool check_marked2);
 
