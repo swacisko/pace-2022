@@ -200,6 +200,7 @@ void EDReducer::moveToU(int u) {
     W.push_back(u);
     U1.push_back(u);
     inU[u] = inW[u] = inU1[u] = true;
+    inU0[u] = true;
 
     inf_rules_1.push_back(u);
 
@@ -209,6 +210,7 @@ void EDReducer::moveToU(int u) {
         deg_notin_W[d] -= inW[d]; // we decrease value for each neighbor d, because u is moved to W
         deg_notin_W[u] += !inW[d]; // we calculate value for the moved node u
         deg_in_S[u] += inS[d];
+        if (inS[d]) inU0[u] = false;
     }
 
 
@@ -224,7 +226,10 @@ void EDReducer::moveToS(int u) {
     inS[u] = inW[u] = true;
 
     deg_in_S[u] = 0;
-    for (int d : V[u]) deg_in_S[u] += inS[d];
+    for (int d : V[u]) {
+        deg_in_S[u] += inS[d];
+        inU0[d] = false;
+    }
 
     for (int d : V[u]) {
         if ( !inW[d] ) {
@@ -254,7 +259,8 @@ void EDReducer::moveToS(int u) {
 void EDReducer::updateU1() {
     for ( int d : U ) { // marking in helper all nodes that should be removed from U1
         int c = 0;
-        for ( int dd : V[d] ) if (inS[dd]) c++;
+        // for ( int dd : V[d] ) if (inS[dd]) c++;
+        for ( int dd : V[d] ) c += inS[dd];
         if (c > 1) helper[d] = true;
     }
 
@@ -291,14 +297,19 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
             // int nonw_neigh_size = getNonWNeighborhoodSize(u);
             // if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
 
-            if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
-            int nonw_neigh_size = getNonWNeighborhoodSize(u);
-            if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
+            // if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
+            // int nonw_neigh_size = getNonWNeighborhoodSize(u);
+            // if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
 
+            if (!has_cnf_bounded_neigh[u]) continue;
             // int nonw_neigh_size = deg_notin_W[u];
             // if ( nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
 
-            for (int w : V[u]) if (!inW[w]) for (int d : V[w]) cnt[d]++;
+            int nonw_neigh_size = 0;
+            for (int w : V[u]) {
+                nonw_neigh_size += !inW[w];
+                if (!inW[w]) for (int d : V[w]) cnt[d]++;
+            }
 
             for ( int w : V[u] ) if (!inW[w]) {
                 for ( int d : V[w] ) if ( !inW[d] && cnt[d] == nonw_neigh_size ) {
@@ -321,27 +332,30 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
             // assert( deg_in_S[u] == getSIntersectionSize(u) ); // #TEST just for tests
             // assert( deg_notin_W[u] == getNonWNeighborhoodSize(u) ); // #TEST just for tests
 
-            if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
+            // if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
+            //
+            // int nonw_neigh_size = 0;
+            // bool empty_S_inters = true;
+            // for ( int d : V[u] ) {
+            //     empty_S_inters &= !inS[d];
+            //     nonw_neigh_size += !inW[d];
+            // }
+            // if (!empty_S_inters) continue;
+            //
+            // // int nonw_neigh_size = getNonWNeighborhoodSize(u);
+            // if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
 
-            int nonw_neigh_size = 0;
-            bool empty_S_inters = true;
-            for ( int d : V[u] ) {
-                empty_S_inters &= !inS[d];
-                nonw_neigh_size += !inW[d];
-            }
-            if (!empty_S_inters) continue;
-
-            // int nonw_neigh_size = getNonWNeighborhoodSize(u);
-            if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
-
+            if (!has_cnf_bounded_neigh[u]) continue;
+            if (!inU0[u]) continue;
             // if ( deg_in_S[u] > 0 || deg_notin_W[u] > cnf.ed_ext_dom_max_node_neigh) continue;
-            // int nonw_neigh_size = deg_notin_W[u];
+            // if ( cnf.ed_use_deficit1_domination && deg_in_S[u] == 0 ) continue; // this will be done in next section
+            int nonw_neigh_size = deg_notin_W[u];
 
             for ( int w : V[u] ) if ( !inW[w] ) helper[w] = true; // marking N(u) \setminus W
 
             for ( int w : V[u] ) if (!inW[w]) {
                 int c = 1;
-                for (int d : V[w]) if ( helper[d] ) c++;
+                for (int d : V[w]) c += helper[d];
                 assert(c <= nonw_neigh_size);
                 if (c == nonw_neigh_size) {
                     if (write_logs) clog << "\t\t\tmarking node " << w << " to move to U using same-neighborhood-rule for node u = " << u  << endl;
@@ -361,14 +375,17 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
             // assert( deg_in_S[u] == getSIntersectionSize(u) ); // #TEST just for tests
             // assert( deg_notin_W[u] == getNonWNeighborhoodSize(u) ); // #TEST just for tests
 
-             if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
+            //  if ( getLowerBoundOnNonWNeighbors(u) > cnf.ed_ext_dom_max_node_neigh ) continue;
+            //
+            // bool empty_S_inters = true;
+            // for ( int d : V[u] ) empty_S_inters &= !inS[d];
+            // if (!empty_S_inters) continue;
+            //
+            // int nonw_neigh_size = getNonWNeighborhoodSize(u);
+            // if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
 
-            bool empty_S_inters = true;
-            for ( int d : V[u] ) empty_S_inters &= !inS[d];
-            if (!empty_S_inters) continue;
-
-            int nonw_neigh_size = getNonWNeighborhoodSize(u);
-            if (nonw_neigh_size > cnf.ed_ext_dom_max_node_neigh) continue;
+            if (!has_cnf_bounded_neigh[u]) continue;
+            if (!inU0[u]) continue;
             // if ( deg_in_S[u] > 0 || deg_notin_W[u] > cnf.ed_ext_dom_max_node_neigh) continue;
 
             T.clear(); vis.clear();
@@ -384,7 +401,10 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
             for (int d : vis) was[d] = false;
 
             for ( int w : T ) { // we exclude each node in T in turn and update counters
-                for (int d : V[w]) if (!inW[d]) cnt[d]--;
+                if (vis.empty()) break;
+
+                // for (int d : V[w]) if (!inW[d]) cnt[d]--;
+                for (int d : V[w]) cnt[d] -= !inW[d];
 
                 for ( int i=(int)vis.size()-1; i>=0; i-- ) {
                     int d = vis[i];
@@ -409,7 +429,8 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
                     }
                 }
 
-                for (int d : V[w]) if (!inW[d]) cnt[d]++;
+                // for (int d : V[w]) if (!inW[d]) cnt[d]++;
+                for (int d : V[w]) cnt[d] += !inW[d];
             }
 
             for ( int w : T ) for (int d : V[w]) cnt[d] = 0;
@@ -675,11 +696,13 @@ void EDReducer::clearAllForConsider() {
     temp.clear();
     temp2.clear();
     for (int d : W) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
+        inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+        has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
         deg_in_S[d] = deg_notin_W[d] = 0;
     }
     for (int d0 : W) for (int d : V[d0]) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
+        inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+        has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
         deg_in_S[d] = deg_notin_W[d] = 0;
     }
 
@@ -687,7 +710,8 @@ void EDReducer::clearAllForConsider() {
         // for (int d0 : W) {
         for (int d0 : W) if (hasNonWIntersectionAtMost(d0,cnf.ed_ext_dom_max_node_neigh)) {
             for (int d1 : V[d0]) for (int d : V[d1]) {
-                inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = helper[d] = marked[d] = marked2[d] = false;
+                inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+                has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
                 deg_in_S[d] = deg_notin_W[d] = 0;
             }
         }
@@ -713,6 +737,7 @@ void EDReducer::checkEmptyArraysAssertions(bool check_marked, bool check_marked2
         }
         if (check_marked2) assert(ranges::all_of(marked2, [&](auto b){return !b;}));
         assert(ranges::all_of(was, [&](auto b){return !b;}));
+        assert(ranges::all_of(has_cnf_bounded_neigh, [&](auto b){return !b;}));
         assert(ranges::all_of(helper, [&](auto b){return !b;}));
         assert(temp.empty());
         assert(temp2.empty());

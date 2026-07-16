@@ -11,7 +11,8 @@
 class EDReducer {
 public:
     explicit EDReducer( int NN, Config c )
-    : N(NN), inS(N), inU(N), inU1(N), inU0(N), inW(N), was(N), helper(N), marked(N), marked2(N), cnf(c) {
+    : N(NN), inS(N), inU(N), inU1(N), inU0(N), inW(N), was(N), helper(N),
+    marked(N), marked2(N), has_cnf_bounded_neigh(N), cnf(c) {
         temp.reserve(N);
         temp2.reserve(N);
         cnt = deg_in_S = deg_notin_W = VI(N,0);
@@ -71,6 +72,7 @@ private:
     VVI V;
 
     VB inS, inU, inU1, inU0, inW, was, helper, marked, marked2;
+    VB has_cnf_bounded_neigh;
     VI deg_in_S, deg_notin_W; // those need to be kept correctly for all nodes in W
     VI temp, temp2,S,U,U1,W;
     VI cnt;
@@ -83,8 +85,16 @@ private:
      */
     int getNonWNeighborhoodSize(int u);
     bool hasNonWIntersectionAtMost( int u, int val ) {
+        if (has_cnf_bounded_neigh[u]) return true;
+
         if ( getLowerBoundOnNonWNeighbors(u) > val ) return false;
-        return getNonWNeighborhoodSize(u) <= val;
+        // return getNonWNeighborhoodSize(u) <= val;
+        return has_cnf_bounded_neigh[u] = (getNonWNeighborhoodSize(u) <= val);
+
+
+        // this version seems to be much slower... perhaps this is due to RAM accesses... ??
+        // if ( getLowerBoundOnNonWNeighbors(u) > val ) return false;
+        // return deg_notin_W[u] <= val;
     }
 
     /**
