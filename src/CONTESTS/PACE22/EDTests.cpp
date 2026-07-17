@@ -375,7 +375,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
     }
 
 
-    constexpr bool test_noned_vc_rules = false;
+    constexpr bool test_noned_vc_rules = true;
     if (test_noned_vc_rules){ // measuring just the VC reduction time WITHOUT ED rule, and the solver results for the non-ed reduced graph
         clog << endl << "***************** CHECKING FULL NON-ED RULES" << endl;
 
@@ -583,6 +583,45 @@ VVI getRandomGraph( int N, int M ) {
     return V;
 }
 
+void trimAllDegreeOneNodes(VVI & V) {
+    int N = V.size();
+    VI deg(N,0);
+    for (int i=0; i<N; i++) deg[i] = V[i].size();
+
+    deque<int> q;
+    for (int i=0; i<N; i++) if (deg[i] == 1) {
+        int b = V[i][0];
+        deg[b]--;
+        if (deg[b] == 1) q.push_back(b);
+        GraphUtils::removeNodeFromGraph(V,i);
+        deg[i] = 0;
+        assert(deg[i] == V[i].size());
+
+        while (!q.empty()) {
+            int a = q.back();
+            q.pop_back();
+            if ( deg[a] != 1 ) {
+                if (deg[a] != 0) DEBUG(PII(a,deg[a]));
+                assert(deg[a] == 0);
+                continue;
+            }
+            assert(deg[a] == 1);
+
+            int b = V[a][0];
+            deg[b]--;
+            if (deg[b] == 1) q.push_back(b);
+            GraphUtils::removeNodeFromGraph(V,a);
+            deg[a] = 0;
+
+            if (deg[b] != V[b].size()) {
+                DEBUG(b);
+                DEBUG(PII(deg[b], V[b].size()));
+                assert(deg[b] == V[b].size());
+            }
+        }
+    }
+}
+
 
 int main() {
     ios_base::sync_with_stdio(0);
@@ -601,6 +640,22 @@ int main() {
     // VVI V = getRandomGraph(N0, M0);
 
     V = GraphUtils::makeSimple(V); // making the graph simple, as at the input it might not...
+
+    constexpr bool trim_deg1_nodes = false;
+    if (trim_deg1_nodes){
+        V = GraphInducer::induceByNonisolatedNodes(V).V;
+        int N = V.size(), M = GraphUtils::countEdges(V);
+        clog << "Before trimming degree 1 nodes, N:" << N << ", M: " << M << endl;
+
+        trimAllDegreeOneNodes(V);
+        V = GraphInducer::induceByNonisolatedNodes(V).V;
+        N = V.size(), M = GraphUtils::countEdges(V);
+        clog << "After trimming degree 1 nodes, N:" << N << ", M: " << M << endl;
+
+        int c = 0;
+        for (int i=0; i<N; i++) c += (V[i].size() == 1);
+        assert(c == 0);
+    }
 
     assert(GraphUtils::isSimple(V));
 

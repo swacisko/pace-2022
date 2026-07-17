@@ -124,7 +124,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         VVI Vcp = V;
         KernelizerVC kern;
 
-        Stopwatch s; string opt = "basic_kern"; s.start(opt);
+        Stopwatch s; string opt = ( allow_crown_and_lp ? "basic_kern_lp_crown" : "basic_kern"); s.start(opt);
         kern.use_crown_and_lp_checks = allow_crown_and_lp;
         auto [kern_nodes, edges_removed] = kern.initialKernelization(Vcp);
         s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
@@ -133,6 +133,10 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         GraphUtils::removeNodes(V, kern_nodes,helper);
 
         return !kern_nodes.empty() || !edges_removed.empty();
+    };
+
+    auto applyDeg1AndDomination = [&]() {
+
     };
 
 
@@ -164,22 +168,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
-
-        if(cnf.reducer_use_unconfined){
-            Stopwatch s; string opt = "unconfined"; s.start(opt);
-            if(write_progress_on_the_fly) clog << "Running unconfined" << endl;
-            VI uncon = unconfined();
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-
-
-            addKNR(uncon);
-            total_unconfined_nodes += uncon.size();
-            GraphUtils::removeNodes(V, uncon, helper);
-
-            modified |= !uncon.empty();
-            if(modified) continue;
-        }
-
         if (false)
         if(cnf.reducer_use_desk){
             Stopwatch s; string opt = "desk"; s.start(opt);
@@ -207,6 +195,23 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             addLiftables(liftables);
 
             modified |= !liftables.empty();
+            if(modified) continue;
+        }
+
+        // running unconfined before funnel, or even folding, can help achieve slightly better reduction ratio,
+        // but it can make total reduction time up to 1.5x slower on some instances...
+        if(cnf.reducer_use_unconfined){
+            Stopwatch s; string opt = "unconfined"; s.start(opt);
+            if(write_progress_on_the_fly) clog << "Running unconfined" << endl;
+            VI uncon = unconfined();
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
+
+            addKNR(uncon);
+            total_unconfined_nodes += uncon.size();
+            GraphUtils::removeNodes(V, uncon, helper);
+
+            modified |= !uncon.empty();
             if(modified) continue;
         }
 
@@ -548,22 +553,21 @@ vector<VCReduction*> Reducer::funnel() {
         for (int d : V[a]) cnt += was[d];
         if (cnt >= V[v].size()) { DEBUG(cnt); DEBUG(PII(v,a)); DEBUG(V[v]); DEBUG(V[a]); }
         assert(cnt <= (int)V[v].size()-1);
+        for ( int d : V[v] ) was[d] = false;
 
         if (cnt == 0) cand = a; // a is isolated from N(v)
-        else if (cnt < (int)V[v].size()-1 ) { // there exists node in V[v] that is not in V[a], we need to find it
+        else if (cnt < (int)V[v].size()-1 ) { // there exists node in N(v) that is not in N[a], we need to find it
             for (int d : V[a]) was2[d] = true;
-            for (int x : V[v]) if (!was2[x]) cand = x;
+            for (int x : V[v]) if (!was2[x] && x != a) cand = x;
             for (int d : V[a]) was2[d] = false;
             assert(cand != -1);
         }else {
             // node a dominates node v
             // clog << "Found a dominating node using funnel, a: " << a << ", V[a]: " << V[a] << endl;
             // clog << "v: " << v << ", V[v]: " << V[v] << endl;
-            for ( int d : V[v] ) was[d] = false;
             return {a,true};
         }
 
-        for ( int d : V[v] ) was[d] = false;
         return {cand,false};
     };
 
@@ -590,11 +594,10 @@ vector<VCReduction*> Reducer::funnel() {
     while (changes) {
         changes = false;
 
-        for (int v=0; v<N; v++) if (!V[v].empty()) if ( (int)V[v].size()-1 <= cnf.reducer_max_funnel_clique_size ) {
+        for (int v=0; v<N; v++) if (V[v].size() >= 2) if ( (int)V[v].size()-1 <= cnf.reducer_max_funnel_clique_size ) {
             auto [cand,dominates] = findIsolatedNodeCandidate(v);
 
             if constexpr(allow_separate_domination) if (dominates) {
-                // continue;
                 liftables += propagateDeg1RuleSlow(cand);
                 if (run_exhaustively) changes = true;
                 continue;
@@ -605,8 +608,9 @@ vector<VCReduction*> Reducer::funnel() {
 
             if constexpr(allow_separate_domination) if (!dominates) {
                 auto neigh = V[v];
+                auto cand_neigh = V[cand];
                 for (int d : V[v]) if (d != cand) was[d] = true;
-                for ( int d : V[cand] ) if (was[d] && !V[d].empty()) {
+                for ( int d : cand_neigh ) if (was[d] && !V[d].empty() && !V[v].empty()) {
                     dominates = true;
                     // clog << "Found a dominating node in funnel!" << endl;
                     liftables += propagateDeg1RuleSlow(d);

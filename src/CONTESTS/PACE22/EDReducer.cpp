@@ -93,7 +93,7 @@ VI EDReducer::reduce(VVI V0) {
                     int t = reducible_nodes.size();
                     if ( V[u].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[u][0]);
                     if ( V[v].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[v][0]);
-                    last_reduce_nodes_removed += t - reducible_nodes.size();
+                    last_reduce_nodes_removed += reducible_nodes.size() - t;
 
                     if (use_exhaustively) changes = true;
                 }
