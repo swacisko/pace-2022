@@ -149,6 +149,7 @@ bool EDReducer::consider(VI initS) {
         for (int u : S) for (int d : V[u]) deg_in_S[d]++;
     }
 
+    // clog << "Initial sizes: W: " << W.size() << ", U: " << U.size() << ", U1: " << U1.size() << endl;
 
     while ( true ) {
         if (write_logs) clog << "\tContinuing ED, next step..." << endl;
@@ -268,7 +269,7 @@ void EDReducer::updateU1() {
         int c = 0;
         for (int d : V[u]) c += inS[d];
         if (c > 1) {
-            inU1[u] = false;
+            inU1[u] = inU0[u] = false;
             REM(U1,i);
         }
     }
