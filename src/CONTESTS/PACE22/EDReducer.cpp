@@ -702,27 +702,57 @@ int EDReducer::nextStep() {
 void EDReducer::clearAllForConsider() {
     temp.clear();
     temp2.clear();
-    for (int d : W) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
-        has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
-        deg_in_S[d] = deg_notin_W[d] = 0;
-    }
-    for (int d0 : W) for (int d : V[d0]) {
-        inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
-        has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
-        deg_in_S[d] = deg_notin_W[d] = 0;
-    }
 
-    if (cnf.ed_consider_nodes_to_move_outside_NW) {
-        // for (int d0 : W) {
-        for (int d0 : W) if (hasNonWIntersectionAtMost(d0,cnf.ed_ext_dom_max_node_neigh)) {
-            for (int d1 : V[d0]) for (int d : V[d1]) {
-                inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
-                has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
-                deg_in_S[d] = deg_notin_W[d] = 0;
+    constexpr int opt = 2;
+    if constexpr (opt == 1) {
+        for (int d : W) {
+            inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+            has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
+            deg_in_S[d] = deg_notin_W[d] = 0;
+        }
+        // for (int d0 : W) for (int d : V[d0]) {
+        for (int d0 : W) if (hasNonWIntersectionAtMost(d0,cnf.ed_ext_dom_max_node_neigh)) for (int d : V[d0]) {
+            inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+            has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
+            deg_in_S[d] = deg_notin_W[d] = 0;
+        }
+
+        if (cnf.ed_consider_nodes_to_move_outside_NW) {
+            // for (int d0 : W) {
+            for (int d0 : W) if (hasNonWIntersectionAtMost(d0,cnf.ed_ext_dom_max_node_neigh)) {
+                for (int d1 : V[d0]) for (int d : V[d1]) {
+                    inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+                    has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
+                    deg_in_S[d] = deg_notin_W[d] = 0;
+                }
             }
         }
     }
+    else if (opt == 2){
+
+        if (cnf.ed_consider_nodes_to_move_outside_NW) {
+            for (int d0 : W) if (has_cnf_bounded_neigh[d0]) {
+                for (int d1 : V[d0]) if (!inW[d1]) for (int d : V[d1]) if (!inW[d]) {
+                    inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+                    helper[d] = marked[d] = marked2[d] = false;
+                    deg_in_S[d] = deg_notin_W[d] = 0;
+                }
+            }
+        }
+
+        for (int d0 : W) if (has_cnf_bounded_neigh[d0]) for (int d : V[d0]) if (!inW[d]) {
+            inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+            helper[d] = marked[d] = marked2[d] = false;
+            deg_in_S[d] = deg_notin_W[d] = 0;
+        }
+
+        for (int d : W) {
+            inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+            has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
+            deg_in_S[d] = deg_notin_W[d] = 0;
+        }
+    }
+
     inf_rules_1.clear();
     inf_rules_2.clear();
     S.clear();

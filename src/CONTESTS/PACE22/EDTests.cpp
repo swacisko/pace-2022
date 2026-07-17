@@ -375,7 +375,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
     }
 
 
-    constexpr bool test_noned_vc_rules = true;
+    constexpr bool test_noned_vc_rules = false;
     if (test_noned_vc_rules){ // measuring just the VC reduction time WITHOUT ED rule, and the solver results for the non-ed reduced graph
         clog << endl << "***************** CHECKING FULL NON-ED RULES" << endl;
 
