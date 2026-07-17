@@ -12,7 +12,7 @@ class EDReducer {
 public:
     explicit EDReducer( int NN, Config c )
     : N(NN), inS(N), inU(N), inU1(N), inU0(N), inW(N), was(N), helper(N),
-    marked(N), marked2(N), has_cnf_bounded_neigh(N), cnf(c) {
+    marked(N), marked2(N), has_cnf_bounded_neigh(N), clearing_helper(N), excluded(N), cnf(c) {
         temp.reserve(N);
         temp2.reserve(N);
         cnt = deg_in_S = deg_notin_W = VI(N,0);
@@ -72,6 +72,7 @@ private:
     VVI V;
 
     VB inS, inU, inU1, inU0, inW, was, helper, marked, marked2;
+    VB clearing_helper, excluded;
     VB has_cnf_bounded_neigh;
     VI deg_in_S, deg_notin_W; // those need to be kept correctly for all nodes in W
     VI temp, temp2,S,U,U1,W;
@@ -145,14 +146,19 @@ private:
     /**
      * Moves node u from N(W) to U.
      * Must be u in N(W)
+     * If [exclude] is set, the u is added to W and U, but not to U1. This way it will not contribute to any changes.
      */
-    void moveToU(int u);
+    void moveToU(int u, bool exclude = false);
 
     /**
      * Moves node u from N(U) to S.
-     * Must be u \in N(W)
+     * Must be u \in N(W).
+     * If [init_exclude] is set to true, then neighbors w of node u that are moved to U will be checked for exclusion.
+     * If max(0, (int)V[u].size() - W_size_after_all_simultaneous_moves - 1) >= cnf.ed_min_nonw_deg_to_exclude_node,
+     * then node w will be excluded,
+     * so it will not contribute to any changes (it will be added to U and W, but not to U1).
      */
-    void moveToS(int u);
+    void moveToS(int u, bool init_exclude = false);
 
     /**
      * Removes from U1 all nodes that have more than one neighbor in S.

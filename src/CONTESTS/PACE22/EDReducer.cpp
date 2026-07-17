@@ -131,7 +131,7 @@ bool EDReducer::consider(VI initS) {
 
     if (write_logs) clog << "Considering initS: " << initS << endl;
 
-    if (initS.size() == 1) moveToS(initS[0]);
+    if (initS.size() == 1) moveToS(initS[0], true);
     else {
         S = W = initS;
         for (int d : S) was[d] = true;
@@ -141,7 +141,12 @@ bool EDReducer::consider(VI initS) {
 
         for (int u : S) inS[u] = inW[u] = true;
         StandardUtils::makeUnique(temp);
-        for (int u : temp) moveToU(u);
+        int W_size_after_all_simultaneous_moves = temp.size();
+        for (int u : temp) {
+            // bool excl =  (getLowerBoundOnNonWNeighbors(u) >= cnf.ed_min_nonw_deg_to_exclude_node);
+            bool excl = (max(0, (int)V[u].size() - W_size_after_all_simultaneous_moves  - 1) >= cnf.ed_min_nonw_deg_to_exclude_node);
+            moveToU(u,excl);
+        }
         temp.clear();
 
         updateU1();
@@ -200,8 +205,18 @@ bool EDReducer::existsExtDominator(VB & marked) {
 
 
 
-void EDReducer::moveToU(int u) {
+void EDReducer::moveToU(int u, const bool exclude) {
     assert(!inW[u]);
+
+    if (exclude) {
+        excluded[u] = true;
+        U.push_back(u);
+        W.push_back(u);
+        inU[u] = inW[u] = true;
+        inU1[u] = inU0[u] = false;
+        deg_notin_W[u] = deg_in_S[u] = 0;
+        return;
+    }
 
     U.push_back(u);
     W.push_back(u);
@@ -220,12 +235,9 @@ void EDReducer::moveToU(int u) {
         if (inS[d]) inU0[u] = false;
     }
 
-
-    if (cnf.ed_U_nodes_sorting_mode == 1) sort(ALL(U1), [&](int a, int b){ return V[a].size() > V[b].size(); });
-    if (cnf.ed_U_nodes_sorting_mode == 2) sort(ALL(U1), [&](int a, int b){ return V[a].size() > V[b].size(); });
 }
 
-void EDReducer::moveToS(int u) {
+void EDReducer::moveToS(int u, const bool init_exclude) {
     assert(!inW[u]);
 
     S.push_back(u);
@@ -233,21 +245,27 @@ void EDReducer::moveToS(int u) {
     inS[u] = inW[u] = true;
 
     deg_in_S[u] = 0;
-    for (int d : V[u]) {
+    for (int d : V[u]) if (!excluded[d]) {
         deg_in_S[u] += inS[d];
         inU0[d] = false;
     }
 
-    for (int d : V[u]) {
+    for (int d : V[u]) if (!excluded[d]) {
+
         if ( !inW[d] ) {
             auto t = write_logs;
             write_logs = false;
 
             if (write_logs) clog << "\t\tmoving neighbor " << d << " of node u=" << u << " to U" << endl;
-            moveToU(d);
+            bool exclude =  (getLowerBoundOnNonWNeighbors(d) >= cnf.ed_min_nonw_deg_to_exclude_node);
+            if (init_exclude) {
+                int W_size_after_all_simultaneous_moves = V[u].size();
+                exclude = (max(0, (int)V[d].size() - W_size_after_all_simultaneous_moves - 1) >= cnf.ed_min_nonw_deg_to_exclude_node);
+            }
+            moveToU(d, exclude);
 
             write_logs = t;
-        }else {
+        }else { // d is not excluded and is already in W
             deg_notin_W[d]--;
             deg_in_S[d]++;
         }
@@ -258,27 +276,35 @@ void EDReducer::moveToS(int u) {
     updateU1();
 
     inf_rules_2.push_back(u);
-
-    if (cnf.ed_U_nodes_sorting_mode == 1) sort(ALL(U1), [&](int a, int b){ return V[a].size() > V[b].size(); });
-    if (cnf.ed_U_nodes_sorting_mode == 2) sort(ALL(U1), [&](int a, int b){ return V[a].size() > V[b].size(); });
 }
 
 void EDReducer::updateU1() {
-    for ( int d : U ) { // marking in helper all nodes that should be removed from U1
+    // for ( int d : U ) { // marking in helper all nodes that should be removed from U1
+    //     int c = 0;
+    //     // for ( int dd : V[d] ) if (inS[dd]) c++;
+    //     for ( int dd : V[d] ) c += inS[dd];
+    //     if (c > 1) helper[d] = true;
+    // }
+    //
+    // // removing now nodes from U1, if necessary
+    // for (int i=(int)U1.size()-1; i>=0; i--) if (helper[U1[i]]) {
+    //     inU1[U1[i]] = false;
+    //     swap(U1[i], U1.back());
+    //     U1.pop_back();
+    // }
+    //
+    // for (int d : U) helper[d] = false; // clearing
+
+
+    for (int i=(int)U1.size()-1; i>=0; i--) {
+        int u = U1[i];
         int c = 0;
-        // for ( int dd : V[d] ) if (inS[dd]) c++;
-        for ( int dd : V[d] ) c += inS[dd];
-        if (c > 1) helper[d] = true;
+        for (int d : V[u]) c += inS[d];
+        if (c > 1) {
+            inU1[u] = false;
+            REM(U1,i);
+        }
     }
-
-    // removing now nodes from U1, if necessary
-    for (int i=(int)U1.size()-1; i>=0; i--) if (helper[U1[i]]) {
-        inU1[U1[i]] = false;
-        swap(U1[i], U1.back());
-        U1.pop_back();
-    }
-
-    for (int d : U) helper[d] = false; // clearing
 }
 
 void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
@@ -579,7 +605,6 @@ VI EDReducer::findNodesToMoveToU() {
     nodes_to_move_to_U.reserve(W.size());
 
     if(cnf.ed_consider_nodes_to_move_outside_NW) {
-        // for ( int u : U1 ) {
         for ( int u : U1 ) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
             for (int w : V[u]) {
                 if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
@@ -587,7 +612,6 @@ VI EDReducer::findNodesToMoveToU() {
             }
         }
     }else {
-        // for ( int u : U1 ) {
         for ( int u : U1 ) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
             for (int w : V[u]) if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
         }
@@ -635,7 +659,12 @@ int EDReducer::nextStep() {
 
         if (!cnf.ed_move_nodes_to_U_simultaneously) nodes_to_move_to_U.resize(1);
         if (write_logs) clog << "\t\tMoving nodes " << nodes_to_move_to_U << " to U (and creating type-1 constraints)" << endl;
-        for (int u : nodes_to_move_to_U) moveToU(u);
+        int W_size_after_all_simultaneous_moves = W.size() + nodes_to_move_to_U.size();
+        for (int u : nodes_to_move_to_U) {
+            // bool excl =  (getLowerBoundOnNonWNeighbors(u) >= cnf.ed_min_nonw_deg_to_exclude_node);
+            bool excl = (max(0, (int)V[u].size() - W_size_after_all_simultaneous_moves  - 1) >= cnf.ed_min_nonw_deg_to_exclude_node);
+            moveToU(u, excl);
+        }
         return 0;
     }
 
@@ -731,24 +760,34 @@ void EDReducer::clearAllForConsider() {
     else if (opt == 2){
 
         if (cnf.ed_consider_nodes_to_move_outside_NW) {
-            for (int d0 : W) if (has_cnf_bounded_neigh[d0]) {
-                for (int d1 : V[d0]) if (!inW[d1]) for (int d : V[d1]) if (!inW[d]) {
-                    inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
-                    helper[d] = marked[d] = marked2[d] = false;
-                    deg_in_S[d] = deg_notin_W[d] = 0;
+            // for (int d0 : W) if (has_cnf_bounded_neigh[d0]) {
+            for (int d0 : W) if (has_cnf_bounded_neigh[d0] && !excluded[d0]) {
+                for (int d1 : V[d0]) if (!inW[d1] && !clearing_helper[d1]) {
+                    clearing_helper[d1] = true;
+                    for (int d : V[d1]) if (!inW[d]) {
+                        inS[d] = inU[d] = inW[d] = false;
+                        inU1[d] = inU0[d] = was[d] = false;
+                        helper[d] = marked[d] = marked2[d] = false;
+                        deg_in_S[d] = deg_notin_W[d] = 0;
+                    }
                 }
             }
         }
 
-        for (int d0 : W) if (has_cnf_bounded_neigh[d0]) for (int d : V[d0]) if (!inW[d]) {
-            inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
+        // for (int d0 : W) if (has_cnf_bounded_neigh[d0]) for (int d : V[d0]) if (!inW[d]) {
+        for (int d0 : W) if (has_cnf_bounded_neigh[d0] && !excluded[d0]) for (int d : V[d0]) if (!inW[d]) {
+            inS[d] = inU[d] = inW[d] = false;
+            inU1[d] = inU0[d] = was[d] = false;
             helper[d] = marked[d] = marked2[d] = false;
             deg_in_S[d] = deg_notin_W[d] = 0;
+            clearing_helper[d] = false;
         }
 
         for (int d : W) {
-            inS[d] = inU[d] = inW[d] = inU1[d] = inU0[d] = was[d] = false;
-            has_cnf_bounded_neigh[d] = helper[d] = marked[d] = marked2[d] = false;
+            inS[d] = inU[d] = inW[d] = false;
+            inU1[d] = inU0[d] = was[d] = false;
+            helper[d] = marked[d] = marked2[d] = false;
+            has_cnf_bounded_neigh[d] = excluded[d] = false;
             deg_in_S[d] = deg_notin_W[d] = 0;
         }
     }

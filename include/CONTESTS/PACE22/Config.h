@@ -57,13 +57,6 @@ public:
      */
     int ed_node_sorting_mode = 1;
 
-    /**
-     * Order in which nodes in
-     * 0 - order in which the nodes just are, nothing is done
-     * 1 - sort nodes in U1 based on their |N(u) \setminus W|, largest to smallest
-     * 2 - sort nodes in U1 based on their |N(u) \setminus W|, smallest to largest
-     */
-    int ed_U_nodes_sorting_mode = 0;
 
     /**
      * If true, then all detected nodes are moved to the set U simultaneously, in the same iteration, otherise
@@ -132,6 +125,16 @@ public:
     int ed_ext_dom_max_node_neigh = 10;
 
     /**
+     * When using the moveToU function AT THE VERY BEGINNING, nodes are moved to the set U.
+     * If a given node u has a lower bound on the |N(u) \setminus W| >= ed_min_nonw_deg_to_exclude_node,
+     * it will be completely removed from consideration.
+     * This way it might be much faster to iterate over U1, as it might be much smaller than U.
+     * Also, it might be much faster to clear data before calling [consider] function, as we will not need to iterate
+     * over excluded nodes in W, for those nodes would never contribute to any changes.
+     */
+    int ed_min_nonw_deg_to_exclude_node = 30;
+
+    /**
      * If true, then in the Reducer there will be at the very end considered adding edges to the graph on the fly
      */
     bool ed_use_edge_insertion = true;
@@ -142,6 +145,8 @@ public:
      * If it returns true, then edge {v,x} will be added to the graph.
      */
     bool ed_use_extended_edges_insertion = false;
+
+
 
     //******************************************************************** ED
 
