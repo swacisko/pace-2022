@@ -41,7 +41,7 @@ string parseAlgorithm(Alg alg) {
 
 struct ExpData {
     int N0=-1, M0=-1, N1=-1, M1=-1, N2=-1, M2=-1, N3=-1, M3=-1, N4=-1, M4=-1;
-    int red1_offset, red_noned_offset = 0, red_ed_offset = 0, red_ed2_offset = 0;
+    int red1_offset = 0, red_noned_offset = 0, red_ed_offset = 0, red_ed2_offset = 0;
     // int type1_constraints = -1;
     // int type2_constraints = -1;
 
@@ -195,6 +195,7 @@ pair<VI,VI> solveByFastVC(VPII & constraints, ExpData & exp_data ) {
 
     VVI V = GraphUtils::getGraphForEdges(constraints);
     auto vc = VCUtils::getMinCVUsingFastVC(V, exp_data.solver_max_time_sec * 1000);
+    for (int & d : vc) d--;
 
     VI res = vc;
     VI res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, vc.size());
@@ -409,6 +410,8 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
 
 
     auto writeConnCompInfo = [&](VVI & V, string msg = "") {
+        return;
+
         if (msg != "") clog << msg << endl;
         auto [cmp_cnt, sizes] = GraphUtils::getConnectedcomponentsInfo(V);
         clog << "There are " << cmp_cnt << " nontrivial connected components, with the following size distribution" << endl;
@@ -455,6 +458,8 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         exp_data.red1_offset = kern_nodes.size();
 
         writeConnCompInfo(V, "Connected components after init-kernelization");
+
+        DEBUG(exp_data.red_init_time_millis);
     }
 
 

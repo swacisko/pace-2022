@@ -119,7 +119,154 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         for(auto *x : liftables) secondary_reduce_liftables.push_back(x);
     };
 
+    auto applyDeg1AndDominationWithMasking = [&]() {
+        VI removed_nodes;
+        VI affected_nodes; affected_nodes.reserve(N);
+        VI deg(N,0);
+        VB in_V(N);
+        VI index(N,-1);
+        VI q; q.reserve(sqrt(N));
+
+        bool changes = true;
+        for (int i=0; i<N; i++) {
+            deg[i] = V[i].size();
+            in_V[i] = (deg[i] > 0);
+        }
+        while (changes) {
+
+            for (int i=0; i<N; i++) if ( deg[i] == 1 ) {
+                int v = -1;
+                for (int d : V[i]) if ( in_V[d] ) v=d;
+                // assert(v != -1);
+                // assert(deg[v] > 0);
+                // assert(in_V[v]);
+
+                q.clear();
+                q.push_back(v);
+
+                while (!q.empty()) {
+                    v = q.back();
+                    q.pop_back();
+                    if (deg[v] == 0) continue;
+
+                    for ( int d : V[v] ) if (in_V[d]) {
+                        deg[d]--;
+                        if (deg[d] == 0) in_V[d] = false;
+
+                        if ( deg[d] == 1 ) {
+                            for (int dd : V[d]) if (in_V[dd]) { // dd is the only element in V[d] that has set in_V
+                                q.push_back(dd);
+                                break;
+                            }
+                        }
+                    }
+
+                    deg[v] = 0;
+                    in_V[v] = false;
+                    removed_nodes.push_back(v);
+                    affected_nodes.push_back(v);
+                }
+            }
+
+            auto checkDomination = [&](){
+                // clog << "Checking domination!" << endl;
+                // checks domination using 'triangle enumeration approach',
+                // this is guaranteed to be efficient for dense graphs, but might be slower than brute force
+                // for sparse graphs
+
+
+                int P = affected_nodes.size();
+                for (int d : affected_nodes) was[d] = true;
+                for (int i=0; i<P; i++) {// was marks nodes that can be checked for domination
+                    int v = affected_nodes[i];
+                    for (int d : V[v]) if (!was[d]) { was[d] = true; affected_nodes.push_back(d); }
+                }
+                int P1 = affected_nodes.size();
+                for (int i=P; i<P1; i++) { // repeat the same to get N^2(X) where X was nodes removed
+                    int v = affected_nodes[i];
+                    for (int d : V[v]) if ( !was[d]) { was[d] = true; affected_nodes.push_back(d); }
+                }
+
+                // for ( int i=0; i<N; i++ ) if ( in_V[i] && was[i] ) nodes.push_back(i);
+                VI nodes = affected_nodes;
+                sort(ALL(nodes), [&](int a, int b){ return deg[a] > deg[b]; });
+
+                // DEBUG(affected_nodes.size()); DEBUG(nodes.size());
+
+                VB is_affected = was;
+                for (int d : affected_nodes) was[d] = false;
+
+                affected_nodes.clear();
+
+                if (!nodes.empty()) {
+
+                    for (int i=0; i<nodes.size(); i++) index[nodes[i]] = i;
+                    for ( int v : nodes ) if (in_V[v]) {
+                        was[v] = true;
+                        for ( int d : V[v] ) if (in_V[d]) was[d] = true;
+                        // for ( int d : V[v] ) if (in_V[d] && index[d] > index[v]) {
+                        for ( int d : V[v] ) if (in_V[d] && index[d] > index[v] && is_affected[d]) {
+                            bool is_d_dominated_by_v = true;
+                            for ( int dd : V[d] ) if ( in_V[dd] && !was[dd] ){ is_d_dominated_by_v = false; break; }
+                            // assert(c <= deg[d]);
+                            // if (c == deg[d]) { // node v dominates node d
+                            if (is_d_dominated_by_v) { // node v dominates node d
+                                total_dominations_done++;
+                                // clog << "\t Domination holds!" << endl; exit(4);
+
+                                changes = true;
+                                removed_nodes.push_back(v);
+                                affected_nodes.push_back(v);
+                                for ( int x : V[v] ) if (in_V[x]) {
+                                    deg[x]--;
+                                    if (deg[x] == 0) in_V[x] = false;
+                                }
+                                deg[v] = 0;
+                                in_V[v] = false;
+                                break;
+                            }
+                        }
+                        was[v] = false;
+                        for ( int d : V[v] ) was[d] = false;
+                    }
+                }
+            };
+
+
+            changes = false; // we only mark changes in domination, as otherwise graph is exhaustively "deg-1 reduced"
+            checkDomination();
+
+            // assertions to check correctness
+            // for ( int i=0; i<N; i++ ) if (in_V[i]) {
+            //     int c = 0;
+            //     for (int d : V[i]) c += in_V[d];
+            //     assert(deg[i] == c);
+            // }else assert(deg[i] == 0);
+            // assert(ranges::none_of(was,std::identity{}));
+        }
+
+        addKNR(removed_nodes);
+
+        GraphUtils::removeNodes(V,removed_nodes,helper);
+
+        return !removed_nodes.empty();
+    };
+
+
+    int basic_red_applied = 0;
     function<bool(bool)> applyBasicReductions = [&](bool allow_crown_and_lp){
+
+        if (basic_red_applied++ & 1) { // hybrid approach - in every second call, used masked checks
+            if (!allow_crown_and_lp) {
+                Stopwatch s; string opt = ( allow_crown_and_lp ? "basic_kern_lp_crown" : "basic_kern"); s.start(opt);
+                auto mod = applyDeg1AndDominationWithMasking();
+                s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+                return mod;
+            }
+        }
+
+        // this is the old verion of basic reducer - just to use crown and LP without specific reimplementation
+
         VVI Vcp = V;
         KernelizerVC kern;
 
@@ -134,9 +281,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         return !kern_nodes.empty() || !edges_removed.empty();
     };
 
-    auto applyDeg1AndDomination = [&]() {
-
-    };
 
 
     int ed_rules_checked = 0;
@@ -246,7 +390,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
             vector<VCReduction*> twin_liftables = twins();
             secondary_reduce_liftables += twin_liftables;
-            for (auto l : twin_liftables) if ( l->name() == "desk" ) total_desks_done++;
+            for (auto l : twin_liftables) if ( l->name() == "twin" ) total_twins_done++;
 
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             modified |= !twin_liftables.empty();
@@ -411,12 +555,13 @@ vector<VCReduction*> Reducer::folding() {
 
 
 void Reducer::writeTotals() {
+    DEBUG(total_dominations_done);
     DEBUG(total_folds_done);
-    DEBUG(total_general_folds_done);
-    DEBUG(total_desks_done);
-    DEBUG(total_unconfined_nodes);
     DEBUG(total_funnels_done);
+    DEBUG(total_desks_done);
     DEBUG(total_twins_done);
+    DEBUG(total_unconfined_nodes);
+    DEBUG(total_general_folds_done);
 
     DEBUG(ed_nodes_reduced);
     DEBUG(ed_edges_removed);
