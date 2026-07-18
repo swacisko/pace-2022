@@ -12,7 +12,8 @@ class EDReducer {
 public:
     explicit EDReducer( int NN, Config c )
     : N(NN), inS(N), inU(N), inU1(N), inU0(N), inW(N), was(N), helper(N),
-    marked(N), marked2(N), has_cnf_bounded_neigh(N), clearing_helper(N), excluded(N), cnf(c) {
+    marked(N), marked2(N), has_cnf_bounded_neigh(N), clearing_helper(N), excluded(N),
+    to_consider_in_next_step(N), cnf(c) {
         temp.reserve(N);
         temp2.reserve(N);
         cnt = deg_in_S = deg_notin_W = VI(N,0);
@@ -72,7 +73,7 @@ private:
     VVI V;
 
     VB inS, inU, inU1, inU0, inW, was, helper, marked, marked2;
-    VB clearing_helper, excluded;
+    VB clearing_helper, excluded, to_consider_in_next_step;
     VB has_cnf_bounded_neigh;
     VI deg_in_S, deg_notin_W; // those need to be kept correctly for all nodes in W
     VI temp, temp2,S,U,U1,W;
@@ -170,10 +171,10 @@ private:
      */
     void clearAllForConsider();
 
-    /**
-     * Removes from U all nodes u with |N(u) \setminus W| > max_nonw_deg
-     */
-    void excludeHighDegreeNodesFromU(int max_nonw_deg);
+    // /**
+    //  * Removes from U all nodes u with |N(u) \setminus W| > max_nonw_deg
+    //  */
+    // void excludeHighDegreeNodesFromU(int max_nonw_deg);
 
 
     void checkEmptyArraysAssertions(bool check_marked, bool check_marked2);
