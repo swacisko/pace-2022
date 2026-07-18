@@ -636,13 +636,19 @@ int EDReducer::nextStep() {
         // by moving node to S we might remove some nodes from U1, which might contribute to ext-domination otherwise
         if (move_all_simultanously){
             if (write_logs) clog << "\t\tMoving nodes " << nodes_to_move_to_S << " to S (and creating type-2 constraints)" << endl;
-            for (const int u : nodes_to_move_to_S) moveToS(u);
-            for (const int u : nodes_to_move_to_S) for (int d : V[u]) if (inU1[d]) to_consider_in_next_step[d] = true;
+
+            // for some reason moving nodes simultaneously fails on some tests...
+            // for (const int u : nodes_to_move_to_S) moveToS(u);
+            // for (const int u : nodes_to_move_to_S) for (int d : V[u]) if (inU1[d]) to_consider_in_next_step[d] = true;
+
+            for (const int u : nodes_to_move_to_S) if (!inW[u]) moveToS(u);
+            for (const int u : nodes_to_move_to_S) if (inS[u]) for (int d : V[u]) if (inU1[d]) to_consider_in_next_step[d] = true;
         }else{
             // move to S only the single node from nodes_to_move_to_S fow which the intersection N(w) \cap U' is smallest
             int id = -1;
             int m = 1e9;
             for (int w : nodes_to_move_to_S) {
+                assert(!inW[w]);
                 int c = 0;
                 for (int d : V[w]) if (inU1[d]) c++;
                 assert(c > 0);

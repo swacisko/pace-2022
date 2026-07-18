@@ -211,19 +211,19 @@ public:
 
     FoldingTwinReduction(int ifnode, VI elses, VI folds ){
         if_node = ifnode;
-        else_nodes = elses;
+        then_other_nodes = elses;
         folding_nodes = folds;
     }
 
     virtual ~FoldingTwinReduction() {}
 
-    int offset() override { return max(else_nodes.size(), folding_nodes.size() ); }
+    int offset() override { return max(then_other_nodes.size(), folding_nodes.size() ); }
 
     void lift( VI & dfvs, VB & in_dfvs ) override{
         bool belongs = in_dfvs[if_node];
         if(belongs){
-            dfvs += else_nodes;
-            for(int d : else_nodes) in_dfvs[d] = true;
+            dfvs += then_other_nodes;
+            for(int d : then_other_nodes) in_dfvs[d] = true;
         }
         else{
             dfvs += folding_nodes;
@@ -233,8 +233,8 @@ public:
 
     string toString() override {
         stringstream str;
-        str << "FoldingTwinReduction, if_node: " << if_node << ", else_nodes: " << else_nodes <<
-                   ", folding_node: " <<folding_nodes;
+        str << "FoldingTwinReduction, if_node: " << if_node << ", then_other_nodes: " << then_other_nodes <<
+                   ", folding_nodes: " << folding_nodes;
         return str.str();
     }
 
@@ -242,7 +242,7 @@ public:
 
 private:
     int if_node;
-    VI else_nodes, folding_nodes;
+    VI then_other_nodes, folding_nodes;
 };
 
 class FunnelReduction : public VCReduction{

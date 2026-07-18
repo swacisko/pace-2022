@@ -339,6 +339,19 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
+        // if (false)
+        if(cnf.reducer_use_twins){
+            Stopwatch s; string opt = "twins"; s.start(opt);
+
+            vector<VCReduction*> twin_liftables = twins();
+            secondary_reduce_liftables += twin_liftables;
+            for (auto l : twin_liftables) if ( l->name() == "twin" ) total_twins_done++;
+
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+            modified |= !twin_liftables.empty();
+            // if(modified) continue;
+        }
+
         // running unconfined before funnel, or even folding, can help achieve slightly better reduction ratio,
         // but it can make total reduction time up to 1.5x slower on some instances...
         if(cnf.reducer_use_unconfined){
@@ -384,18 +397,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         }
 
 
-        if (false)
-        if(cnf.reducer_use_twins){
-            Stopwatch s; string opt = "twins merge"; s.start(opt);
-
-            vector<VCReduction*> twin_liftables = twins();
-            secondary_reduce_liftables += twin_liftables;
-            for (auto l : twin_liftables) if ( l->name() == "twin" ) total_twins_done++;
-
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-            modified |= !twin_liftables.empty();
-            if(modified) continue;
-        }
 
 
         modified |= applyBasicReductions(true); // use crown and LP in addition to degree-1 and domination
@@ -498,8 +499,87 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 }
 
 vector<VCReduction*> Reducer::twins() {
-    assert(false && "Implement folding twins");
-    return {};
+    vector<VCReduction*> liftables;
+
+    VLL hashes(N);
+    IntGenerator rnd;
+    for (auto & d : hashes) d = rnd.rand();
+    vector<pair<LL,int>> neigh_h;
+    neigh_h.reserve(N);
+
+    VB affected(N);
+
+    for ( int i=0; i<N; i++ ) if (!V[i].empty()) {
+        LL h = 0;
+        for (int d : V[i]) h ^= hashes[d];
+        neigh_h.emplace_back(h,i);
+    }
+    sort(ALL(neigh_h));
+
+    int p = 0, q = p;
+    while ( p < neigh_h.size() ) {
+        q = p+1;
+        while ( q < neigh_h.size() && neigh_h[q].first == neigh_h[p].first ) q++;
+
+        int deg = V[neigh_h[p].second].size();
+        // We have twins in set X and their neighborhood in set T
+        // if |T| <= |X|, then we can add T to the solution
+        // if |T| = |X|+1 and T is an independent set, we can fold twins
+
+        if ( q-p >= deg ) { // we have a set X of twins with |N(X)| >= |X|. We denote T = N(X)
+            VI T = V[neigh_h[p].second];
+            bool is_affected = false;
+            for (int t : T) is_affected |= affected[t];
+            for ( int i=p; i<q; i++ ) is_affected |= affected[ neigh_h[i].second ]; // check nodes in X for affected
+            if (!is_affected) {
+                total_twins_done++;
+                liftables.push_back(new KernelizedNodesReduction(T));
+                for (int t : T) affected[t] = true;
+                for ( int i=p; i<q; i++ ) affected[ neigh_h[i].second ] = true;
+                GraphUtils::removeNodes(V,T,was);
+            }
+        }
+
+        if ( q-p+1 == deg ) { // if T is an independent set, we can fold those twins
+            VI T = V[neigh_h[p].second];
+            for (int t : T) was[t] = true;
+            bool is_mis = true;
+            for ( int t : T ) for (int d : V[t]) if ( was[d] ){ is_mis = false; break; };
+            for (int t : T) was[t] = false;
+
+            if (is_mis) { // we can fold
+                total_twins_done++;
+                VI neigh;
+                for ( int i=p; i<q; i++ ) was[neigh_h[i].second] = true;
+                for (int t : T) for (int d : V[t]) if (!was[d]) {
+                    was[d] = true;
+                    neigh.push_back(d);
+                }
+                for ( int i=p; i<q; i++ ) was[neigh_h[i].second] = false;
+                for (int d : neigh) was[d] = false;
+
+                GraphUtils::removeNodes(V,T,helper);
+
+                VI X; X.reserve(q-p);
+                for (int i=p; i<q; i++) X.push_back(neigh_h[i].second);
+                int merge_to = T.back();
+
+                for ( int d : neigh ) GraphUtils::addEdge(V,merge_to,d);
+
+                T.pop_back();
+                clog << "\tApplying twin folding!! Check the correctness of it, test it properly!" << endl;
+                liftables.push_back(new FoldingTwinReduction(merge_to,T, X));
+            }
+        }
+
+        p = q;
+    }
+
+    VI rem;
+    for (int i=0; i<N; i++) if (V[i].size() == 1) liftables += propagateDeg1RuleSlow(i);
+    if (!rem.empty()) liftables.push_back(new KernelizedNodesReduction(rem));
+
+    return liftables;
 }
 
 
