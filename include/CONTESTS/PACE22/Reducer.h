@@ -510,14 +510,12 @@ public:
 
     map<string,int> reduction_times_millis;
 
-    int total_twins_merged = 0;
-    int total_twin_folds_done = 0;
+    int total_dominations_done = 0;
+    int total_twins_done = 0;
     int total_folds_done = 0;
     int total_general_folds_done = 0;
-    int total_desk_folds = 0;
-    int total_desk_dominations = 0;
+    int total_desks_done = 0;
     int total_unconfined_nodes = 0;
-    int total_desk_arcs_added = 0;
     int total_funnels_done = 0;
 
     int ed_nodes_reduced = 0;
@@ -541,6 +539,8 @@ private:
      */
     VVI V;
 
+    Stopwatch sw;
+    string reducer_str = "reducer";
 
     VB was, was2, helper, helper2;
 };

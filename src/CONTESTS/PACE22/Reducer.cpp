@@ -31,6 +31,9 @@ ReducedInstance Reducer::reduce() {
     // tie( reduced_graph_edges, reduced_instance.primary_liftables) = primaryReduce(primary_edges);
 
 
+    sw.setLimit(reducer_str, cnf.reducer_max_time_millis);
+    sw.start(reducer_str);
+
     V = GraphUtils::getGraphForEdges(primary_edges);
     N = V.size();
 
@@ -101,10 +104,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
     bool modified;
 
-    Stopwatch sw;
-    string reducer_str = "reducer";
-    sw.setLimit(reducer_str, cnf.reducer_max_time_millis);
-    sw.start(reducer_str);
 
     vector<VCReduction*> secondary_reduce_liftables;
     KernelizedNodesReduction * knr = nullptr;
@@ -174,10 +173,8 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             vector<VCReduction*> desk_liftables = desk();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
-            for (auto l : desk_liftables) {
-                if ( l->name() == "desk" ) total_desk_folds++;
-                if ( l->name() == "knr" ) total_desk_dominations += l->offset();
-            }
+            for (auto l : desk_liftables) if ( l->name() == "desk" ) total_desks_done++;
+
             addLiftables(desk_liftables);
 
             modified |= !desk_liftables.empty();
@@ -243,39 +240,16 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         }
 
 
-        // if(cnf.reducer_use_folding_twins) {
-        //     Stopwatch s; string opt = "folding twins"; s.start(opt);
-        //     auto [twin_folds, to_remove] = foldingTwins();
-        //     if (write_progress_on_the_fly) DEBUG(total_twin_folds_done);
-        //     total_twin_folds_done += twin_folds.size() + to_remove.size();
-        //     if (write_progress_on_the_fly) DEBUG(total_twin_folds_done);
-        //     addKNR(to_remove);
-        //     Utils::removeNodes(V, revV, to_remove, helper);
-        //     if(!modified) modified = (!twin_folds.empty() || !to_remove.empty());
-        //     s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-        //
-        //     { // add to resulting kernelization objects
-        //         if (knr != nullptr) { res.push_back(knr); knr = nullptr; }
-        //         for (auto *x : twin_folds) res.push_back(x);
-        //     }
-        //
-        //     if(modified) continue;
-        // }
-
-
-
-
         if (false)
         if(cnf.reducer_use_twins){
             Stopwatch s; string opt = "twins merge"; s.start(opt);
-            if(write_progress_on_the_fly) DEBUG(total_twins_merged);
 
-            vector<VCReduction*> liftables = twins();
-            secondary_reduce_liftables += liftables;
+            vector<VCReduction*> twin_liftables = twins();
+            secondary_reduce_liftables += twin_liftables;
+            for (auto l : twin_liftables) if ( l->name() == "desk" ) total_desks_done++;
 
-            if(write_progress_on_the_fly) DEBUG(total_twins_merged);
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-            modified |= !liftables.empty();
+            modified |= !twin_liftables.empty();
             if(modified) continue;
         }
 
@@ -439,12 +413,10 @@ vector<VCReduction*> Reducer::folding() {
 void Reducer::writeTotals() {
     DEBUG(total_folds_done);
     DEBUG(total_general_folds_done);
-    DEBUG(total_twin_folds_done);
-    DEBUG(total_desk_folds);
-    DEBUG(total_desk_dominations);
+    DEBUG(total_desks_done);
     DEBUG(total_unconfined_nodes);
     DEBUG(total_funnels_done);
-    DEBUG(total_twins_merged);
+    DEBUG(total_twins_done);
 
     DEBUG(ed_nodes_reduced);
     DEBUG(ed_edges_removed);

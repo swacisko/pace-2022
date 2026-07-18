@@ -174,7 +174,7 @@ public:
 
     int reducer_max_twin_merge_neighborhood_size = 5; // for smaller graphs it may be larger, e.g. 24 seems to be good
 
-    int reducer_max_general_folding_neighborhood_size = 5;
+    int reducer_max_general_folding_neighborhood_size = 4;
     int reducer_max_general_folding_antiedges = 1; // original value 1e9
 
 

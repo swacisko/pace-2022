@@ -27,7 +27,6 @@ enum Alg {
     CPSAT_DEF = 2,
     NUMVC = 3,
     HIGHS = 4,
-    EVAL_MAXSAT = 5
 };
 
 string parseAlgorithm(Alg alg) {
@@ -69,6 +68,12 @@ struct ExpData {
     int ed_t2_inference_rules_added = -1;
     int ed2_t2_inference_rules_added = -1;
 
+
+    int reducer_max_time_millis = 900 * 1000; // 15 minutes
+
+    int noned_folds = 0, noned_funnels = 0, noned_unconfined = 0, noned_ext_dom = 0, noned_desks = 0, noned_twins = 0, noned_dominations = 0;
+    int ed_folds = 0, ed_funnels = 0, ed_unconfined = 0, ed_ext_dom = 0, ed_desks = 0, ed_twins = 0, ed_dominations = 0;
+
     Alg alg = CPSAT_SAT;
     int cpsat_workers = 2;
 
@@ -107,6 +112,17 @@ struct ExpData {
 
         res["algorithm"] = parseAlgorithm(alg);
 
+        // ed_folds = 0, ed_funnels = 0, ed_unconfined = 0, ed_ext_dom = 0, ed_desks = 0, ed_twins
+        res["ed_folds"] = to_string(ed_folds); res["ed_funnels"] = to_string(ed_funnels);
+        res["ed_unconfined"] = to_string(ed_unconfined); res["ed_ext_dom"] = to_string(ed_ext_dom);
+        res["ed_desks"] = to_string(ed_desks); res["ed_twins"] = to_string(ed_twins);
+        res["ed_dominations"] = to_string(ed_dominations);
+
+        res["noned_folds"] = to_string(noned_folds); res["noned_funnels"] = to_string(noned_funnels);
+        res["noned_unconfined"] = to_string(noned_unconfined); res["noned_ext_dom"] = to_string(noned_ext_dom);
+        res["noned_desks"] = to_string(noned_desks); res["noned_twins"] = to_string(noned_twins);
+        res["noned_dominations"] = to_string(noned_dominations);
+
         stringstream str;
         for (int d : noned_results) str << d << " ";
         res["noned_results"] = str.str();
@@ -140,6 +156,8 @@ struct ExpData {
             "red_ed_time_millis", "red_ed2_time_millis",
             "solver_max_time_sec", "solver_time_granularity", "solver_repeats", "algorithm",
             "noned_results", "ed_results", "ed2_results",
+            "ed_folds", "ed_funnels", "ed_unconfined", "ed_ext_dom", "ed_desks", "ed_twins", "ed_dominations",
+            "noned_folds", "noned_funnels", "noned_unconfined", "noned_ext_dom", "noned_desks", "noned_twins", "noned_dominations"
         };
 
         auto writeLine = [&](vector<string> & l) {
@@ -172,13 +190,24 @@ static void updateResTimes(auto & res_times) {
 pair<VI,VI> solveByFastVC(VPII & constraints, ExpData & exp_data ) {
     int max_sec = exp_data.solver_max_time_sec;
     int res_measure_freq_sec = exp_data.solver_time_granularity;
-    VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1);
-    return {};
+
+    clog << "Looking for solution using NuMVC/FastVC for " << exp_data.solver_max_time_sec << " seconds" << endl;
+
+    VVI V = GraphUtils::getGraphForEdges(constraints);
+    auto vc = VCUtils::getMinCVUsingFastVC(V, exp_data.solver_max_time_sec * 1000);
+
+    VI res = vc;
+    VI res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, vc.size());
+
+    return {res,res_times};
 }
 
 pair<VI,VI> solveByHIGHS(VPII & constraints,ExpData & exp_data ) {
     int max_sec = exp_data.solver_max_time_sec;
     int res_measure_freq_sec = exp_data.solver_time_granularity;
+
+    clog << "Looking for solution using HiGHS for " << exp_data.solver_max_time_sec << " seconds" << endl;
+
     VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1);
     return {};
 }
@@ -190,7 +219,8 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
 
     VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1 );
 
-    clog << "Running cpsat for at most " << max_sec << " seconds" << endl;
+    clog << "Looking for solution using CPSAT (" << parseAlgorithm(exp_data.alg) << " for "
+         << exp_data.solver_max_time_sec << " seconds" << endl;
 
     int N = 0;
     for ( auto [a,b] : constraints ) N = max( N, 1 + max( abs(a), abs(b) ) );
@@ -285,8 +315,6 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
             for (int i = 0; i < nodes.size(); ++i) cnt += SolutionBooleanValue(r, nodes[i]);
 
             const double t = r.wall_time();              // seconds
-            const double dt = r.deterministic_time();    // deterministic solver time
-
             // clog << "Found new results of size " << cnt << " at time " << t << " seconds " << endl;
 
             int ind = ceil(1.0 * t / res_measure_freq_sec);
@@ -322,10 +350,6 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
     return {res,res_times};
 }
 
-pair<VI,VI> solveByEvalMaxSAT(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
-    VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec), -1);
-    return {};
-}
 
 pair<VI,VD> solveInstanceUsingSolver(VPII constraints, ExpData & exp_data) {
 
@@ -454,7 +478,9 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         return vc;
     };
 
-    { // numvc/fastvc testing
+    constexpr bool use_numvc_for_testing = false;
+
+    if constexpr(use_numvc_for_testing){ // numvc/fastvc testing
         int t = numvc_time_check_sec;
         numvc_time_check_sec *= 1;
         auto fastvc_sol = checkByNuMVC(V, 0);
@@ -463,7 +489,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     }
 
 
-    constexpr bool test_noned_vc_rules = false;
+    constexpr bool test_noned_vc_rules = true;
     if (test_noned_vc_rules){ // measuring just the VC reduction time WITHOUT ED rule, and the solver results for the non-ed reduced graph
         clog << endl << "***************** CHECKING FULL NON-ED RULES" << endl;
 
@@ -476,6 +502,8 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         cnf.reducer_use_twins = true;
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
         auto edges = GraphUtils::getGraphEdges(V);
+        cnf.reducer_max_time_millis = exp_data_cnf.reducer_max_time_millis;
+
         Reducer red(edges,cnf);
         auto reduced_instance = red.reduce();
 
@@ -486,6 +514,14 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         exp_data.red_noned_time_millis = exp_data.red_init_time_millis + sw.getTime("main");
         VVI & coreV = reduced_instance.getCoreV();
 
+        exp_data.noned_dominations = red.total_dominations_done;
+        exp_data.noned_desks = red.total_desks_done;
+        exp_data.noned_folds = red.total_folds_done;
+        exp_data.noned_twins = red.total_twins_done;
+        exp_data.noned_ext_dom = red.ed_nodes_reduced;
+        exp_data.noned_funnels = red.total_funnels_done;
+        exp_data.noned_unconfined = red.total_unconfined_nodes;
+
         exp_data.N2 = coreV.size();
         exp_data.M2 = GraphUtils::countEdges(coreV);
         DEBUG(PII(exp_data.N2,exp_data.M2));
@@ -494,7 +530,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         DEBUG(noned_solution_lift_overhead);
         exp_data.red_noned_offset = noned_solution_lift_overhead;
 
-        { // numvc/fastvc testing
+        if constexpr(use_numvc_for_testing){ // numvc/fastvc testing
             auto fastvc_sol = checkByNuMVC(coreV, exp_data.red_noned_offset);
             assert(VCUtils::isVertexCover( coreV, fastvc_sol ));
             fastvc_sol = reduced_instance.liftSolution(fastvc_sol);
@@ -522,6 +558,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
 
     auto testEDRules = [&](auto & exp_data, bool add_constraints = false) {
         constexpr bool test_ed_vc_rules = true;
+
         if (test_ed_vc_rules) {
             clog << endl << "***************** CHECKING FULL ED RULES" << endl;
 
@@ -558,6 +595,14 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             exp_data.ed_t2_inference_rules_added = red.ed_t2_inference_rules_added;
             exp_data.ed_total_t2_inference_rules_created = red.ed_total_t2_inference_rules_created;
 
+            exp_data.ed_dominations = red.total_dominations_done;
+            exp_data.ed_desks = red.total_desks_done;
+            exp_data.ed_folds = red.total_folds_done;
+            exp_data.ed_twins = red.total_twins_done;
+            exp_data.ed_ext_dom = red.ed_nodes_reduced;
+            exp_data.ed_funnels = red.total_funnels_done;
+            exp_data.ed_unconfined = red.total_unconfined_nodes;
+
             VVI & coreV = reduced_instance.getCoreV();
             exp_data.N3 = coreV.size();
             exp_data.M3 = GraphUtils::countEdges(coreV);
@@ -568,7 +613,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             DEBUG(ed_solution_lift_overhead);
             exp_data.red_ed_offset = ed_solution_lift_overhead;
 
-            { // numvc/fastvc testing
+            if constexpr(use_numvc_for_testing){ // numvc/fastvc testing
                 auto fastvc_sol = checkByNuMVC(coreV, exp_data.red_ed_offset);
                 assert(VCUtils::isVertexCover( coreV, fastvc_sol ));
                 fastvc_sol = reduced_instance.liftSolution(fastvc_sol);
@@ -583,7 +628,8 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             auto edges = GraphUtils::getGraphEdges(coreV);
             for ( auto [a,b] : edges ) constraints.emplace_back(a+1,b+1);
 
-            if (add_constraints) {
+            bool add_t2_constraints = (add_constraints && exp_data.alg != NUMVC); // for numvc we do not want to add t2-constraints
+            if (add_t2_constraints) {
 
             }
 
@@ -622,7 +668,6 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     exp_data.ed2_total_t2_inference_rules_created = dummy_exp_data.ed_total_t2_inference_rules_created;
     exp_data.ed2_nodes_reduced = dummy_exp_data.ed_nodes_reduced;
     exp_data.ed2_edges_removed = dummy_exp_data.ed_edges_removed;
-
 
 }
 
@@ -748,10 +793,12 @@ int main() {
 
     // int solver_max_time_sec = 300;
     // int solver_time_granularity = 10;
-    int solver_max_time_sec = 60;
+    int solver_max_time_sec = 20;
     int solver_time_granularity = 1;
     int solver_repeats = 1;
-    Alg alg = CPSAT_LP;
+    Alg alg = NUMVC;
+    // Alg alg = CPSAT_SAT;
+    // Alg alg = CPSAT_DEF;
 
     ExpData exp_data;
     exp_data.solver_max_time_sec = solver_max_time_sec;
