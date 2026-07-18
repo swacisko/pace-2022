@@ -522,6 +522,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
     // now checking the impact with adding t1-constraints on the fly
     ExpData dummy_exp_data = exp_data;
+    // numvc_time_check_sec = 15; // just to check, whether the denser graph still has a solution of similar quality...
     testEDRules( dummy_exp_data, true);
     exp_data.N4 = dummy_exp_data.N3;
     exp_data.M4 = dummy_exp_data.M3;

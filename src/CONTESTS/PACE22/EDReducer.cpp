@@ -126,7 +126,11 @@ bool EDReducer::consider(VI initS) {
 
     if (write_logs) clog << "Considering initS: " << initS << endl;
 
-    if (initS.size() == 1) moveToS(initS[0], true);
+    if (initS.size() == 1) {
+        int v = initS[0];
+        moveToS(v, true);
+        for (int d : V[v]) if (!excluded[d] && inU1[d]) to_consider_in_next_step[d] = true;
+    }
     else {
         S = W = initS;
         for (int d : S) was[d] = true;
@@ -146,7 +150,10 @@ bool EDReducer::consider(VI initS) {
 
         updateU1();
 
-        for (int u : S) for (int d : V[u]) deg_in_S[d]++;
+        for (int u : S) for (int d : V[u]) if (!excluded[d]) {
+            if (inU1[d]) to_consider_in_next_step[d] = true;
+            deg_in_S[d]++;
+        }
     }
 
     // clog << "Initial sizes: W: " << W.size() << ", U: " << U.size() << ", U1: " << U1.size() << endl;
@@ -166,12 +173,14 @@ bool EDReducer::consider(VI initS) {
 bool EDReducer::existsExtDominator(VB & marked) {
     bool exists_ext_dominator = false;
 
-    for ( int u : U1 ) {
+    for ( int u : U1 ) if ( to_consider_in_next_step[u] ) {
+    // for ( int u : U1 ) {
         bool all_marked = true;
         int marked_cnt = 0;
 
         for ( int w : V[u] ) if (!inW[w]) {
             all_marked &= marked[w];
+            if (!all_marked) break;
             marked_cnt++;
         }
         if (all_marked) {
@@ -218,8 +227,10 @@ void EDReducer::moveToU(int u, const bool exclude) {
         deg_in_S[u] += inS[d];
         if (inS[d]) inU0[u] = false;
 
-        to_consider_in_next_step[d] = inU1[d];
+        if (inU1[d]) to_consider_in_next_step[d] = true;
     }
+
+    to_consider_in_next_step[u] = true;
 
 }
 
@@ -254,13 +265,14 @@ void EDReducer::moveToS(int u, const bool init_exclude) {
         }else { // d is not excluded and is already in W
             deg_notin_W[d]--;
             deg_in_S[d]++;
-            to_consider_in_next_step[d] = inU1[d];
         }
     }
 
     deg_notin_W[u] = 0;
 
     updateU1();
+
+    // for (int d : V[u]) if (!excluded[d] && inU1[d]) to_consider_in_next_step[d] = true;
 
     inf_rules_2.push_back(u);
 }
@@ -273,6 +285,7 @@ void EDReducer::updateU1() {
         for (int d : V[u]) c += inS[d];
         if (c > 1) {
             inU1[u] = inU0[u] = false;
+            to_consider_in_next_step[u] = false;
             REM(U1,i);
         }
     }
@@ -290,7 +303,8 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
     checkEmptyArraysAssertions(check_double_ed, !check_double_ed); // we check all arrays, including the marked array, which should be empty here
 
     if constexpr(Config::use_ed_domination) { // the standard concept, used always
-        for (int u : U1) if (!V[u].empty()) {
+        // for (int u : U1) if (!V[u].empty()) {
+        for (int u : U1) if (!V[u].empty() && to_consider_in_next_step[u]) {
             if (!has_cnf_bounded_neigh[u]) continue;
             if ( cnf.ed_use_deficit1_domination && inU0[u] ) continue; // do not duplicate search
 
@@ -316,7 +330,8 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         // here we use ``same neighborhood domination'' approach.
         // we find all nodes w \in N(u) \setminus W such that N(u) \setminus W \subseteq N[w]
         // we can consider only nodes u \in U_0, that is nodes for which N(u) \cap S = \emptyset
-        for ( int u : U1 ) if (!V[u].empty()) {
+        // for ( int u : U1 ) if (!V[u].empty()) {
+        for ( int u : U1 ) if (!V[u].empty() && to_consider_in_next_step[u]) {
             if (!has_cnf_bounded_neigh[u]) continue;
             if (!inU0[u]) continue;
             if ( cnf.ed_use_deficit1_domination ) continue; // do not duplicate search
@@ -350,7 +365,8 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         VI& T = temp;
         VI& vis = temp2;
 
-        for (int u : U1) if (!V[u].empty()) {
+        // for (int u : U1) if (!V[u].empty()) {
+        for (int u : U1) if (!V[u].empty() && to_consider_in_next_step[u]) {
             if (!has_cnf_bounded_neigh[u]) continue;
             if (!inU0[u]) continue;
 
@@ -572,7 +588,6 @@ int EDReducer::nextStep() {
 
     markDominationNodes(marked);
 
-    for (int d : U1) to_consider_in_next_step[d] = false;
 
     if (write_logs) {
         VI temp;
@@ -584,6 +599,9 @@ int EDReducer::nextStep() {
     if (existsExtDominator(marked)) {
         return 1;
     }else if (write_logs) clog << "\t\tdominator does not exist" << endl;
+
+
+    for (int d : U1) to_consider_in_next_step[d] = false;
 
     VI nodes_to_move_to_U = findNodesToMoveToU();
     for (int u : nodes_to_move_to_U) marked[u] = false;
@@ -618,7 +636,8 @@ int EDReducer::nextStep() {
         // by moving node to S we might remove some nodes from U1, which might contribute to ext-domination otherwise
         if (move_all_simultanously){
             if (write_logs) clog << "\t\tMoving nodes " << nodes_to_move_to_S << " to S (and creating type-2 constraints)" << endl;
-            for (int u : nodes_to_move_to_S) moveToS(u);
+            for (const int u : nodes_to_move_to_S) moveToS(u);
+            for (const int u : nodes_to_move_to_S) for (int d : V[u]) if (inU1[d]) to_consider_in_next_step[d] = true;
         }else{
             // move to S only the single node from nodes_to_move_to_S fow which the intersection N(w) \cap U' is smallest
             int id = -1;
@@ -637,6 +656,7 @@ int EDReducer::nextStep() {
 
             if (write_logs) clog << "\t\tMoving single node " << id << ", with " << m << " neighbors in U', to S (and creating type-2 constraint)" << endl;
             moveToS(id);
+            for (int d : V[id]) if (inU1[d]) to_consider_in_next_step[d] = true;
         }
 
 
@@ -665,7 +685,7 @@ void EDReducer::clearAllForConsider() {
                     inS[d] = inU[d] = inW[d] = false;
                     inU1[d] = inU0[d] = was[d] = false;
                     helper[d] = marked[d] = marked2[d] = false;
-                    deg_in_S[d] = deg_notin_W[d] = to_consider_in_next_step[d] = 0;
+                    deg_in_S[d] = deg_notin_W[d] = 0;
                 }
             }
         }
@@ -675,7 +695,7 @@ void EDReducer::clearAllForConsider() {
         inS[d] = inU[d] = inW[d] = false;
         inU1[d] = inU0[d] = was[d] = false;
         helper[d] = marked[d] = marked2[d] = false;
-        deg_in_S[d] = deg_notin_W[d] = to_consider_in_next_step[d] = 0;
+        deg_in_S[d] = deg_notin_W[d] = 0;
         clearing_helper[d] = false;
     }
 
@@ -684,7 +704,8 @@ void EDReducer::clearAllForConsider() {
         inU1[d] = inU0[d] = was[d] = false;
         helper[d] = marked[d] = marked2[d] = false;
         has_cnf_bounded_neigh[d] = excluded[d] = false;
-        deg_in_S[d] = deg_notin_W[d] = to_consider_in_next_step[d] = 0;
+        deg_in_S[d] = deg_notin_W[d] = 0;
+        to_consider_in_next_step[d] = false;
     }
 
 
