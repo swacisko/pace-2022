@@ -114,6 +114,13 @@ public:
     bool ed_apply_type1_constraints_on_the_fly = false;
 
     /**
+     * If true, then if [ed_apply_type1_constraints_on_the_fly] i set and we run the 'add edges' ED and some
+     * nonempty set of reducible nodes is identified, then we revert the graph to the original state and simply remove
+     * those found nodes.
+     */
+    bool ed_remove_added_t1_constraints_if_kernelized_node_found = false;
+
+    /**
      * If true, then initial sets S of the form {v} will be checked for each node in the graph.
      * This is the default check and should be set to true, unless you really need to disable that for some reason.
      */

@@ -20,6 +20,26 @@
 
 using namespace operations_research::sat;
 
+
+enum Alg {
+    CPSAT_SAT = 0,
+    CPSAT_LP = 1,
+    CPSAT_DEF = 2,
+    NUMVC = 3,
+    HIGHS = 4,
+    EVAL_MAXSAT = 5
+};
+
+string parseAlgorithm(Alg alg) {
+    if (alg == CPSAT_SAT) return "cpsat-sat";
+    if (alg == CPSAT_LP) return "cpsat-lp";
+    if (alg == CPSAT_DEF) return "cpsat-def";
+    if (alg == NUMVC) return "numvc";
+    if (alg == HIGHS) return "highs";
+
+    assert(false && "incorrect algorithm");
+}
+
 struct ExpData {
     int N0=-1, M0=-1, N1=-1, M1=-1, N2=-1, M2=-1, N3=-1, M3=-1, N4=-1, M4=-1;
     int red1_offset, red_noned_offset = 0, red_ed_offset = 0, red_ed2_offset = 0;
@@ -48,6 +68,9 @@ struct ExpData {
     int ed2_total_t2_inference_rules_created = -1;
     int ed_t2_inference_rules_added = -1;
     int ed2_t2_inference_rules_added = -1;
+
+    Alg alg = CPSAT_SAT;
+    int cpsat_workers = 2;
 
     map<string,string> getEntries() {
         map<string,string> res;
@@ -82,6 +105,8 @@ struct ExpData {
         res["solver_time_granularity"] = to_string(solver_time_granularity);
         res["solver_repeats"] = to_string(solver_repeats);
 
+        res["algorithm"] = parseAlgorithm(alg);
+
         stringstream str;
         for (int d : noned_results) str << d << " ";
         res["noned_results"] = str.str();
@@ -99,7 +124,7 @@ struct ExpData {
     }
 
 
-    void writeToFile(ostream & str, bool debug_entries = false) {
+    void writeToFile(ostream & str, bool debug_entries = false, const bool debug_only = false) {
         str.precision(2);
 
         auto mapa = getEntries();
@@ -113,11 +138,8 @@ struct ExpData {
             "red_init_time_millis",
             "red_noned_time_millis",
             "red_ed_time_millis", "red_ed2_time_millis",
-            "solver_max_time_sec",
-            "solver_time_granularity",
-            "solver_repeats",
-            "noned_results",
-            "ed_results", "ed2_results"
+            "solver_max_time_sec", "solver_time_granularity", "solver_repeats", "algorithm",
+            "noned_results", "ed_results", "ed2_results",
         };
 
         auto writeLine = [&](vector<string> & l) {
@@ -132,9 +154,9 @@ struct ExpData {
         writeLine(header); // write header
         vector<string> line;
         for (auto k : header) line.push_back(mapa[k]); // create entries in the order of the header
-        writeLine(line); // write entries
+        if (!debug_only) writeLine(line); // write entries
 
-        if (debug_entries) for (auto k : header) clog << k << ": " << mapa[k] << endl;
+        if (debug_entries || debug_only) for (auto k : header) clog << k << ": " << mapa[k] << endl;
     }
 };
 
@@ -147,17 +169,25 @@ static void updateResTimes(auto & res_times) {
 }
 
 
-pair<VI,VI> solveByFastVC(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
+pair<VI,VI> solveByFastVC(VPII & constraints, ExpData & exp_data ) {
+    int max_sec = exp_data.solver_max_time_sec;
+    int res_measure_freq_sec = exp_data.solver_time_granularity;
     VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1);
     return {};
 }
 
-pair<VI,VI> solveByHIGHS(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
+pair<VI,VI> solveByHIGHS(VPII & constraints,ExpData & exp_data ) {
+    int max_sec = exp_data.solver_max_time_sec;
+    int res_measure_freq_sec = exp_data.solver_time_granularity;
     VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1);
     return {};
 }
 
-pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
+// pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
+pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
+    int max_sec = exp_data.solver_max_time_sec;
+    int res_measure_freq_sec = exp_data.solver_time_granularity;
+
     VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1 );
 
     clog << "Running cpsat for at most " << max_sec << " seconds" << endl;
@@ -168,7 +198,62 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_s
     sw.start("cpsat");
 
     SatParameters params;
-    params.set_num_search_workers(6);
+
+
+    bool use_sat_heavy_computation = (exp_data.alg == CPSAT_SAT);
+    if (use_sat_heavy_computation) {
+        constexpr int workers = 2;
+        params.set_num_workers(workers);  // Preferred over deprecated num_search_workers.
+
+        params.clear_subsolvers();
+        params.set_num_full_subsolvers(workers);
+
+        params.add_subsolvers("quick_restart_no_lp");
+        params.add_subsolvers("no_lp");
+
+        // Explicitly disable incomplete primal heuristics.
+        params.set_use_lns(false);
+        params.set_use_rins_lns(false);
+        params.set_use_feasibility_pump(false);
+        params.set_use_feasibility_jump(false);
+        params.set_num_violation_ls(0);
+
+        // params.set_log_search_progress(true);
+        // params.set_log_subsolver_statistics(true);
+    }
+
+    bool use_lp_heavy_compuation =  (exp_data.alg == CPSAT_LP);
+    if (use_lp_heavy_compuation) {
+        constexpr int workers = 2;
+        params.set_num_workers(workers);
+
+        params.clear_subsolvers();
+        params.set_num_full_subsolvers(workers);
+
+        // Make both workers construct the LP constraints eagerly.
+        params.set_add_lp_constraints_lazily(false);
+
+        params.add_subsolvers("max_lp");
+        params.add_subsolvers("quick_restart_max_lp");
+
+        // Disable incomplete primal heuristics.
+        params.set_use_lns(false);
+        params.set_use_rins_lns(false);
+        params.set_use_feasibility_pump(false);
+        params.set_use_feasibility_jump(false);
+        params.set_num_violation_ls(0);
+
+        // params.set_log_search_progress(true);
+        // params.set_log_subsolver_statistics(true);
+    }
+
+    bool use_default_computation = (exp_data.alg == CPSAT_DEF);
+    if (use_default_computation) {
+        constexpr int workers = 2;
+        params.set_num_workers(workers);
+    }
+
+
     params.set_max_time_in_seconds(max_sec);
 
     Model solver_model;
@@ -242,7 +327,13 @@ pair<VI,VI> solveByEvalMaxSAT(VPII & constraints, int max_sec, int res_measure_f
     return {};
 }
 
-pair<VI,VD> solveInstanceUsingSolver(VPII constraints, int max_time_sec, int res_measure_freq_sec, int repeats, string alg = "cpsat") {
+pair<VI,VD> solveInstanceUsingSolver(VPII constraints, ExpData & exp_data) {
+
+    int max_time_sec = exp_data.solver_max_time_sec;
+    int res_measure_freq_sec = exp_data.solver_time_granularity;
+    Alg alg = exp_data.alg;
+    int repeats = exp_data.solver_repeats;
+
     // times[i] is the result found by the solver after time (i+1) * granularity seconds
     const int I = ceil(1.0 * max_time_sec / res_measure_freq_sec) + 1;
     VVI iteration_res_times(I, VI());
@@ -252,10 +343,10 @@ pair<VI,VD> solveInstanceUsingSolver(VPII constraints, int max_time_sec, int res
     for (int rep=0; rep<repeats; rep++) {
 
         auto solve = [&]() {
-            if (alg == "cpsat") return solveByCPSAT(constraints, max_time_sec, res_measure_freq_sec);
-            if (alg == "evalmaxsat") return solveByEvalMaxSAT(constraints, max_time_sec, res_measure_freq_sec);
-            if (alg == "highs") return solveByHIGHS(constraints, max_time_sec, res_measure_freq_sec);
-            if (alg == "numvc" || alg == "fastvc") return solveByFastVC( constraints, max_time_sec, res_measure_freq_sec);
+            if (alg == CPSAT_SAT || alg == CPSAT_LP || alg == CPSAT_DEF) return solveByCPSAT(constraints, exp_data);
+            // if (alg == "evalmaxsat") return solveByEvalMaxSAT(constraints, max_time_sec, res_measure_freq_sec);
+            if (alg == HIGHS) return solveByHIGHS(constraints, exp_data);
+            if (alg == NUMVC) return solveByFastVC( constraints, exp_data);
             return pair<VI,VI>{};
         };
 
@@ -280,14 +371,11 @@ pair<VI,VD> solveInstanceUsingSolver(VPII constraints, int max_time_sec, int res
     return make_pair(res,res_times);
 }
 
-static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time_granularity, int solver_repeats, string alg) {
+static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     int N = V.size();
     auto initV = V;
 
-    ExpData exp_data;
-    exp_data.solver_time_granularity = solver_time_granularity;
-    exp_data.solver_max_time_sec = solver_max_time_sec;
-    exp_data.solver_repeats = solver_repeats;
+    auto exp_data_cnf = exp_data;
 
     exp_data.N0 = N;
     exp_data.M0 = GraphUtils::countEdges(V);
@@ -415,7 +503,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
 
         VPII constraints = GraphUtils::getGraphEdges(coreV);
         for (auto & [a,b] : constraints){a++; b++;}
-        auto [solver_vc,times] = solveInstanceUsingSolver(constraints, solver_max_time_sec, solver_time_granularity, solver_repeats, alg);
+        auto [solver_vc,times] = solveInstanceUsingSolver(constraints, exp_data_cnf);
         DEBUG(times);
         for (auto& d : times) if (d != -1) d += noned_solution_lift_overhead;
         exp_data.noned_results = times;
@@ -500,7 +588,7 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
             }
 
 
-            auto [solver_vc,times] = solveInstanceUsingSolver(constraints,solver_max_time_sec,solver_time_granularity, solver_repeats);
+            auto [solver_vc,times] = solveInstanceUsingSolver(constraints, exp_data_cnf);
             DEBUG(times);
             for (auto& d : times) if (d != -1) d += ed_solution_lift_overhead;
             exp_data.ed_results = times;
@@ -536,8 +624,6 @@ static ExpData runVCTestforGraph(VVI V, int solver_max_time_sec, int solver_time
     exp_data.ed2_edges_removed = dummy_exp_data.ed_edges_removed;
 
 
-
-    return exp_data;
 }
 
 VVI getTestV1() {
@@ -662,12 +748,20 @@ int main() {
 
     // int solver_max_time_sec = 300;
     // int solver_time_granularity = 10;
-    int solver_max_time_sec = 10;
+    int solver_max_time_sec = 60;
     int solver_time_granularity = 1;
     int solver_repeats = 1;
-    string alg = "cpsat";
+    Alg alg = CPSAT_LP;
 
-    auto exp_data = runVCTestforGraph(V,  solver_max_time_sec, solver_time_granularity,solver_repeats, alg);
+    ExpData exp_data;
+    exp_data.solver_max_time_sec = solver_max_time_sec;
+    exp_data.solver_time_granularity = solver_time_granularity;
+    exp_data.solver_repeats = solver_repeats;
+    exp_data.alg = alg;
+
+    exp_data.writeToFile(clog, true, true);
+
+    runVCTestforGraph(V,  exp_data);
 
 
     ENDL(5);

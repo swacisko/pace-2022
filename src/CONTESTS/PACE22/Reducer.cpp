@@ -327,10 +327,13 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         if ( cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
             VI res;
             bool made_changes = false;
+            VPII init_V_edges = GraphUtils::getGraphEdges(V);
+
             do {
                 ed_rules_checked++;
                 Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
                 clog << "Running ED with edge insertion" << endl;
+
 
                 EDReducer edred(V.size(), cnf);
                 edred.resetAllUsedTechniques();
@@ -344,14 +347,23 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
                 ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
                 addKNR(res);
-                if (edred.madeChangesInLastReduce())  V = edred.getV();
-                assert( GraphUtils::isSimple(V) );
                 made_changes = edred.madeChangesInLastReduce();
-
-                ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
-                modified |= edred.madeChangesInLastReduce();
-
+                modified |= made_changes;
                 s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
+                if (made_changes) {
+                    if (!res.empty() && cnf.ed_remove_added_t1_constraints_if_kernelized_node_found) {
+                        clog << "Found kernelized nodes when using edge-insertion mode in ED!";
+                        clog << " Reverting graph state and removing nodes" << endl;
+                        V = GraphUtils::getGraphForEdges(init_V_edges); // revert changes to the original graph
+                        GraphUtils::removeNodes(V,res,helper); // and remove nodes...
+                        break;
+                    }else {
+                        V = edred.getV();
+                    }
+                }
+                assert( GraphUtils::isSimple(V) );
+
             }while (res.empty() && made_changes);
 
             if(modified) continue;
