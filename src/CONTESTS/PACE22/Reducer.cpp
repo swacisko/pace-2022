@@ -520,13 +520,22 @@ vector<VCReduction*> Reducer::twins() {
     while ( p < neigh_h.size() ) {
         q = p+1;
         while ( q < neigh_h.size() && neigh_h[q].first == neigh_h[p].first ) q++;
+        if (q == p+1){ p = q; continue; }
 
         int deg = V[neigh_h[p].second].size();
         // We have twins in set X and their neighborhood in set T
         // if |T| <= |X|, then we can add T to the solution
         // if |T| = |X|+1 and T is an independent set, we can fold twins
+        // additionally, the size of vc in G[T] can be taken into account as well
 
-        if ( q-p >= deg ) { // we have a set X of twins with |N(X)| >= |X|. We denote T = N(X)
+        int vc_in_T_size = 0;
+        if ( q-p >= 2 && V[neigh_h[p].second].size() <= q-p+4 ) {
+            VI T = V[neigh_h[p].second];
+            auto indg = GraphInducer::induce(V,T);
+            vc_in_T_size = Utils::getMinVcCPSAT(indg.V).size();
+        }
+
+        if ( q-p >= deg - vc_in_T_size ) { // we have a set X of twins with |N(X)| >= |X|. We denote T = N(X)
             VI T = V[neigh_h[p].second];
             bool is_affected = false;
             for (int t : T) is_affected |= affected[t];
@@ -540,7 +549,7 @@ vector<VCReduction*> Reducer::twins() {
             }
         }
 
-        if ( q-p+1 == deg ) { // if T is an independent set, we can fold those twins
+        if ( q-p+1 == deg - vc_in_T_size ) { // if T is an independent set, we can fold those twins
             VI T = V[neigh_h[p].second];
             for (int t : T) was[t] = true;
             bool is_mis = true;
