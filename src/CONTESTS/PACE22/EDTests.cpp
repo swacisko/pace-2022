@@ -798,7 +798,7 @@ int main() {
 
     // int solver_max_time_sec = 300;
     // int solver_time_granularity = 10;
-    int solver_max_time_sec = 20;
+    int solver_max_time_sec = 5;
     int solver_time_granularity = 1;
     int solver_repeats = 1;
     Alg alg = NUMVC;

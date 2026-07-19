@@ -302,8 +302,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             auto folds = folding();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
-            if(write_progress_on_the_fly) DEBUG(total_folds_done);
-
             if(!folds.empty()) modified = true;
             addLiftables(folds);
             assert( GraphUtils::isSimple(V) );
@@ -311,19 +309,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
-        if (false)
-        if(cnf.reducer_use_desk){
-            Stopwatch s; string opt = "desk"; s.start(opt);
-            vector<VCReduction*> desk_liftables = desk();
-            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
-            for (auto l : desk_liftables) if ( l->name() == "desk" ) total_desks_done++;
-
-            addLiftables(desk_liftables);
-
-            modified |= !desk_liftables.empty();
-            if(modified) continue;
-        }
 
         if(cnf.reducer_use_funnel){
             if(write_progress_on_the_fly) clog << "Running funnel" << endl;
@@ -339,13 +325,22 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(modified) continue;
         }
 
-        // if (false)
+        if(cnf.reducer_use_desk){
+            Stopwatch s; string opt = "desk"; s.start(opt);
+            vector<VCReduction*> desk_liftables = desk();
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
+            addLiftables(desk_liftables);
+
+            modified |= !desk_liftables.empty();
+            // if(modified) continue;
+        }
+
         if(cnf.reducer_use_twins){
             Stopwatch s; string opt = "twins"; s.start(opt);
 
             vector<VCReduction*> twin_liftables = twins();
             secondary_reduce_liftables += twin_liftables;
-            for (auto l : twin_liftables) if ( l->name() == "twin" ) total_twins_done++;
 
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             modified |= !twin_liftables.empty();
@@ -576,7 +571,7 @@ vector<VCReduction*> Reducer::twins() {
                 for ( int d : neigh ) GraphUtils::addEdge(V,merge_to,d);
 
                 T.pop_back();
-                clog << "\tApplying twin folding!! Check the correctness of it, test it properly!" << endl;
+                // clog << "\tApplying twin folding!! Check the correctness of it, test it properly!" << endl;
                 liftables.push_back(new FoldingTwinReduction(merge_to,T, X));
             }
         }
@@ -585,7 +580,7 @@ vector<VCReduction*> Reducer::twins() {
     }
 
     VI rem;
-    for (int i=0; i<N; i++) if (V[i].size() == 1) liftables += propagateDeg1RuleSlow(i);
+    for (int i=0; i<N; i++) if (V[i].size() == 1) liftables += propagateDeg1RuleSlow(V[i][0]);
     if (!rem.empty()) liftables.push_back(new KernelizedNodesReduction(rem));
 
     return liftables;
@@ -608,8 +603,10 @@ vector<VCReduction*> Reducer::folding() {
                 for (int d : V[a]) GraphUtils::removeEdge(V,d,a);
                 for (int d : V[b]) GraphUtils::removeEdge(V,d,b);
 
-                for (int d : V[a]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
-                for (int d : V[b]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
+                // for (int d : V[a]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
+                // for (int d : V[b]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(d);
+                for (int d : V[a]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(V[d][0]);
+                for (int d : V[b]) if (V[d].size() == 1) liftables += propagateDeg1RuleSlow(V[d][0]);
 
                 V[a].clear();
                 V[b].clear();
@@ -677,7 +674,7 @@ void Reducer::disableAllConditionalReductions() {
 
 
 
-vector<VCReduction *> Reducer::applyAlternativeSets(VI A, VI B) {
+vector<VCReduction *> Reducer::applyAlternativeSets(VI A, VI B, bool log) {
     vector<VCReduction*> liftables;
 
 
@@ -698,7 +695,7 @@ vector<VCReduction *> Reducer::applyAlternativeSets(VI A, VI B) {
         for (int a : A) was[a] = false;
 
         if (!to_remove.empty()) {
-            // clog << "In alternative sets, found nonempty intersection of NA and NB: " << to_remove << endl;
+            if (log) clog << "In alternative sets, found nonempty intersection of NA and NB: " << to_remove << endl;
             liftables.push_back( new KernelizedNodesReduction(to_remove) );
             GraphUtils::removeNodes(V,to_remove,helper);
         }
@@ -738,7 +735,7 @@ vector<VCReduction *> Reducer::applyAlternativeSets(VI A, VI B) {
         }
     }
 
-    // DEBUG(A); DEBUG(B); DEBUG(NA); DEBUG(NB);
+    if (log){ DEBUG(A); DEBUG(B); DEBUG(NA); DEBUG(NB); }
     NA = StandardUtils::setDifference(NA,B,helper);
     if ( !NA.empty() && !NB.empty() ) liftables.push_back( new AlternativeSetsReduction(NA,B,A) );
 
@@ -931,7 +928,80 @@ void Reducer::createVFromEdges(VPII & edges) {
 
 
 vector<VCReduction*> Reducer::desk(){
-   assert(false && "Implement desk efficiently for VC - both the desk domination and desk folding");
+    vector<VCReduction*> liftables;
+
+    auto edges = GraphUtils::getGraphEdges(V);
+
+    VI desk, neigh;
+
+    for (auto [a,b] : edges) if (V[a].size() == 3 && V[b].size() == 3) {
+        desk.clear();
+        bool adj = false;
+        for (int x : V[a]) adj |= (x == b);
+        if (!adj) continue;
+
+        for (int d : V[a]) was[d] = true;
+        for ( int c : V[b] ) if ( c != a && V[c].size() == 3 && !was[c] ) {
+            for ( int d : V[c] ) if ( d != a && d != b && was[d] && V[d].size() == 3 ) {
+                desk = {a,b,c,d};
+                break;
+            }
+            if (!desk.empty()) break;
+        }
+        for (int d : V[a]) was[d] = false;
+
+        if (desk.empty()) continue;
+        int c = desk[2], d = desk[3];
+        for (int x : V[a]) if (x == c) desk.clear();
+        for (int x : V[b]) if (x == d) desk.clear();
+        if (desk.empty()) continue;
+
+        neigh.clear();
+        for (int x : desk) was[x] = true;
+        for (int x : desk) for (int y : V[x]) if (!was[y]){ was[y] = true; neigh.push_back(y); }
+        for (int x : desk) was[x] = false;
+        for (int x : neigh) was[x] = false;
+
+
+        constexpr bool debug = false;
+        assert(neigh.size() <= 4);
+
+        if ( neigh.size() < 4 ) {
+
+            for (int i=(int)neigh.size()-1; i>=0; i--) {
+                int x = neigh[i];
+                bool remove_x = (ranges::contains(V[x],a) && ranges::contains(V[x],b));
+                remove_x |= (ranges::contains(V[x],b) && ranges::contains(V[x],c));
+                remove_x |= (ranges::contains(V[x],c) && ranges::contains(V[x],d));
+                remove_x |= (ranges::contains(V[x],d) && ranges::contains(V[x],a));
+                if (!remove_x) REM(neigh,i);
+            }
+
+            if (neigh.empty()) continue;
+
+            if (debug) clog << "Found DESK DOMINATION, need to handle it properly..." << endl;
+            total_desks_done++;
+
+            GraphUtils::removeNodes(V,neigh,was);
+            liftables.push_back(new KernelizedNodesReduction(neigh));
+            continue;
+        }
+
+        if (debug) { DEBUG(desk); DEBUG(neigh); for (int x : desk) clog << "V[" << x << "]: " << V[x] << endl; }
+
+        auto lft = applyAlternativeSets({a,c}, {b,d}, debug);
+        for (auto l : lft) if (auto* derived = dynamic_cast<AlternativeSetsReduction*>(l)) derived->red_name = "desk";
+        liftables += lft;
+
+        if (debug) clog << "\t\tFound a DESK FOLDING!" << endl;
+        total_desks_done++;
+    }
+
+    VI rem;
+    for (int i=0; i<N; i++) if (V[i].size() == 1) liftables += propagateDeg1RuleSlow(V[i][0]);
+    if (!rem.empty()) liftables.push_back(new KernelizedNodesReduction(rem));
+
+    return liftables;
 }
 
 
@@ -963,11 +1033,11 @@ vector<GeneralFoldingReduction *> Reducer::generalFolding() {
         }
         if(aff) continue;
 
-        int vs_size;
+        int vc_size;
         InducedGraph g = GraphInducer::induce(V, W);
-        vs_size = Utils::getMinVcCPSAT(g.V).size();
+        vc_size = Utils::getMinVcCPSAT(g.V).size();
 
-        if( vs_size + 2 < W.size() ) continue;
+        if( vc_size + 2 < W.size() ) continue;
 
         if(debug){ ENDL(5); clog << "Found W with DFVS(G[W]) >= W.size()-2" << endl; DEBUG(w); DEBUG(W); }
 

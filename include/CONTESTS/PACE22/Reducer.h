@@ -480,7 +480,7 @@ public:
      * CAUTION! It only creates and returns the KernelizedNodesReduction if N(A) \cap N(B) \neq \emptyset.
      * The responsibility to create the liftable rule such as funnel or desk lies in the specialised functions.
      */
-    vector<VCReduction*> applyAlternativeSets(VI A, VI B);
+    vector<VCReduction*> applyAlternativeSets(VI A, VI B, bool log = false);
 
     vector<VCReduction*> funnel();
 
