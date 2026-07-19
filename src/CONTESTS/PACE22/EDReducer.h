@@ -16,7 +16,8 @@ public:
     to_consider_in_next_step(N), cnf(c) {
         temp.reserve(N);
         temp2.reserve(N);
-        cnt = deg_in_S = deg_notin_W = VI(N,0);
+        cnt = VI(N,0);
+        if constexpr (keep_track_of_degrees) deg_in_S = deg_notin_W = VI(N,0);
     }
 
     /**
@@ -66,6 +67,7 @@ public:
     bool write_logs = false;
     int max_time_millis = 1e9; // max time in milliseconds to allow the rule to be run
 
+    static constexpr bool keep_track_of_degrees = false; // this is useless at the moment...
 
 private:
 

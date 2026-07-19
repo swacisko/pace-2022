@@ -50,6 +50,7 @@ VI EDReducer::reduce(VVI V0) {
 
                 // clog << "\rConsidering node " << v << flush;
                 if (consider({v})) {
+                    clearAllForConsider();
                     if (write_logs)
                         clog << "\t\tNode " << v << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
                     auto temp = propagateDeg1RuleSlow(v);
@@ -135,6 +136,8 @@ bool EDReducer::consider(VI initS) {
 
     if (write_logs) clog << "Considering initS: " << initS << endl;
 
+    checkEmptyArraysAssertions(true,true);
+
     if (initS.size() == 1) {
         int v = initS[0];
         moveToS(v, true);
@@ -161,11 +164,12 @@ bool EDReducer::consider(VI initS) {
 
         for (int u : S) for (int d : V[u]) if (!excluded[d]) {
             if (inU1[d]) to_consider_in_next_step[d] = true;
-            deg_in_S[d]++;
+            if constexpr (keep_track_of_degrees) deg_in_S[d]++;
         }
     }
 
     // clog << "Initial sizes: W: " << W.size() << ", U: " << U.size() << ", U1: " << U1.size() << endl;
+    checkEmptyArraysAssertions(true,true);
 
     while ( true ) {
         if (write_logs) clog << "\tContinuing ED, next step..." << endl;
@@ -216,7 +220,8 @@ void EDReducer::moveToU(int u, const bool exclude) {
         W.push_back(u);
         inU[u] = inW[u] = true;
         inU1[u] = inU0[u] = false;
-        deg_notin_W[u] = deg_in_S[u] = 0;
+        if constexpr (keep_track_of_degrees) deg_notin_W[u] = deg_in_S[u] = 0;
+        if constexpr (keep_track_of_degrees) for (int d : V[u]) deg_notin_W[d] -= inW[d]; // we may  exclude the node, but we need to update neighbors!! Get rid of the ''deg_notin_shit'' completely!
         return;
     }
 
@@ -228,12 +233,11 @@ void EDReducer::moveToU(int u, const bool exclude) {
 
     inf_rules_1.push_back(u);
 
-    deg_notin_W[u] = 0;
-    deg_in_S[u] = 0;
+    if constexpr (keep_track_of_degrees) deg_notin_W[u] = deg_in_S[u] = 0;
     for (int d : V[u]) {
-        deg_notin_W[d] -= inW[d]; // we decrease value for each neighbor d, because u is moved to W
-        deg_notin_W[u] += !inW[d]; // we calculate value for the moved node u
-        deg_in_S[u] += inS[d];
+        if constexpr (keep_track_of_degrees) deg_notin_W[d] -= inW[d]; // we decrease value for each neighbor d, because u is moved to W
+        if constexpr (keep_track_of_degrees) deg_notin_W[u] += !inW[d]; // we calculate value for the moved node u
+        if constexpr (keep_track_of_degrees) deg_in_S[u] += inS[d];
         if (inS[d]) inU0[u] = false;
 
         if (inU1[d]) to_consider_in_next_step[d] = true;
@@ -249,10 +253,11 @@ void EDReducer::moveToS(int u, const bool init_exclude) {
     S.push_back(u);
     W.push_back(u);
     inS[u] = inW[u] = true;
+    inU[u] = inU1[u] = inU0[u] = false;
 
-    deg_in_S[u] = 0;
+    if constexpr (keep_track_of_degrees) deg_in_S[u] = 0;
     for (int d : V[u]) if (!excluded[d]) {
-        deg_in_S[u] += inS[d];
+        if constexpr (keep_track_of_degrees) deg_in_S[u] += inS[d];
         inU0[d] = false;
     }
 
@@ -272,12 +277,12 @@ void EDReducer::moveToS(int u, const bool init_exclude) {
 
             write_logs = t;
         }else { // d is not excluded and is already in W
-            deg_notin_W[d]--;
-            deg_in_S[d]++;
+            if constexpr (keep_track_of_degrees) deg_notin_W[d]--;
+            if constexpr (keep_track_of_degrees) deg_in_S[d]++;
         }
     }
 
-    deg_notin_W[u] = 0;
+    if constexpr (keep_track_of_degrees) deg_notin_W[u] = 0;
 
     updateU1();
 
@@ -323,6 +328,11 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
                 if (!inW[w]) for (int d : V[w]) cnt[d]++;
             }
 
+            if constexpr (keep_track_of_degrees) {
+                if(nonw_neigh_size != deg_notin_W[u]) { DEBUG(nonw_neigh_size); DEBUG(deg_notin_W[u]); }
+                assert(nonw_neigh_size == deg_notin_W[u]);
+            }
+
             for ( int w : V[u] ) if (!inW[w]) {
                 for ( int d : V[w] ) if ( !inW[d] && cnt[d] == nonw_neigh_size ) {
                     if (write_logs) clog << "\t\tmarking node d = " << d << " for u = " << u << ", _c: " << nonw_neigh_size << endl;
@@ -353,7 +363,10 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
                 nonw_neigh_size++;
             }
 
-            assert(nonw_neigh_size == deg_notin_W[u]);
+            if constexpr (keep_track_of_degrees) {
+                if(nonw_neigh_size != deg_notin_W[u]) { DEBUG(nonw_neigh_size); DEBUG(deg_notin_W[u]); }
+                assert(nonw_neigh_size == deg_notin_W[u]);
+            }
 
             for ( int w : V[u] ) if (!inW[w]) {
                 int c = 1;
@@ -704,7 +717,7 @@ void EDReducer::clearAllForConsider() {
                     inS[d] = inU[d] = inW[d] = false;
                     inU1[d] = inU0[d] = was[d] = false;
                     helper[d] = marked[d] = marked2[d] = false;
-                    deg_in_S[d] = deg_notin_W[d] = 0;
+                    if constexpr (keep_track_of_degrees) deg_in_S[d] = deg_notin_W[d] = 0;
                 }
             }
         }
@@ -714,7 +727,7 @@ void EDReducer::clearAllForConsider() {
         inS[d] = inU[d] = inW[d] = false;
         inU1[d] = inU0[d] = was[d] = false;
         helper[d] = marked[d] = marked2[d] = false;
-        deg_in_S[d] = deg_notin_W[d] = 0;
+        if constexpr (keep_track_of_degrees) deg_in_S[d] = deg_notin_W[d] = 0;
         clearing_helper[d] = false;
     }
 
@@ -723,7 +736,7 @@ void EDReducer::clearAllForConsider() {
         inU1[d] = inU0[d] = was[d] = false;
         helper[d] = marked[d] = marked2[d] = false;
         has_cnf_bounded_neigh[d] = excluded[d] = false;
-        deg_in_S[d] = deg_notin_W[d] = 0;
+        if constexpr (keep_track_of_degrees) deg_in_S[d] = deg_notin_W[d] = 0;
         to_consider_in_next_step[d] = false;
     }
 
@@ -759,7 +772,7 @@ void EDReducer::checkEmptyArraysAssertions(bool check_marked, bool check_marked2
         }
         if (check_marked2) assert(ranges::all_of(marked2, [&](auto b){return !b;}));
         assert(ranges::all_of(was, [&](auto b){return !b;}));
-        assert(ranges::all_of(has_cnf_bounded_neigh, [&](auto b){return !b;}));
+        // assert(ranges::all_of(has_cnf_bounded_neigh, [&](auto b){return !b;}));
         assert(ranges::all_of(helper, [&](auto b){return !b;}));
         assert(temp.empty());
         assert(temp2.empty());

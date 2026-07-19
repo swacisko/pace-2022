@@ -81,6 +81,8 @@ struct ExpData {
     bool run_ed = true;
     bool run_ed2 = true;
 
+    bool use_def1_dom = true;
+
     map<string,string> getEntries() {
         map<string,string> res;
         res["N0"] = to_string(N0); res["M0"] = to_string(M0);
@@ -117,6 +119,7 @@ struct ExpData {
         res["run_noned"] = to_string(run_noned);
         res["run_ed"] = to_string(run_ed);
         res["run_ed2"] = to_string(run_ed2);
+        res["use_def1_dom"] = to_string(use_def1_dom);
 
         res["algorithm"] = parseAlgorithm(alg);
 
@@ -166,7 +169,8 @@ struct ExpData {
             "noned_results", "ed_results", "ed2_results",
             "ed_folds", "ed_funnels", "ed_unconfined", "ed_ext_dom", "ed_desks", "ed_twins", "ed_dominations",
             "noned_folds", "noned_funnels", "noned_unconfined", "noned_ext_dom", "noned_desks", "noned_twins", "noned_dominations",
-            "metadata_filepath", "run_noned", "run_ed", "run_ed2"
+            "metadata_filepath", "run_noned", "run_ed", "run_ed2",
+            "use_def1_dom"
         };
 
         auto writeLine = [&](vector<string> & l) {
@@ -591,7 +595,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             cnf.reducer_use_ed = true;
             cnf.ed_consider_nodes_to_move_outside_NW = true;
             cnf.ed_use_same_neigh_domination = true;
-            cnf.ed_use_deficit1_domination = true;
+            cnf.ed_use_deficit1_domination = exp_data.use_def1_dom;
 
             cnf.ed_use_double_ed_checks = false; // time-consuming, especially for denser graphs... use for sparse graphs only
             // cnf.ed_use_edge_removal = true;
@@ -646,6 +650,10 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
 
             bool add_t2_constraints = (add_constraints && exp_data.alg != NUMVC); // for numvc we do not want to add t2-constraints
             if (add_t2_constraints) {
+                // EDReducer edred(N,cnf);
+                // edred.resetAllUsedTechniques();
+                // edred.cnf.ed_use_node_removal = true;
+                // auto removed_nodes = edred.reduce(V);
 
             }
 
@@ -898,6 +906,7 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.addOption("run_noned", false); // noned tests
     ap.addOption("run_ed", false); // ed tests
     ap.addOption("run_ed2", false); // ed2 tests
+    ap.addOption("use_def1_dom", false); // ed2 tests
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -922,6 +931,7 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.findAndAssign("run_noned", "bool", &cnf.run_noned);
     ap.findAndAssign("run_ed", "bool", &cnf.run_ed);
     ap.findAndAssign("run_ed2", "bool", &cnf.run_ed2);
+    ap.findAndAssign("use_def1_dom", "bool", &cnf.use_def1_dom);
 
 
     return cnf;
