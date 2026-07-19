@@ -308,7 +308,8 @@ void EDReducer::updateU1() {
 void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
 
     for (int u : U1) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
-        for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
+        // for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
+        for (int w : V[u]) if (!inW[w]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
             marked[u] = marked[w] = marked[d] = false;
             cnt[u] = cnt[w] = cnt[d] = 0;
         }
