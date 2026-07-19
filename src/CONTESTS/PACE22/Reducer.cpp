@@ -37,15 +37,59 @@ ReducedInstance Reducer::reduce() {
     V = GraphUtils::getGraphForEdges(primary_edges);
     N = V.size();
 
+    auto induceAndRemapToBFSOrder = [&]() {
+        VI neigh;
+        neigh.reserve(N);
+        was = VB(N);
 
+        for ( int i=0; i<N; i++ ) if (!V[i].empty() && !was[i]) {
+            neigh.push_back(i);
+            was[i] = true;
 
-    { // #TEST - here should be implemented a more efficient graph inducing than the following...
-        auto indg = GraphInducer::induceByNonisolatedNodes(V);
-        reduced_instance.primary_indg_nodes = indg.nodes;
-        V = indg.V;
+            for ( int j=(int)neigh.size()-1; j<neigh.size(); j++ ) {
+                int v = neigh[j];
+
+                for (int d : V[v]) if (!was[d]) {
+                    was[d] = true;
+                    neigh.push_back(d);
+                }
+            }
+        }
+
+        assert(neigh.size() <= N);
+
+        int N0 = V.size();
+
+        { // inducing graph
+            int indN = neigh.size();
+            VVI indV(indN);
+            for (int i=0; i<neigh.size(); i++) indV[i].reserve( V[neigh[i]].size() );
+            VI mapper(N,-1);
+            for (int i=0; i<neigh.size(); i++) mapper[neigh[i]] = i;
+            for ( int i=0; i<neigh.size(); i++ ) {
+                int v = neigh[i];
+                for (int d : V[v]) indV[mapper[v]].push_back(mapper[d]);
+            }
+            swap(V,indV);
+        }
+
+        swap(reduced_instance.primary_indg_nodes,neigh);
         N = V.size();
         was = was2 = helper = helper2 = VB(N);
-    }
+
+        clog << "Remapped graph with " << N0 << " nodes to a graph with " << N << " nodes using BFS ordering" << endl;
+    };
+
+    induceAndRemapToBFSOrder();
+
+
+    // { // #TEST - here should be implemented a more efficient graph inducing than the following...
+    // auto indg = GraphInducer::induceByNonisolatedNodes(V);
+    //     reduced_instance.primary_indg_nodes = indg.nodes;
+    //     V = indg.V;
+    //     N = V.size();
+    //     was = was2 = helper = helper2 = VB(N);
+    // }
 
     reduced_instance.secondaryN = N;
     tie( V, reduced_instance.secondary_liftables) = secondaryReduce();
@@ -368,13 +412,15 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         bool ed_application_cond = ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) );
         if( cnf.reducer_use_ed && cnf.ed_use_node_removal && ed_application_cond){
             ed_rules_checked++;
-            clog << "Running ED node removal rules in POINT-1, time: " << sw.getTime(reducer_str) / 1000 << endl;
+            int edge_cnt = GraphUtils::countEdges(V);
+            clog << "Running ED node removal rules in POINT-1, time: " << sw.getTime(reducer_str) / 1000 << ", edges: " << edge_cnt << endl;
 
+            Stopwatch s; string opt = "ED node removal"; s.start(opt);
             EDReducer edred(V.size(), cnf);
+            edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
             edred.resetAllUsedTechniques();
             edred.cnf.ed_use_node_removal = true;
 
-            Stopwatch s; string opt = "ED node removal"; s.start(opt);
             VI res = edred.reduce(V);
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
@@ -401,11 +447,13 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         if( cnf.reducer_use_ed && cnf.ed_use_node_removal){
             ed_rules_checked++;
             Stopwatch s; string opt = "ED node removal"; s.start(opt);
-            clog << "Running ED node removal rules in POINT-2, time: " << sw.getTime(reducer_str) / 1000 << endl;
+            int edge_cnt = GraphUtils::countEdges(V);
+            clog << "Running ED node removal rules in POINT-2, time: " << sw.getTime(reducer_str) / 1000 << ", edges: " << edge_cnt << endl;
 
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
             edred.cnf.ed_use_node_removal = true;
+            edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
             VI res = edred.reduce(V);
             assert(res.size() == edred.last_reduce_nodes_removed);
@@ -453,6 +501,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
                 edred.resetAllUsedTechniques();
                 edred.cnf.ed_use_node_removal = true;
                 edred.cnf.ed_apply_type1_constraints_on_the_fly = true;
+                edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
                 res = edred.reduce(V);
                 assert(res.size() == edred.last_reduce_nodes_removed);

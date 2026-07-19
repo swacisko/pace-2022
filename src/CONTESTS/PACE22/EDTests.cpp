@@ -68,6 +68,7 @@ struct ExpData {
     int ed_t2_inference_rules_added = -1;
     int ed2_t2_inference_rules_added = -1;
 
+    string metadata_filepath = "";
 
     int reducer_max_time_millis = 900 * 1000; // 15 minutes
 
@@ -75,7 +76,10 @@ struct ExpData {
     int ed_folds = 0, ed_funnels = 0, ed_unconfined = 0, ed_ext_dom = 0, ed_desks = 0, ed_twins = 0, ed_dominations = 0;
 
     Alg alg = CPSAT_SAT;
-    int cpsat_workers = 2;
+
+    bool run_noned = true;
+    bool run_ed = true;
+    bool run_ed2 = true;
 
     map<string,string> getEntries() {
         map<string,string> res;
@@ -109,6 +113,10 @@ struct ExpData {
         res["solver_max_time_sec"] = to_string(solver_max_time_sec);
         res["solver_time_granularity"] = to_string(solver_time_granularity);
         res["solver_repeats"] = to_string(solver_repeats);
+        res["metadata_filepath"] = metadata_filepath;
+        res["run_noned"] = to_string(run_noned);
+        res["run_ed"] = to_string(run_ed);
+        res["run_ed2"] = to_string(run_ed2);
 
         res["algorithm"] = parseAlgorithm(alg);
 
@@ -157,7 +165,8 @@ struct ExpData {
             "solver_max_time_sec", "solver_time_granularity", "solver_repeats", "algorithm",
             "noned_results", "ed_results", "ed2_results",
             "ed_folds", "ed_funnels", "ed_unconfined", "ed_ext_dom", "ed_desks", "ed_twins", "ed_dominations",
-            "noned_folds", "noned_funnels", "noned_unconfined", "noned_ext_dom", "noned_desks", "noned_twins", "noned_dominations"
+            "noned_folds", "noned_funnels", "noned_unconfined", "noned_ext_dom", "noned_desks", "noned_twins", "noned_dominations",
+            "metadata_filepath", "run_noned", "run_ed", "run_ed2"
         };
 
         auto writeLine = [&](vector<string> & l) {
@@ -229,10 +238,11 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
     sw.start("cpsat");
 
     SatParameters params;
-
+    params.set_max_time_in_seconds(max_sec);
 
     bool use_sat_heavy_computation = (exp_data.alg == CPSAT_SAT);
     if (use_sat_heavy_computation) {
+        clog << "Running CPSAT with SAT orientation" << endl;
         constexpr int workers = 2;
         params.set_num_workers(workers);  // Preferred over deprecated num_search_workers.
 
@@ -255,6 +265,7 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
 
     bool use_lp_heavy_compuation =  (exp_data.alg == CPSAT_LP);
     if (use_lp_heavy_compuation) {
+        clog << "Running CPSAT with LP orientation" << endl;
         constexpr int workers = 2;
         params.set_num_workers(workers);
 
@@ -264,8 +275,8 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
         // Make both workers construct the LP constraints eagerly.
         params.set_add_lp_constraints_lazily(false);
 
-        params.add_subsolvers("max_lp");
         params.add_subsolvers("quick_restart_max_lp");
+        params.add_subsolvers("max_lp");
 
         // Disable incomplete primal heuristics.
         params.set_use_lns(false);
@@ -280,12 +291,12 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
 
     bool use_default_computation = (exp_data.alg == CPSAT_DEF);
     if (use_default_computation) {
+        clog << "Running CPSAT with DEFAULT orientation" << endl;
         constexpr int workers = 2;
         params.set_num_workers(workers);
     }
 
 
-    params.set_max_time_in_seconds(max_sec);
 
     Model solver_model;
     CpModelBuilder model;
@@ -494,7 +505,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     }
 
 
-    constexpr bool test_noned_vc_rules = true;
+    const bool test_noned_vc_rules = exp_data.run_noned;
     if (test_noned_vc_rules){ // measuring just the VC reduction time WITHOUT ED rule, and the solver results for the non-ed reduced graph
         clog << endl << "***************** CHECKING FULL NON-ED RULES" << endl;
 
@@ -656,23 +667,24 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     };
 
     // now checking the impact without adding t1-constraints on the fly
-    testEDRules(exp_data, false);
+    if (exp_data.run_ed) testEDRules(exp_data, false);
 
 
-    // now checking the impact with adding t1-constraints on the fly
-    ExpData dummy_exp_data = exp_data;
-    // numvc_time_check_sec = 15; // just to check, whether the denser graph still has a solution of similar quality...
-    testEDRules( dummy_exp_data, true);
-    exp_data.N4 = dummy_exp_data.N3;
-    exp_data.M4 = dummy_exp_data.M3;
-    exp_data.red_ed2_offset = dummy_exp_data.red_ed_offset;
-    exp_data.ed2_results = dummy_exp_data.ed_results;
-    exp_data.red_ed2_time_millis = dummy_exp_data.red_ed_time_millis;
-    exp_data.ed2_t1_inference_rules_added = dummy_exp_data.ed_t1_inference_rules_added;
-    exp_data.ed2_t2_inference_rules_added = dummy_exp_data.ed_t2_inference_rules_added;
-    exp_data.ed2_total_t2_inference_rules_created = dummy_exp_data.ed_total_t2_inference_rules_created;
-    exp_data.ed2_nodes_reduced = dummy_exp_data.ed_nodes_reduced;
-    exp_data.ed2_edges_removed = dummy_exp_data.ed_edges_removed;
+    if (exp_data.run_ed2) {
+        // now checking the impact with adding t1-constraints on the fly and t2 constraints on the used solver
+        ExpData dummy_exp_data = exp_data;
+        testEDRules( dummy_exp_data, true);
+        exp_data.N4 = dummy_exp_data.N3;
+        exp_data.M4 = dummy_exp_data.M3;
+        exp_data.red_ed2_offset = dummy_exp_data.red_ed_offset;
+        exp_data.ed2_results = dummy_exp_data.ed_results;
+        exp_data.red_ed2_time_millis = dummy_exp_data.red_ed_time_millis;
+        exp_data.ed2_t1_inference_rules_added = dummy_exp_data.ed_t1_inference_rules_added;
+        exp_data.ed2_t2_inference_rules_added = dummy_exp_data.ed_t2_inference_rules_added;
+        exp_data.ed2_total_t2_inference_rules_created = dummy_exp_data.ed_total_t2_inference_rules_created;
+        exp_data.ed2_nodes_reduced = dummy_exp_data.ed_nodes_reduced;
+        exp_data.ed2_edges_removed = dummy_exp_data.ed_edges_removed;
+    }
 
 }
 
@@ -760,68 +772,211 @@ void trimAllDegreeOneNodes(VVI & V) {
 }
 
 
-int main() {
+ExpData parseArguments(int argc, char ** argv) {
+    ExpData cnf{};
+
+    class ArgParser {
+    public:
+        // Store flags: --verbose, --help
+        unordered_map<string, bool> flags;
+
+        // Store options with values: --input=..., --threads=...
+        unordered_map<string, string> options;
+
+        // Which names are flags/options
+        unordered_set<string> flag_names;
+        unordered_set<string> option_names;
+        unordered_set<string> required_options;
+
+        void addFlag(const string &name) {
+            flag_names.insert(name);
+            flags[name] = false;
+        }
+
+        void addOption(const string &name, bool required) {
+            option_names.insert(name);
+            options[name] = "";
+            if (required) required_options.insert(name);
+        }
+
+        using VARIANT = variant<bool*,int*,double*,string*>;
+        void findAndAssign(string name, string type, VARIANT data) {
+            if (!hasProvidedOption(name)) return;
+
+
+            if (type == "bool") {
+                bool* ptr = get<bool*>(data);
+                auto isTrue = [&](string s) { return s == "True" || s == "true" || s == "1"; };
+                *ptr = isTrue(getOption(name));
+            }
+            else if (type == "int") {
+                int* ptr = get<int*>(data);
+                *ptr = stoi(getOption(name));
+            }else if (type == "double") {
+                double* ptr = get<double*>(data);
+                *ptr = stod(getOption(name));
+            }else if (type == "string") {
+                string* ptr = get<string*>(data);
+                *ptr = getOption(name);
+            }
+        }
+
+        void parse(int argc, char **argv) {
+            for (int i = 1; i < argc; i++) {
+                string arg = argv[i];
+
+                if (!startsWithDoubleDash(arg)) throw runtime_error("Unknown positional or malformed argument: " + arg);
+
+                string inner = arg.substr(2); // strip "--"
+                size_t eq = inner.find('='); // Split on '='
+                string name, value;
+
+                if (eq == string::npos) { // No '=' → must be a flag (e.g., --verbose)
+                    name = inner;
+
+                    if (flag_names.contains(name)) {
+                        flags[name] = true;
+                    } else if (option_names.contains(name)) {
+                        throw runtime_error("Missing '=value' for option --" + name + " (expected --" + name + "=VALUE)");
+                    } else {
+                        throw runtime_error("Unknown argument: --" + name);
+                    }
+                } else {
+                    // Has '=' → must be an option: --name=value
+                    name = inner.substr(0, eq);
+                    value = inner.substr(eq + 1);
+
+                    if (flag_names.contains(name)) {
+                        throw runtime_error("Flag --" + name + " does not take a value (remove '=...').");
+                    } else if (option_names.contains(name)) {
+                        if (value.empty()) {
+                            throw runtime_error("Missing value for option --" + name + " (use --" + name + "=VALUE)");
+                        }
+                        options[name] = value;
+                    } else {
+                        throw runtime_error("Unknown argument: --" + name);
+                    }
+                }
+            }
+        }
+
+        bool getFlag(const string &name) const {
+            auto it = flags.find(name);
+            if (it == flags.end()) throw runtime_error("Flag not registered: " + name);
+            return it->second;
+        }
+
+        bool hasProvidedOption(const string &name) const { return options.find(name)->second != ""; }
+
+        string getOption(const string &name) const {
+            auto it = options.find(name);
+            if (it == options.end()) throw runtime_error("Option not registered: " + name);
+            return it->second;
+        }
+
+        void printHelp(const string &progName) const {
+            cout << "Usage: " << progName << " [options]\n\n";
+            cout << "Options:\n";
+            for (auto &f : flag_names) cout << "  --" << f << "\n";
+            for (auto &o : option_names) cout << "  --" << o << "=<value>\n";
+            cout << "\n";
+        }
+
+    private:
+        static bool startsWithDoubleDash(const string &s) {
+            return s.size() >= 2 && s[0] == '-' && s[1] == '-';
+        }
+    };
+
+
+    ArgParser ap;
+    ap.addOption("alg", false);
+    ap.addOption("mtd", true);
+    ap.addOption("time", false); // max time for solvers in seconds
+    ap.addOption("rep", false); // max time for solvers in seconds
+    ap.addOption("gran", false); // granularity
+    ap.addOption("run_noned", false); // noned tests
+    ap.addOption("run_ed", false); // ed tests
+    ap.addOption("run_ed2", false); // ed2 tests
+
+    ap.parse(argc, argv);
+    for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
+        clog << "Option " << opt << " is not provided, but is mandatory!" << endl;
+    }
+    for ( const string& opt : ap.required_options ) assert( ap.hasProvidedOption(opt) );
+
+    string alg;
+    ap.findAndAssign("alg", "string", &alg);
+    std::transform(alg.begin(), alg.end(), alg.begin(), [](unsigned char c){ return std::tolower(c); });
+    DEBUG(alg);
+    if ( alg == "cpsat-sat" ) cnf.alg = CPSAT_SAT;
+    if ( alg == "cpsat-def" ) cnf.alg = CPSAT_DEF;
+    if ( alg == "cpsat-lp" ) cnf.alg = CPSAT_LP;
+    if ( alg == "highs" ) cnf.alg = HIGHS;
+    if ( alg == "numvc" ) cnf.alg = NUMVC;
+
+    ap.findAndAssign("mtd", "string", &cnf.metadata_filepath);
+    ap.findAndAssign("time", "int", &cnf.solver_max_time_sec);
+    ap.findAndAssign("gran", "int", &cnf.solver_time_granularity);
+    ap.findAndAssign("rep", "int", &cnf.solver_repeats);
+    ap.findAndAssign("run_noned", "bool", &cnf.run_noned);
+    ap.findAndAssign("run_ed", "bool", &cnf.run_ed);
+    ap.findAndAssign("run_ed2", "bool", &cnf.run_ed2);
+
+
+    return cnf;
+}
+
+void trimDeg1Nodes(VVI & V) {
+    V = GraphInducer::induceByNonisolatedNodes(V).V;
+    int N = V.size(), M = GraphUtils::countEdges(V);
+    clog << "Before trimming degree 1 nodes, N:" << N << ", M: " << M << endl;
+
+    trimAllDegreeOneNodes(V);
+    V = GraphInducer::induceByNonisolatedNodes(V).V;
+    N = V.size(), M = GraphUtils::countEdges(V);
+    clog << "After trimming degree 1 nodes, N:" << N << ", M: " << M << endl;
+
+    int c = 0;
+    for (int i=0; i<N; i++) c += (V[i].size() == 1);
+    assert(c == 0);
+}
+
+int main(int argc, char** argv) {
     ios_base::sync_with_stdio(0);
     cin.tie(0);
     cout << fixed;
     clog << fixed;
 
 
-    int N0 = 3'000, M0 = 4'700;
-    double C = 3;
-    N0 *= C; M0 *= C;
+
+    // int N0 = 3'000, M0 = 4'700;
+    // double C = 3;
+    // N0 *= C; M0 *= C;
+    // VVI V = getRandomGraph(N0, M0);
 
     VVI V = GraphReader::readGraphStandardEdges(cin);
     // VVI V = GraphReader::readGraphDIMACSWunweighed(cin,true);
     // VVI V = getTestV1();
-    // VVI V = getRandomGraph(N0, M0);
 
     V = GraphUtils::makeSimple(V); // making the graph simple, as at the input it might not...
 
-    constexpr bool trim_deg1_nodes = false;
-    if (trim_deg1_nodes){
-        V = GraphInducer::induceByNonisolatedNodes(V).V;
-        int N = V.size(), M = GraphUtils::countEdges(V);
-        clog << "Before trimming degree 1 nodes, N:" << N << ", M: " << M << endl;
-
-        trimAllDegreeOneNodes(V);
-        V = GraphInducer::induceByNonisolatedNodes(V).V;
-        N = V.size(), M = GraphUtils::countEdges(V);
-        clog << "After trimming degree 1 nodes, N:" << N << ", M: " << M << endl;
-
-        int c = 0;
-        for (int i=0; i<N; i++) c += (V[i].size() == 1);
-        assert(c == 0);
-    }
+    constexpr bool trim_deg1_nodes = false; // can be used to obtain a slightly more difficult instance
+    if (trim_deg1_nodes) trimDeg1Nodes(V);
 
     assert(GraphUtils::isSimple(V));
 
-    // int solver_max_time_sec = 300;
-    // int solver_time_granularity = 10;
-    int solver_max_time_sec = 5;
-    int solver_time_granularity = 1;
-    int solver_repeats = 1;
-    Alg alg = NUMVC;
-    // Alg alg = CPSAT_SAT;
-    // Alg alg = CPSAT_DEF;
 
-    ExpData exp_data;
-    exp_data.solver_max_time_sec = solver_max_time_sec;
-    exp_data.solver_time_granularity = solver_time_granularity;
-    exp_data.solver_repeats = solver_repeats;
-    exp_data.alg = alg;
-
-    exp_data.writeToFile(clog, true, true);
+    ExpData exp_data = parseArguments(argc, argv);
+    exp_data.writeToFile(clog, true, true); // just log the parameters from the input
 
     runVCTestforGraph(V,  exp_data);
-
 
     ENDL(5);
     clog << "FINISHED TESTS!" << endl;
 
-
-    exp_data.writeToFile(cout, true);
-
+    ofstream mtd_str(exp_data.metadata_filepath);
+    exp_data.writeToFile(mtd_str, true);
 
     return 0;
 }

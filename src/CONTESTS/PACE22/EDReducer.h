@@ -64,6 +64,7 @@ public:
     Config cnf;
 
     bool write_logs = false;
+    int max_time_millis = 1e9; // max time in milliseconds to allow the rule to be run
 
 
 private:
@@ -80,7 +81,6 @@ private:
     VI cnt;
 
     bool check_double_ed = false;
-
 
     /**
      * Counts and returns |N(u) \setminus W|

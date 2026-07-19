@@ -35,11 +35,19 @@ VI EDReducer::reduce(VVI V0) {
     bool changes = true;
     constexpr bool use_exhaustively = false;
 
+    Stopwatch sw;
+    string ed = "ed";
+    sw.setLimit(ed,max_time_millis);
+    sw.start(ed);
+
     while (changes) {
+        if (sw.tle(ed)) break;
         changes = false;
 
         if (cnf.ed_use_node_removal) {
             for (int v : nodes) if (!V[v].empty()) {
+                if (sw.tle(ed)) break;
+
                 // clog << "\rConsidering node " << v << flush;
                 if (consider({v})) {
                     if (write_logs)
@@ -76,7 +84,8 @@ VI EDReducer::reduce(VVI V0) {
             });
             if ( cnf.ed_node_sorting_mode == 2 ) reverse(ALL(edges));
 
-            for ( auto [u,v] : edges ) if ( !V[u].size() <= 1 && !V[v].size() <= 1 ) {
+            for ( auto [u,v] : edges ) if ( V[u].size() >= 2 && V[v].size() >= 2 ) {
+                if (sw.tle(ed)) break;
                 // clog << "Considering edge " << PII(u,v) << " for ED-edge-removal" << endl;
                 if ( consider({u,v}) ) {
                     clearAllForConsider();
@@ -558,12 +567,16 @@ int EDReducer::getLowerBoundOnNonWNeighbors(int u) {
 
 VI EDReducer::findNodesToMoveToU() {
     VI nodes_to_move_to_U;
-    nodes_to_move_to_U.reserve(W.size());
+    nodes_to_move_to_U.reserve(U1.size());
 
     if(cnf.ed_consider_nodes_to_move_outside_NW) {
         for ( int u : U1 ) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
-            for (int w : V[u]) {
-                if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
+            // for (int w : V[u]) {
+            //     if (!inW[w] && marked[w]) nodes_to_move_to_U.push_back(w);
+            //     for( int d : V[w] ) if(!inW[d] && marked[d]) nodes_to_move_to_U.push_back(d);
+            // }
+            for (int w : V[u]) if (!inW[w]) {
+                if (marked[w]) nodes_to_move_to_U.push_back(w);
                 for( int d : V[w] ) if(!inW[d] && marked[d]) nodes_to_move_to_U.push_back(d);
             }
         }
@@ -651,7 +664,7 @@ int EDReducer::nextStep() {
                 assert(!inW[w]);
                 int c = 0;
                 for (int d : V[w]) if (inU1[d]) c++;
-                assert(c > 0);
+                assert(c > 0 && "this might fail if we design detection of nodes that can be moved to S that are not in N(W)");
                 bool cond = (c < m);
                 cond |= ( c == m && ( id != -1 && V[c].size() < V[id].size() ) );
                 if (cond) {
