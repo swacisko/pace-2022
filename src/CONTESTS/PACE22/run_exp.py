@@ -13,10 +13,11 @@ import numpy as np
 import itertools
 from pathlib import Path
 
-RUN_TESTS = False
+# inst_dir = 'vcred-exp-graphs'
+# output_root_dir = 'results'
 
-inst_dir = 'vcred-test-graphs'
-output_root_dir = 'results'
+inst_dir = 'vcred-tests-small'
+output_root_dir = 'results-tests-small'
 
 solver_name = 'VCReducer'
 
@@ -24,8 +25,8 @@ solver_name = 'VCReducer'
 
 # this program will run [thread_cnt] processes, each running TestsRunner, which runs tests_runner_threads processes,
 # each of which calls the solver process (and CPSAT might use many workers...)
-thread_cnt = 1 if not RUN_TESTS else 1
-tests_runner_threads = 4 if not RUN_TESTS else 1
+thread_cnt = 1
+tests_runner_threads = 4
 
 def getDefaultCommand():
     cmd = 'python3 TestsRunner.py' + \
@@ -73,21 +74,18 @@ def setNumThreads(t):
     global tests_runner_threads
     tests_runner_threads = t
 
-def createCommands():
+def createTestsCommands():
     global inst_dir, output_root_dir
 
     for alg in algorithms:
         cmd = getDefaultCommand()
         cmd += ' --run_name=vc-reducer'
-        solver_params = ' --alg=' + alg + \
+        solver_params = '--alg=' + alg + \
                         ' --time=120' + \
                         ' --rep=5' + \
                         ' --gran=1'
         cmd += ' --solver_params=\'' + solver_params + '\''
         all_tests_commands.append(cmd)
-
-def createTestsCommands():
-
 
 
     print(f'\nThere are altogether {len(all_tests_commands)} commands to run in total')
@@ -113,7 +111,7 @@ if __name__ == '__main__':
     print(all_input_files)
 
     print(f'{(platform.system())=}')
-    print(f'{RUN_TESTS=} {thread_cnt=} {tests_runner_threads=} {all_input_files=}')
+    print(f'{thread_cnt=} {tests_runner_threads=} {all_input_files=}')
 
     try:
         if not os.path.exists(output_root_dir):
@@ -122,16 +120,7 @@ if __name__ == '__main__':
         print(f"Error creating directory: {e}")
 
 
-    if RUN_TESTS:
-        solver_name = 'cpsat_exp_1_no_run'
-
     createTestsCommands()
-    print(all_tests_commands)
-    exit(1)
-
-    if RUN_TESTS:
-        print('#CAUTION! Taking only a fraction of all tests, just to test if it works as intended...')
-        all_tests_commands = all_tests_commands[0::5]
 
     print(f"All {len(all_tests_commands)} commands to run:", *all_tests_commands, sep='\n\n', end='\n\n')
 
