@@ -25,7 +25,7 @@ solver_name = 'VCReducer'
 
 # this program will run [thread_cnt] processes, each running TestsRunner, which runs tests_runner_threads processes,
 # each of which calls the solver process (and CPSAT might use many workers...)
-thread_cnt = 2
+thread_cnt = 1
 tests_runner_threads = 2
 
 def getDefaultCommand():
@@ -66,7 +66,7 @@ def createTablesAndRankings():
 all_tests_commands = []
 
 
-algorithms = ["cpsat-sat", "cpsat-def", "numvc"]
+algorithms = ["cpsat-sat", "numvc", "cpsat-def"]
 
 
 def setNumThreads(t):
@@ -76,13 +76,17 @@ def setNumThreads(t):
 def createTestsCommands():
     global inst_dir, output_root_dir
 
-    for def1 in [True,False]:
+    # for def1 in [True,False]:
+    for def1 in [True]:
         for alg in algorithms:
-            setNumThreads( (16 // thread_cnt) if alg == 'numvc' else (4 // thread_cnt) )
+            # setNumThreads( (16 // thread_cnt) if alg == 'numvc' else (4 // thread_cnt) )
+            # setNumThreads( (16 // thread_cnt) if alg == 'numvc' else (8 // thread_cnt) )
+            setNumThreads( (20 // thread_cnt) if alg == 'numvc' else (10 // thread_cnt) )
             solver_time = ( 60 if alg == 'numvc' else 120 )
 
             cmd = getDefaultCommand()
-            cmd += ' --run_name=vc-reducer_def1-' + str(def1)
+            # cmd += ' --run_name=vc-reducer_def1-' + str(def1) #old, incorrect run name - does not distinguihs between algorithms
+            cmd += ' --run_name=vc-reducer_alg-' + alg + '_def1-' + str(def1)
             solver_params = '--alg=' + alg + \
                             ' --time=' + str(solver_time) + \
                             ' --rep=5' + \
@@ -93,6 +97,22 @@ def createTestsCommands():
 
 
     print(f'\nThere are altogether {len(all_tests_commands)} commands to run in total')
+
+
+def createCommandsToRerunOverwrittenInstances():
+    for alg in ['cpsat-sat']:
+        setNumThreads(4 // thread_cnt)
+        solver_time = 120
+
+        cmd = getDefaultCommand()
+        cmd += ' --run_name=vc-reducer_def1-True'
+        solver_params = '--alg=' + alg + \
+                        ' --time=' + str(solver_time) + \
+                        ' --rep=5' + \
+                        ' --gran=1' + \
+                        ' --use_def1_dom=True'
+        cmd += ' --solver_params=\'' + solver_params + '\''
+        all_tests_commands.append(cmd)
 
 def runTestForCommand(cmd):
     print('Running command', cmd)
