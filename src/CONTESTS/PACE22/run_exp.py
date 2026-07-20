@@ -13,11 +13,11 @@ import numpy as np
 import itertools
 from pathlib import Path
 
-# inst_dir = 'vcred-exp-graphs'
-# output_root_dir = 'results'
+inst_dir = 'vcred-exp-graphs'
+output_root_dir = 'results'
 
-inst_dir = 'vcred-tests-small'
-output_root_dir = 'results-tests-small'
+# inst_dir = 'vcred-tests-small'
+# output_root_dir = 'results-tests-small'
 
 solver_name = 'VCReducer'
 
@@ -25,8 +25,8 @@ solver_name = 'VCReducer'
 
 # this program will run [thread_cnt] processes, each running TestsRunner, which runs tests_runner_threads processes,
 # each of which calls the solver process (and CPSAT might use many workers...)
-thread_cnt = 1
-tests_runner_threads = 4
+thread_cnt = 2
+tests_runner_threads = 2
 
 def getDefaultCommand():
     cmd = 'python3 TestsRunner.py' + \
@@ -67,7 +67,6 @@ all_tests_commands = []
 
 
 algorithms = ["cpsat-sat", "cpsat-def", "numvc"]
-cpsat_threads = 8
 
 
 def setNumThreads(t):
@@ -77,15 +76,20 @@ def setNumThreads(t):
 def createTestsCommands():
     global inst_dir, output_root_dir
 
-    for alg in algorithms:
-        cmd = getDefaultCommand()
-        cmd += ' --run_name=vc-reducer'
-        solver_params = '--alg=' + alg + \
-                        ' --time=120' + \
-                        ' --rep=5' + \
-                        ' --gran=1'
-        cmd += ' --solver_params=\'' + solver_params + '\''
-        all_tests_commands.append(cmd)
+    for def1 in [True,False]:
+        for alg in algorithms:
+            setNumThreads( (16 // thread_cnt) if alg == 'numvc' else (4 // thread_cnt) )
+            solver_time = ( 60 if alg == 'numvc' else 120 )
+
+            cmd = getDefaultCommand()
+            cmd += ' --run_name=vc-reducer_def1-' + str(def1)
+            solver_params = '--alg=' + alg + \
+                            ' --time=' + str(solver_time) + \
+                            ' --rep=5' + \
+                            ' --gran=1' + \
+                            ' --use_def1_dom=' + str(def1)
+            cmd += ' --solver_params=\'' + solver_params + '\''
+            all_tests_commands.append(cmd)
 
 
     print(f'\nThere are altogether {len(all_tests_commands)} commands to run in total')

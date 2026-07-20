@@ -157,18 +157,17 @@ struct ExpData {
         auto mapa = getEntries();
         vector<string> header = { "N0", "M0", "N1", "M1", "N2", "M2", "N3", "M3", "N4", "M4",
             "red1_offset", "red_noned_offset", "red_ed_offset", "red_ed2_offset",
-            "ed_total_t2_inference_rules_created",
-            "ed_t2_inference_rules_added",
             "ed_nodes_reduced", "ed2_nodes_reduced",
             "ed_edges_removed", "ed2_edges_removed",
             "ed_t1_inference_rules_added", "ed2_t1_inference_rules_added",
-            "red_init_time_millis",
-            "red_noned_time_millis",
+            "ed_total_t2_inference_rules_created", "ed2_total_t2_inference_rules_created",
+            "ed_t2_inference_rules_added", "ed2_t2_inference_rules_added",
+            "red_init_time_millis", "red_noned_time_millis",
             "red_ed_time_millis", "red_ed2_time_millis",
             "solver_max_time_sec", "solver_time_granularity", "solver_repeats", "algorithm",
             "noned_results", "ed_results", "ed2_results",
-            "ed_folds", "ed_funnels", "ed_unconfined", "ed_ext_dom", "ed_desks", "ed_twins", "ed_dominations",
             "noned_folds", "noned_funnels", "noned_unconfined", "noned_ext_dom", "noned_desks", "noned_twins", "noned_dominations",
+            "ed_folds", "ed_funnels", "ed_unconfined", "ed_ext_dom", "ed_desks", "ed_twins", "ed_dominations",
             "metadata_filepath", "run_noned", "run_ed", "run_ed2",
             "use_def1_dom"
         };
