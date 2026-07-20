@@ -51,7 +51,8 @@ public:
 
 
     VI inf_rules_1, inf_rules_2;
-    VPII all_inf_rules_1_found, all_inf_rules_2_found;
+    VPII all_inf_rules_1_found;
+    vector<pair<int,VI>> all_inf_rules_2_found;
 
     int last_reduce_inf_rules_1_added = 0;
     int last_reduce_inf_rules_2_created = 0;

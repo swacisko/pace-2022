@@ -153,7 +153,10 @@ public:
      */
     bool ed_use_extended_edges_insertion = false;
 
-
+    /**
+     * If true, the inference rules of type 2 will be created.
+     */
+    bool gather_t2_inf_rules = false;
 
     //******************************************************************** ED
 

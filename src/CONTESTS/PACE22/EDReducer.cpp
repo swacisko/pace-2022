@@ -73,6 +73,13 @@ VI EDReducer::reduce(VVI V0) {
                     }
                     for (int d : V[v]) was[d] = false;
                 }
+
+                if (cnf.gather_t2_inf_rules) {
+                    VI to_add;
+                    for (int d : inf_rules_2) if (d != v) to_add.push_back(d);
+                    if (!to_add.empty()) all_inf_rules_2_found.emplace_back(v,to_add);
+                }
+
             }
         }
 

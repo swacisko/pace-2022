@@ -233,7 +233,7 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
 
     VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1 );
 
-    clog << "Looking for solution using CPSAT (" << parseAlgorithm(exp_data.alg) << " for "
+    clog << "Looking for solution using CPSAT (" << parseAlgorithm(exp_data.alg) << ") for "
          << exp_data.solver_max_time_sec << " seconds" << endl;
 
     int N = 0;
@@ -315,10 +315,10 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
         vector<BoolVar> cnstr; cnstr.reserve(2);
 
         if (a > 0) cnstr.push_back(nodes[a]);
-        else cnstr.push_back(nodes[a].Not());
+        else cnstr.push_back(nodes[-a].Not());
 
         if (b > 0) cnstr.push_back(nodes[b]);
-        else cnstr.push_back(nodes[b].Not());
+        else cnstr.push_back(nodes[-b].Not());
 
         model.AddBoolOr(cnstr );
     }
@@ -576,7 +576,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         writeConnCompInfo(coreV, "Connected components after full NON-ED reduction");
     }
 
-    auto testEDRules = [&](auto & exp_data, bool add_constraints = false) {
+    auto testEDRules = [&](ExpData & exp_data, bool add_constraints = false) {
         constexpr bool test_ed_vc_rules = true;
 
         if (test_ed_vc_rules) {
@@ -649,12 +649,59 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             for ( auto [a,b] : edges ) constraints.emplace_back(a+1,b+1);
 
             bool add_t2_constraints = (add_constraints && exp_data.alg != NUMVC); // for numvc we do not want to add t2-constraints
+            // bool add_t2_constraints = true;
             if (add_t2_constraints) {
-                // EDReducer edred(N,cnf);
-                // edred.resetAllUsedTechniques();
-                // edred.cnf.ed_use_node_removal = true;
-                // auto removed_nodes = edred.reduce(V);
 
+                clog << "Preparing to create type-2 constraints" << endl;
+                EDReducer edred(coreV.size(),cnf);
+                edred.resetAllUsedTechniques();
+                edred.cnf.ed_use_node_removal = true;
+                edred.cnf.gather_t2_inf_rules = true;
+                auto removed_nodes = edred.reduce(coreV);
+
+                // assert(removed_nodes.empty() && " this should hold if the preprocessing finished and did not terminate due to timeout");
+                DEBUG(removed_nodes.size());
+                if (!removed_nodes.empty()) clog << "Found reducible nodes... why?!" << endl;
+
+                if (removed_nodes.empty()) {
+                    clog << "Creating and adding type-2 constraints" << endl;
+                    auto rules = edred.all_inf_rules_2_found;
+                    clog << "\t found " << rules.size() << " rules" << endl;
+
+                    sort(ALL(rules),[&](auto & a, auto & b){ return a.second.size() > b.second.size(); });
+
+                    VB was(N);
+                    // int cnstr_added_test = 0;
+                    for ( auto & [v,r] : rules ) {
+                        // DEBUG(v); DEBUG(r); ENDL(1);
+
+                        // check if the neighborhood is blocked
+                        bool blocked = was[v];
+                        for (int d : V[v]) blocked |= was[d];
+                        if (blocked) continue;
+                        for (int d : r) blocked |= was[d];
+                        if (blocked) continue;
+                        for (int d : r) for (int dd : V[d]) blocked |= was[dd];
+                        if (blocked) continue;
+
+                        // mark neighborhoods as blocked
+                        was[v] = true;
+                        for (int d : V[v]) was[d] = true;
+                        for (int d : r) was[d] = true;
+                        for (int d : r) for (int dd : V[d]) was[dd] = true;
+
+                        for (int d : r) {
+                            // clog << "\tadding t2-inf-rule, v: " << v << ", d: " << d << endl;
+                            constraints.emplace_back( -(d+1), v+1 ); // if d belongs, then v also belongs
+                            exp_data.ed_t2_inference_rules_added++;
+                            // break;
+                        }
+
+                        // if (++cnstr_added_test > 0) break;
+                    }
+
+                    clog << "Created and added " << exp_data.ed_t2_inference_rules_added << " type-2 constraints" << endl;
+                }
             }
 
 
