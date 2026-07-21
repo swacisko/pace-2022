@@ -323,7 +323,7 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
 
     checkEmptyArraysAssertions(check_double_ed, !check_double_ed); // we check all arrays, including the marked array, which should be empty here
 
-    if constexpr(Config::use_ed_domination) { // the standard concept, used always
+    if constexpr(Config::ed_use_standard_ext_domination) { // the standard concept, used always
         for (int u : U1) if (!V[u].empty() && to_consider_in_next_step[u]) {
             if (!has_cnf_bounded_neigh[u]) continue;
             if ( cnf.ed_use_deficit1_domination && inU0[u] ) continue; // do not duplicate search

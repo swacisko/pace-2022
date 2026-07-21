@@ -76,7 +76,7 @@ public:
     /**
      * This is the standard concept that must be used.
      */
-    constexpr static bool use_ed_domination = true;
+    constexpr static bool ed_use_standard_ext_domination = true;
 
     /**
      * If true, then the ``same neighborhood'' appraoch will be used to identify nodes to move to U.

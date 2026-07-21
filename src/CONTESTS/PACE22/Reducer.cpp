@@ -327,7 +327,10 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
 
 
-    int ed_rules_checked = 0;
+    int ed_rules_checked_total = 0;
+    int ed_node_removal_rules_checked = 0;
+    int ed_with_edge_insertion_rules_checked = 0;
+    int ed_with_edge_removal_rules_checked = 0;
     int general_folding_rules_checked = 0;
 
     do{
@@ -409,17 +412,20 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         }
 
         // standard node-removal version
-        bool ed_application_cond = ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_rules_checked == 0) );
-        if( cnf.reducer_use_ed && cnf.ed_use_node_removal && ed_application_cond){
-            ed_rules_checked++;
+        bool ed_application_cond = ( cnf.ed_application_mode == 0 || (cnf.ed_application_mode == 1 && ed_node_removal_rules_checked == 0) );
+        if(cnf.reducer_use_ed && cnf.ed_use_node_removal && ed_application_cond){
+            ed_rules_checked_total++;
+            ed_node_removal_rules_checked++;
             int edge_cnt = GraphUtils::countEdges(V);
-            clog << "Running ED node removal rules in POINT-1, time: " << sw.getTime(reducer_str) / 1000 << ", edges: " << edge_cnt << endl;
+            int node_cnt = ranges::count_if(V,[&](auto & v){ return !v.empty(); });
+            clog << "Running ED node removal POINT-1, time: " << sw.getTime(reducer_str) / 1000
+                 << ", nodes: " << node_cnt << ", edges: " << edge_cnt << endl;
 
             Stopwatch s; string opt = "ED node removal"; s.start(opt);
             EDReducer edred(V.size(), cnf);
-            edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
             edred.resetAllUsedTechniques();
             edred.cnf.ed_use_node_removal = true;
+            edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
             VI res = edred.reduce(V);
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
@@ -438,18 +444,21 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         }
 
 
-
-
-        modified |= applyBasicReductions(true); // use crown and LP in addition to degree-1 and domination
+        bool lp_and_crown_improved = applyBasicReductions(true); // use crown and LP in addition to degree-1 and domination
+        modified |= lp_and_crown_improved;
         if (modified) continue;
 
-        // standard node-removal version
-        if( cnf.reducer_use_ed && cnf.ed_use_node_removal){
-            ed_rules_checked++;
-            Stopwatch s; string opt = "ED node removal"; s.start(opt);
-            int edge_cnt = GraphUtils::countEdges(V);
-            clog << "Running ED node removal rules in POINT-2, time: " << sw.getTime(reducer_str) / 1000 << ", edges: " << edge_cnt << endl;
 
+        // standard node-removal version
+        if(cnf.reducer_use_ed && cnf.ed_use_node_removal && !lp_and_crown_improved){
+            ed_rules_checked_total++;
+            ed_node_removal_rules_checked++;
+            int edge_cnt = GraphUtils::countEdges(V);
+            int node_cnt = ranges::count_if(V,[&](auto & v){ return !v.empty(); });
+            clog << "Running ED node removal POINT-2, time: " << sw.getTime(reducer_str) / 1000
+                 << ", nodes: " << node_cnt << ", edges: " << edge_cnt << endl;
+
+            Stopwatch s; string opt = "ED node removal"; s.start(opt);
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
             edred.cnf.ed_use_node_removal = true;
@@ -466,6 +475,43 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             modified |= edred.madeChangesInLastReduce();
 
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+            if(modified) continue;
+        }
+
+
+        if (cnf.reducer_use_ed && cnf.ed_use_edge_removal && ed_with_edge_insertion_rules_checked == 0) {
+            ed_with_edge_removal_rules_checked++;
+            ed_rules_checked_total++;
+            int edge_cnt = GraphUtils::countEdges(V);
+            int node_cnt = ranges::count_if(V,[&](auto & v){ return !v.empty(); });
+            clog << "Running ED edge removal, time: " << sw.getTime(reducer_str) / 1000
+                 << ", nodes: " << node_cnt << ", edges: " << edge_cnt << endl;
+
+            Stopwatch s; string opt = "ED edge removal"; s.start(opt);
+            EDReducer edred(V.size(), cnf);
+            edred.resetAllUsedTechniques();
+            edred.cnf.ed_use_node_removal = false;
+            edred.cnf.ed_use_edge_removal = true;
+            edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
+
+            VI res = edred.reduce(V);
+            s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
+
+
+            clog << "last_reduce_edges_removed: " << edred.last_reduce_edges_removed << endl;
+            clog << "last_reduce_nodes_removed (deg1-propagated): " << edred.last_reduce_nodes_removed << endl;
+            clog << "#CAUTION! Solution lifting not supported yet for ED-edge-removal rule" << endl;
+
+            assert(res.size() == edred.last_reduce_nodes_removed);
+            ed_nodes_reduced += edred.ed_node_applied_cnt;
+            ed_edges_removed += edred.ed_edge_applied_cnt;
+            ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
+
+            addKNR(res);
+            if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
+            if (edred.madeChangesInLastReduce()) V = edred.getV();
+            modified |= edred.madeChangesInLastReduce();
+
             if(modified) continue;
         }
 
@@ -486,17 +532,21 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
         // standard edge-insertion - those edges that are found using consider(v) for single-node initial sets S
         if (cnf.ed_apply_type1_constraints_on_the_fly)
-        if ( cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
+        if (cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
             VI res;
             bool made_changes = false;
             VPII init_V_edges = GraphUtils::getGraphEdges(V);
 
             do {
-                ed_rules_checked++;
+                ed_with_edge_insertion_rules_checked++;
+                ed_rules_checked_total++;
+                int edge_cnt = GraphUtils::countEdges(V);
+                int node_cnt = ranges::count_if(V,[&](auto & v){ return !v.empty(); });
+                clog << "Running ED with edge insertion, time: " << sw.getTime(reducer_str) / 1000
+                     << ", nodes: " << node_cnt << ", edges: " << edge_cnt << endl;
+
+
                 Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
-                clog << "Running ED with edge insertion" << endl;
-
-
                 EDReducer edred(V.size(), cnf);
                 edred.resetAllUsedTechniques();
                 edred.cnf.ed_use_node_removal = true;
