@@ -135,15 +135,15 @@ struct ExpData {
         res["noned_dominations"] = to_string(noned_dominations);
 
         stringstream str;
-        for (int d : noned_results) str << d << " ";
+        for (auto d : noned_results) str << d << " ";
         res["noned_results"] = str.str();
         str.clear(); str.str("");
 
-        for (int d : ed_results) str << d << " ";
+        for (auto d : ed_results) str << d << " ";
         res["ed_results"] = str.str();
         str.clear(); str.str("");
 
-        for (int d : ed2_results) str << d << " ";
+        for (auto d : ed2_results) str << d << " ";
         res["ed2_results"] = str.str();
         str.clear(); str.str("");
 

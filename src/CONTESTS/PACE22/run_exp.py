@@ -81,7 +81,7 @@ def createTestsCommands():
         for alg in algorithms:
             # setNumThreads( (16 // thread_cnt) if alg == 'numvc' else (4 // thread_cnt) )
             # setNumThreads( (16 // thread_cnt) if alg == 'numvc' else (8 // thread_cnt) )
-            setNumThreads( (20 // thread_cnt) if alg == 'numvc' else (10 // thread_cnt) )
+            setNumThreads( (16 // thread_cnt) if alg == 'numvc' else (8 // thread_cnt) )
             solver_time = ( 60 if alg == 'numvc' else 120 )
 
             cmd = getDefaultCommand()
