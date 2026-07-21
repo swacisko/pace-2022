@@ -315,7 +315,6 @@ void EDReducer::updateU1() {
 void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
 
     for (int u : U1) if (hasNonWIntersectionAtMost(u,cnf.ed_ext_dom_max_node_neigh)) {
-        // for (int w : V[u]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
         for (int w : V[u]) if (!inW[w]) for ( int d : V[w] ) {  // clearing marked and cnt arrays - should be clear - perhaps this will be enough clearing...
             marked[u] = marked[w] = marked[d] = false;
             cnt[u] = cnt[w] = cnt[d] = 0;
@@ -325,7 +324,6 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
     checkEmptyArraysAssertions(check_double_ed, !check_double_ed); // we check all arrays, including the marked array, which should be empty here
 
     if constexpr(Config::use_ed_domination) { // the standard concept, used always
-        // for (int u : U1) if (!V[u].empty()) {
         for (int u : U1) if (!V[u].empty() && to_consider_in_next_step[u]) {
             if (!has_cnf_bounded_neigh[u]) continue;
             if ( cnf.ed_use_deficit1_domination && inU0[u] ) continue; // do not duplicate search
@@ -357,13 +355,11 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         // here we use ``same neighborhood domination'' approach.
         // we find all nodes w \in N(u) \setminus W such that N(u) \setminus W \subseteq N[w]
         // we can consider only nodes u \in U_0, that is nodes for which N(u) \cap S = \emptyset
-        // for ( int u : U1 ) if (!V[u].empty()) {
         for ( int u : U1 ) if (!V[u].empty() && to_consider_in_next_step[u]) {
             if (!has_cnf_bounded_neigh[u]) continue;
             if (!inU0[u]) continue;
             if ( cnf.ed_use_deficit1_domination ) continue; // do not duplicate search
 
-            // int nonw_neigh_size = deg_notin_W[u];
             int nonw_neigh_size = 0;
 
             for ( int w : V[u] ) if ( !inW[w] ) {
@@ -395,7 +391,6 @@ void EDReducer::markDominationNodes(VB& marked, bool check_double_ed) {
         VI& T = temp;
         VI& vis = temp2;
 
-        // for (int u : U1) if (!V[u].empty()) {
         for (int u : U1) if (!V[u].empty() && to_consider_in_next_step[u]) {
             if (!has_cnf_bounded_neigh[u]) continue;
             if (!inU0[u]) continue;

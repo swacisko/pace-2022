@@ -82,6 +82,8 @@ struct ExpData {
     bool run_ed2 = true;
 
     bool use_def1_dom = true;
+    bool ed_use_edge_removal = false;
+    bool ed_use_double_ed_checks = false;
 
     map<string,string> getEntries() {
         map<string,string> res;
@@ -120,6 +122,8 @@ struct ExpData {
         res["run_ed"] = to_string(run_ed);
         res["run_ed2"] = to_string(run_ed2);
         res["use_def1_dom"] = to_string(use_def1_dom);
+        res["ed_use_edge_removal"] = to_string(ed_use_edge_removal);
+        res["ed_use_double_ed_checks"] = to_string(ed_use_double_ed_checks);
 
         res["algorithm"] = parseAlgorithm(alg);
 
@@ -169,7 +173,7 @@ struct ExpData {
             "noned_folds", "noned_funnels", "noned_unconfined", "noned_ext_dom", "noned_desks", "noned_twins", "noned_dominations",
             "ed_folds", "ed_funnels", "ed_unconfined", "ed_ext_dom", "ed_desks", "ed_twins", "ed_dominations",
             "metadata_filepath", "run_noned", "run_ed", "run_ed2",
-            "use_def1_dom"
+            "use_def1_dom", "ed_use_edge_removal", "ed_use_double_ed_checks"
         };
 
         auto writeLine = [&](vector<string> & l) {
@@ -516,7 +520,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         sw.start("main");
         Config cnf;
         cnf.disableAllNonbasicReductions();
-        cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
+        cnf.reducer_use_folding = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined = true;
         cnf.reducer_use_twins = true;
         cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
@@ -586,7 +590,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             sw.start("main");
             Config cnf;
             cnf.disableAllNonbasicReductions();
-            cnf.reducer_use_folding = cnf.reducer_use_folding_twins = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
+            cnf.reducer_use_folding = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
             cnf.reducer_use_unconfined = true;
             cnf.reducer_use_twins = true;
             // cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10; // original
@@ -595,8 +599,9 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             cnf.ed_consider_nodes_to_move_outside_NW = true;
             cnf.ed_use_same_neigh_domination = true;
             cnf.ed_use_deficit1_domination = exp_data.use_def1_dom;
+            cnf.ed_use_edge_removal = exp_data.ed_use_edge_removal;
 
-            cnf.ed_use_double_ed_checks = false; // time-consuming, especially for denser graphs... use for sparse graphs only
+            cnf.ed_use_double_ed_checks = exp_data.ed_use_double_ed_checks; // time-consuming, especially for denser graphs... use for sparse graphs only
             // cnf.ed_use_edge_removal = true;
             cnf.ed_apply_type1_constraints_on_the_fly = add_constraints;
 
@@ -953,6 +958,8 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.addOption("run_ed", false); // ed tests
     ap.addOption("run_ed2", false); // ed2 tests
     ap.addOption("use_def1_dom", false); // ed2 tests
+    ap.addOption("ed_use_edge_removal", false); // ed2 tests
+    ap.addOption("ed_use_double_ed_checks", false); // ed2 tests
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -978,6 +985,8 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.findAndAssign("run_ed", "bool", &cnf.run_ed);
     ap.findAndAssign("run_ed2", "bool", &cnf.run_ed2);
     ap.findAndAssign("use_def1_dom", "bool", &cnf.use_def1_dom);
+    ap.findAndAssign("ed_use_edge_removal", "bool", &cnf.ed_use_edge_removal);
+    ap.findAndAssign("ed_use_double_ed_checks", "bool", &cnf.ed_use_double_ed_checks);
 
 
     return cnf;

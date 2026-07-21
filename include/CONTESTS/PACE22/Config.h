@@ -17,7 +17,6 @@ public:
     bool reducer_use_twins = false;
     bool reducer_use_folding = false;
     bool reducer_use_general_folding = false;
-    bool reducer_use_folding_twins = false;
     bool reducer_use_full_bipartite_blocker = false;
     bool reducer_use_edge_neighborhood_blocker = false;
     bool reducer_use_desk = false;
@@ -185,7 +184,6 @@ public:
         reducer_use_twins = true;
         reducer_use_folding = true;
         reducer_use_general_folding = true;
-        reducer_use_folding_twins = true;
         reducer_use_full_bipartite_blocker = true;
         reducer_use_edge_neighborhood_blocker = true;
         reducer_use_desk = true;
@@ -198,7 +196,6 @@ public:
         reducer_use_twins = false;
         reducer_use_folding = false;
         reducer_use_general_folding = false;
-        reducer_use_folding_twins = false;
         reducer_use_full_bipartite_blocker = false;
         reducer_use_edge_neighborhood_blocker = false;
         reducer_use_desk = false;
@@ -211,7 +208,6 @@ public:
         reducer_use_funnel = false;
         reducer_use_folding = false;
         reducer_use_general_folding = false;
-        reducer_use_folding_twins = false;
         reducer_use_full_bipartite_blocker = false;
         reducer_use_desk = false;
     }
