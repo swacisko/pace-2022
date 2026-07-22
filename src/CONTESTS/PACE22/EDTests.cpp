@@ -487,7 +487,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     ENDL(3);
 
     constexpr bool use_numvc_for_testing = true;
-    double numvc_time_check_sec = 5;
+    double numvc_time_check_sec = 10;
     int numvc_control_check_init = 0;
     int numvc_control_check_noned = 0;
     int numvc_control_check_ed = 0;
@@ -510,7 +510,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
 
     if constexpr(use_numvc_for_testing){ // numvc/fastvc testing
         int t = numvc_time_check_sec;
-        numvc_time_check_sec *= 2;
+        numvc_time_check_sec *= 1.5;
         auto fastvc_sol = checkByNuMVC(V, 0);
         numvc_control_check_init = fastvc_sol.size();
         assert(VCUtils::isVertexCover( V, fastvc_sol ));
@@ -526,10 +526,12 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         sw.start("main");
         Config cnf;
         cnf.disableAllNonbasicReductions();
-        cnf.reducer_use_folding = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
-        cnf.reducer_use_unconfined = true;
+        cnf.reducer_use_folding = true;
+        cnf.reducer_use_funnel = true;
+        cnf.reducer_use_desk = true;
+        cnf.reducer_use_unconfined = true; // the unconfined rule seems to be faulty!!
         cnf.reducer_use_twins = true;
-        cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
+        cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
         auto edges = GraphUtils::getGraphEdges(V);
         cnf.reducer_max_time_millis = exp_data_cnf.reducer_max_time_millis;
 
@@ -597,11 +599,12 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             sw.start("main");
             Config cnf;
             cnf.disableAllNonbasicReductions();
-            cnf.reducer_use_folding = cnf.reducer_use_funnel = cnf.reducer_use_desk = true;
+            cnf.reducer_use_folding = true;
+            cnf.reducer_use_funnel = true;
+            cnf.reducer_use_desk = true;
             cnf.reducer_use_unconfined = true;
             cnf.reducer_use_twins = true;
-            // cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 2; cnf.reducer_max_general_folding_neighborhood_size = 10; // original
-            cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 5;
+            cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
             cnf.reducer_use_ed = true;
             cnf.ed_consider_nodes_to_move_outside_NW = true;
             cnf.ed_use_same_neigh_domination = true;

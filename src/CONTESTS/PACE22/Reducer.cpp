@@ -6,11 +6,12 @@
 #include <utils/RandomNumberGenerators.h>
 #include <graphs/GraphInducer.h>
 #include <utils/StandardUtils.h>
-#include <combinatorics/CombinatoricUtils.h>
 #include <graphs/VertexCover/kernelization/KernelizerVC.h>
 #include "CONTESTS/PACE22/Reducer.h"
-
+#include <ranges>
 #include "EDReducer.h"
+#include <functional>
+
 
 using namespace Utils;
 
@@ -1252,6 +1253,7 @@ vector<GeneralFoldingReduction *> Reducer::generalFolding() {
 
 
 VI Reducer::unconfined() {
+    constexpr bool debug = false;
     VI removed_nodes;
 
     VB inS(N), inNS(N);
@@ -1262,6 +1264,48 @@ VI Reducer::unconfined() {
     VB calculated_NS_outdeg(N);
 
     VI cand_NS;
+
+    auto checkAssertions = [&]() {
+        return; // do not check...
+
+        if constexpr (debug) clog << "\t#CAUTION! Checking slow assertions in unconfined" << endl;
+
+        for (int i=0; i<N; i++) if (!inNS[i]) {
+            assert(deg_in_S[i] == 0);
+            assert(deg_out_NS[i] == 0);
+            assert(calculated_NS_outdeg[i] == false);
+        }
+
+        for (int s : S) {
+            int d_in_s = 0;
+            for (int d : V[s]) d_in_s += inS[d];
+            assert(d_in_s == deg_in_S[s]);
+
+            int d_out_ns = 0;
+            for (int d : V[s]) d_out_ns += !inNS[d];
+            if (d_out_ns != 0) DEBUG(PII(s,d_out_ns));
+            assert(d_out_ns == 0);
+
+            for (int d : V[s]) if (!inS[d]) {
+                assert(inNS[d]);
+
+                d_in_s = 0;
+                for (int dd : V[d]) d_in_s += inS[dd];
+                if (d_in_s != deg_in_S[d]) DEBUG(PII(d_in_s, deg_in_S[d]));
+                assert(d_in_s == deg_in_S[d] );
+
+                if (calculated_NS_outdeg[d]) {
+                    d_out_ns = 0;
+                    for (int dd : V[d]) d_out_ns += !inNS[dd];
+                    if (d_out_ns != deg_out_NS[d]) {
+                        DEBUG(d_out_ns);
+                        DEBUG(deg_out_NS[d]);
+                    }
+                    assert(d_out_ns == deg_out_NS[d]);
+                }
+            }
+        }
+    };
 
     auto clearForS = [&]() {
         int ns_size = 0, ns_sumdeg = 0;
@@ -1285,7 +1329,7 @@ VI Reducer::unconfined() {
     auto getLbNSOutdegForUnexpandedNode = [&](int d) {
         // // with 'return 0' uncommented the unconfined rule is stronger, but could potentially be much slower.
         // It should be the same, but there probably must be some hidden bug somewhere...
-        // return 0;
+        return 0;
 
         if (calculated_NS_outdeg[d]) return deg_out_NS[d];
         return max(0, (int)V[d].size() - deg_in_S[d] - ns_size);
@@ -1298,6 +1342,8 @@ VI Reducer::unconfined() {
     };
 
     auto check = [&](int v) {
+        if constexpr (debug) clog << "checking node v: " << v << endl;
+
         S.clear(); S.push_back(v);
         inS[v] = inNS[v] = true;
         ns_size = V[v].size();
@@ -1313,48 +1359,108 @@ VI Reducer::unconfined() {
         }
 
         while ( !cand_NS.empty() ) {
-            int u = cand_NS.back();
+            if constexpr (debug) clog << "\tcand_NS: " << cand_NS << endl;
+            checkAssertions();
+
+            int u = cand_NS.back(); // we will move node u to S - but here it is the node that has |N(u) \ N(S)| = 1
             cand_NS.pop_back();
+            assert(!inS[u]);
+
             if ( deg_in_S[u] != 1 ) continue;
             if ( deg_out_NS[u] == 0 ) return true;
             assert(deg_out_NS[u] == 1);
 
+            int cnt = 0;
+            for (int d : V[u]) cnt += !inNS[d];
+            assert(cnt == 1);
+
+            int only_neighbor = -1;
+            for ( int d : V[u] ) if ( !inNS[d] ){ only_neighbor = d; break; }
+            assert(only_neighbor != -1);
+
+            if constexpr (debug) clog << "\tcand u: " << u << ", only_neighbor: " << only_neighbor << endl;
+
+            // now u should be the only neighbor, so we can move u to S
+            u = only_neighbor;
+            if constexpr (debug) clog << "\tmoving node " << u << " to S, V[" << u << "]: " << V[u] << endl;
+
+            assert(deg_in_S[u] == 0);
             inS[u] = inNS[u] = true;
             S.push_back(u);
             deg_out_NS[u] = 0;
 
-            for ( int d : V[u] ) deg_in_S[d]++;
-            for (int d : V[u]) if (!inS[d]) { // moving conceptually node d to N(S)
-                if ( inNS[d] ) continue; // we can consider only those nodes that are not in NS, as those in NS have deg_in_S > 1
-                assert(!inNS[d]);
+
+            bool can_return_true = false;
+
+            for ( int d : V[u] ) if (inNS[d]) {
+                // u may have several neighbors in S, but is was the only neighbor outside N[S] for some node in N(S)
+                deg_in_S[d]++;
+                deg_out_NS[d]--;
+            }
+
+            for (int d : V[u]) if (!inNS[d]) { // moving conceptually node d to N(S)
+                if constexpr (debug) clog << "\t\tmoving node d: " << d << " to N(S), V[" << d << "]: " << V[d] << endl;
                 inNS[d] = true;
                 ns_size++;
+                assert(deg_out_NS[d] == 0);
 
                 for ( int dd : V[d] ) {
-                    assert((dd == u) || !inS[dd]);
-                    if ( inNS[dd] ) {
+                    if (dd == u) { // this is the only neighbor of d that can be in S
+                        // this was not taken into account when iterating over V[u] earlier, as d was not set in inNS
+                        deg_out_NS[d]--;
+                        deg_in_S[d]++;
+                        continue;
+                    }
+
+                    assert(!inS[dd]);
+                    if ( inNS[dd] ) { // we need to update degrees of all neighbors dd of node d which is moved to N(S)
                         if ( getLbNSOutdegForUnexpandedNode(dd) <= 1 ) {
                             if ( !calculated_NS_outdeg[dd] ) calculateNSOutdeg(dd);
                             else deg_out_NS[dd]--;
 
-                            if (deg_out_NS[dd] == 0) return true;
+                            // if (deg_out_NS[dd] == 0) return true;
+                            if (deg_out_NS[dd] == 0 && deg_in_S[dd] <= 1) {
+                                assert(deg_in_S[dd] == 1);
+                                can_return_true = true;
+                            }
                             if (deg_out_NS[dd] == 1) cand_NS.push_back(dd);
                         }
-                    }else { // dd is not in NS
+                    }
+                    else { // dd is not in NS
                         deg_out_NS[d]++;
                     }
                 }
 
-                if (!calculated_NS_outdeg[d]) calculateNSOutdeg(d);
+                // if (!calculated_NS_outdeg[d])
+                    calculateNSOutdeg(d);
+                // checkAssertions();
+
                 if (calculated_NS_outdeg[d] && deg_out_NS[d] == 1) cand_NS.push_back(d);
+
+                // checkAssertions();
+
+                if (can_return_true) return true;
+
+
+                // checkAssertions();
             }
 
+            checkAssertions();
         }
+
+        checkAssertions();
 
         return false;
     };
 
     for ( int v=0; v<N; v++ ) {
+        assert(ranges::none_of(deg_in_S, std::identity{}));
+        assert(ranges::none_of(deg_out_NS, std::identity{}));
+        assert(ranges::none_of(was, std::identity{}));
+        assert(ranges::none_of(inS, std::identity{}));
+        assert(ranges::none_of(inNS, std::identity{}));
+        assert(ranges::none_of(calculated_NS_outdeg, std::identity{}));
+
         if (check(v)) {
             clearForS();
             removed_nodes.push_back(v);
