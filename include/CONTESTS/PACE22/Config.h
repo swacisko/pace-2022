@@ -113,11 +113,21 @@ public:
     bool ed_apply_type1_constraints_on_the_fly = false;
 
     /**
-     * If true, then if [ed_apply_type1_constraints_on_the_fly] i set and we run the 'add edges' ED and some
+     * If true, then if [ed_apply_type1_constraints_on_the_fly] is set and we run the 'add edges' ED and some
      * nonempty set of reducible nodes is identified, then we revert the graph to the original state and simply remove
      * those found nodes.
+     * This way, if a reducible node is identified, effectively no additional edges will be inserted.
+     * This is therefore kind of a realisation of the prospective variant of ED rule.
      */
     bool ed_remove_added_t1_constraints_if_kernelized_node_found = false;
+
+    /**
+     * If edge-insertion did not contribute to the identification of a reducible node and
+    [ed_remove_added_t1_constraints_if_no_kernelized_node_found] is set, then we revert the graph to the original
+     * state. This can be set to use edge insertion only in the prospective mode, but not allow the graph
+     * edge set to grow if no reduction to node set is done.
+     */
+    bool ed_remove_added_t1_constraints_if_no_kernelized_node_found = false;
 
     /**
      * If true, then initial sets S of the form {v} will be checked for each node in the graph.

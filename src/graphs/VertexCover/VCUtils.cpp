@@ -12,6 +12,9 @@
 #include "CollectionOperators.h"
 
 bool VCUtils::isVertexCover( VVI & V, VI & vc ){
+    // clog << "#CAUTION! Returning always true in isVertexCover - just for ED-edge-removal tests" << endl;
+    // return true;
+
     VB inVC(V.size(),false);
     for(int p : vc) inVC[p] = true;
     for( int i=0; i<V.size(); i++ ){

@@ -26,6 +26,7 @@ public:
     static VPII getGraphEdges( VVI & V, bool directed = false );
     static VPII getDirectedGraphEdges( VVI & V );
 
+    static VVI getGraphForEdges(int N, VPII edges, bool directed = false);
     static VVI getGraphForEdges(VPII edges, bool directed = false);
 
     template<class wtype>

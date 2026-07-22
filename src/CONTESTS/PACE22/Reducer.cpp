@@ -498,8 +498,8 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
 
-            clog << "last_reduce_edges_removed: " << edred.last_reduce_edges_removed << endl;
-            clog << "last_reduce_nodes_removed (deg1-propagated): " << edred.last_reduce_nodes_removed << endl;
+            // clog << "last_reduce_edges_removed: " << edred.last_reduce_edges_removed << endl;
+            // clog << "last_reduce_nodes_removed (deg1-propagated): " << edred.last_reduce_nodes_removed << endl;
             clog << "#CAUTION! Solution lifting not supported yet for ED-edge-removal rule" << endl;
 
             assert(res.size() == edred.last_reduce_nodes_removed);
@@ -508,7 +508,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
             addKNR(res);
-            if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
+            // if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
             if (edred.madeChangesInLastReduce()) V = edred.getV();
             modified |= edred.madeChangesInLastReduce();
 
@@ -535,6 +535,8 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         if (cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
             VI res;
             bool made_changes = false;
+            VI nodes_kernelized;
+            bool made_changes_in_iteration = false;
             VPII init_V_edges = GraphUtils::getGraphEdges(V);
 
             do {
@@ -545,6 +547,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
                 clog << "Running ED with edge insertion, time: " << sw.getTime(reducer_str) / 1000
                      << ", nodes: " << node_cnt << ", edges: " << edge_cnt << endl;
 
+                made_changes_in_iteration = false;
 
                 Stopwatch s; string opt = "ED edge insertion"; s.start(opt);
                 EDReducer edred(V.size(), cnf);
@@ -560,24 +563,39 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
                 ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
                 addKNR(res);
-                made_changes = edred.madeChangesInLastReduce();
-                modified |= made_changes;
+                // made_changes = edred.madeChangesInLastReduce();
+                made_changes_in_iteration = edred.madeChangesInLastReduce();
+                made_changes |= made_changes_in_iteration;
+                nodes_kernelized += res;
+                // modified |= made_changes_in_iteration;
                 s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
-                if (made_changes) {
+                if (made_changes_in_iteration) {
                     if (!res.empty() && cnf.ed_remove_added_t1_constraints_if_kernelized_node_found) {
                         clog << "Found kernelized nodes when using edge-insertion mode in ED!";
                         clog << " Reverting graph state and removing nodes" << endl;
-                        V = GraphUtils::getGraphForEdges(init_V_edges); // revert changes to the original graph
+                        V = GraphUtils::getGraphForEdges(N,init_V_edges); // revert changes to the original graph
                         GraphUtils::removeNodes(V,res,helper); // and remove nodes...
                         break;
+
+                        // an alternative to breaking...
+                        // we simply remove the nodes and continue with edge insertion mode, but remember new
+                        // set of init_edges
+                        init_V_edges = GraphUtils::getGraphEdges(V);
                     }else {
                         V = edred.getV();
                     }
                 }
                 assert( GraphUtils::isSimple(V) );
 
-            }while (res.empty() && made_changes);
+            }while (res.empty() && made_changes_in_iteration);
+
+            if ( cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found && nodes_kernelized.empty() ) {
+                V = GraphUtils::getGraphForEdges(N,init_V_edges);
+                made_changes = false;
+            }
+
+            modified |= made_changes;
 
             if(modified) continue;
         }
@@ -645,33 +663,43 @@ vector<VCReduction*> Reducer::twins() {
 
         if ( q-p+1 == deg - vc_in_T_size ) { // if T is an independent set, we can fold those twins
             VI T = V[neigh_h[p].second];
-            for (int t : T) was[t] = true;
-            bool is_mis = true;
-            for ( int t : T ) for (int d : V[t]) if ( was[d] ){ is_mis = false; break; };
-            for (int t : T) was[t] = false;
 
-            if (is_mis) { // we can fold
-                total_twins_done++;
-                VI neigh;
-                for ( int i=p; i<q; i++ ) was[neigh_h[i].second] = true;
-                for (int t : T) for (int d : V[t]) if (!was[d]) {
-                    was[d] = true;
-                    neigh.push_back(d);
+            bool is_affected = false;
+            for (int t : T) is_affected |= affected[t];
+            for ( int i=p; i<q; i++ ) is_affected |= affected[ neigh_h[i].second ]; // check nodes in X for affected
+
+            if (!is_affected) {
+                for (int t : T) was[t] = true;
+                bool is_mis = true;
+                for ( int t : T ) for (int d : V[t]) if ( was[d] ){ is_mis = false; break; };
+                for (int t : T) was[t] = false;
+
+                if (is_mis) { // we can fold
+                    total_twins_done++;
+                    VI neigh;
+                    for ( int i=p; i<q; i++ ) was[neigh_h[i].second] = true;
+                    for (int t : T) for (int d : V[t]) if (!was[d]) {
+                        was[d] = true;
+                        neigh.push_back(d);
+                    }
+                    for ( int i=p; i<q; i++ ) was[neigh_h[i].second] = false;
+                    for (int d : neigh) was[d] = false;
+
+                    GraphUtils::removeNodes(V,T,helper);
+
+                    VI X; X.reserve(q-p);
+                    for (int i=p; i<q; i++) X.push_back(neigh_h[i].second);
+                    int merge_to = T.back();
+
+                    for ( int d : neigh ) GraphUtils::addEdge(V,merge_to,d);
+
+                    T.pop_back();
+                    // clog << "\tApplying twin folding!! Check the correctness of it, test it properly!" << endl;
+                    liftables.push_back(new FoldingTwinReduction(merge_to,T, X));
+
+                    for (int x : X) assert(V[x].empty());
+                    for (int x : T) assert(V[x].empty());
                 }
-                for ( int i=p; i<q; i++ ) was[neigh_h[i].second] = false;
-                for (int d : neigh) was[d] = false;
-
-                GraphUtils::removeNodes(V,T,helper);
-
-                VI X; X.reserve(q-p);
-                for (int i=p; i<q; i++) X.push_back(neigh_h[i].second);
-                int merge_to = T.back();
-
-                for ( int d : neigh ) GraphUtils::addEdge(V,merge_to,d);
-
-                T.pop_back();
-                // clog << "\tApplying twin folding!! Check the correctness of it, test it properly!" << endl;
-                liftables.push_back(new FoldingTwinReduction(merge_to,T, X));
             }
         }
 

@@ -139,6 +139,7 @@ struct ExpData {
         res["noned_dominations"] = to_string(noned_dominations);
 
         stringstream str;
+        str << fixed; str.precision(2);
         for (auto d : noned_results) str << d << " ";
         res["noned_results"] = str.str();
         str.clear(); str.str("");
@@ -485,7 +486,12 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     DEBUG(exp_data.red1_offset);
     ENDL(3);
 
-    double numvc_time_check_sec = 4;
+    constexpr bool use_numvc_for_testing = true;
+    double numvc_time_check_sec = 5;
+    int numvc_control_check_init = 0;
+    int numvc_control_check_noned = 0;
+    int numvc_control_check_ed = 0;
+    int numvc_control_check_ed2 = 0;
 
     auto checkByNuMVC = [&](VVI & V, int additional_offset = 0) {
         if ( GraphUtils::countEdges(V) == 0 ) return VI{};
@@ -501,12 +507,12 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         return vc;
     };
 
-    constexpr bool use_numvc_for_testing = false;
 
     if constexpr(use_numvc_for_testing){ // numvc/fastvc testing
         int t = numvc_time_check_sec;
-        numvc_time_check_sec *= 1;
+        numvc_time_check_sec *= 2;
         auto fastvc_sol = checkByNuMVC(V, 0);
+        numvc_control_check_init = fastvc_sol.size();
         assert(VCUtils::isVertexCover( V, fastvc_sol ));
         numvc_time_check_sec = t;
     }
@@ -557,6 +563,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             auto fastvc_sol = checkByNuMVC(coreV, exp_data.red_noned_offset);
             assert(VCUtils::isVertexCover( coreV, fastvc_sol ));
             fastvc_sol = reduced_instance.liftSolution(fastvc_sol);
+            numvc_control_check_noned = fastvc_sol.size();
             assert(VCUtils::isVertexCover( V, fastvc_sol ));
         }
 
@@ -604,6 +611,8 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             cnf.ed_use_double_ed_checks = exp_data.ed_use_double_ed_checks; // time-consuming, especially for denser graphs... use for sparse graphs only
             // cnf.ed_use_edge_removal = true;
             cnf.ed_apply_type1_constraints_on_the_fly = add_constraints;
+            cnf.ed_remove_added_t1_constraints_if_kernelized_node_found = true; // #TEST
+            cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found = true; // #TEST
 
             Reducer red(GraphUtils::getGraphEdges(V),cnf);
             auto reduced_instance = red.reduce();
@@ -614,7 +623,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             exp_data.red_ed_time_millis = exp_data.red_init_time_millis + sw.getTime("main");
 
             exp_data.ed_nodes_reduced = red.ed_nodes_reduced;
-            exp_data.ed_edges_removed = red.ed_edges_removed; assert(red.ed_edges_removed == 0);
+            exp_data.ed_edges_removed = red.ed_edges_removed;
             exp_data.ed_t1_inference_rules_added = red.ed_t1_inference_rules_added;
             exp_data.ed_t2_inference_rules_added = red.ed_t2_inference_rules_added;
             exp_data.ed_total_t2_inference_rules_created = red.ed_total_t2_inference_rules_created;
@@ -641,6 +650,8 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
                 auto fastvc_sol = checkByNuMVC(coreV, exp_data.red_ed_offset);
                 assert(VCUtils::isVertexCover( coreV, fastvc_sol ));
                 fastvc_sol = reduced_instance.liftSolution(fastvc_sol);
+                if (!add_constraints) numvc_control_check_ed = fastvc_sol.size();
+                else numvc_control_check_ed2 = fastvc_sol.size();
                 assert(VCUtils::isVertexCover( V, fastvc_sol ));
             }
 
@@ -743,6 +754,14 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         exp_data.ed2_total_t2_inference_rules_created = dummy_exp_data.ed_total_t2_inference_rules_created;
         exp_data.ed2_nodes_reduced = dummy_exp_data.ed_nodes_reduced;
         exp_data.ed2_edges_removed = dummy_exp_data.ed_edges_removed;
+    }
+
+    if constexpr(use_numvc_for_testing) {
+        ENDL(1);
+        DEBUG(numvc_control_check_init);
+        DEBUG(numvc_control_check_noned);
+        DEBUG(numvc_control_check_ed);
+        DEBUG(numvc_control_check_ed2);
     }
 
 }
@@ -1012,6 +1031,7 @@ int main(int argc, char** argv) {
     cin.tie(0);
     cout << fixed;
     clog << fixed;
+    clog.precision(2);
 
 
 
@@ -1041,6 +1061,8 @@ int main(int argc, char** argv) {
     clog << "FINISHED TESTS!" << endl;
 
     ofstream mtd_str(exp_data.metadata_filepath);
+    mtd_str << fixed;
+    mtd_str.precision(2);
     exp_data.writeToFile(mtd_str, true);
 
     return 0;

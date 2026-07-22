@@ -59,6 +59,12 @@ VPII GraphUtils::getDirectedGraphEdges( VVI & V ){
     return res;
 }
 
+VVI GraphUtils::getGraphForEdges(int N, VPII edges, bool directed) {
+    VVI V(N);
+    for( auto & [a,b] : edges ) addEdge(V,a,b,directed);
+    return V;
+}
+
 
 VVI GraphUtils::transposeGraph(VVI &v) {
     VVI g( SIZE(v) );

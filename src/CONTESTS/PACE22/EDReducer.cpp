@@ -4,6 +4,8 @@
 
 #include "EDReducer.h"
 
+#include <ranges>
+
 #include "GraphUtils.h"
 #include "StandardUtils.h"
 #include "CONTESTS/PACE22/Utils.h"
@@ -92,7 +94,22 @@ VI EDReducer::reduce(VVI V0) {
             });
             if ( cnf.ed_node_sorting_mode == 2 ) reverse(ALL(edges));
 
-            for ( auto [u,v] : edges ) if ( V[u].size() >= 2 && V[v].size() >= 2 ) {
+            VI selected_neigh(N,-1);
+            for (int i=0; i<N; i++) if (!V[i].empty()) {
+                selected_neigh[i] = *min_element(ALL(V[i]),[&](auto & v1, auto & v2) {
+                    return V[v1].size() < V[v2].size();
+                });
+            }
+
+            // we keep all nodes for which both ends have small degree, and a single edge from each node
+            // to its neighbor with smallest degree
+            auto fltr = [&](PII p) {
+                auto [a,b] = p;
+                return (V[a].size() <= cnf.ed_ext_dom_max_node_neigh && V[b].size() <= cnf.ed_ext_dom_max_node_neigh)
+                || (selected_neigh[a] == b) || (selected_neigh[b] == a);
+            };
+
+            for ( auto [u,v] : views::filter(edges, fltr) ) if ( V[u].size() >= 2 && V[v].size() >= 2 ) {
                 if (sw.tle(ed)) break;
                 // clog << "Considering edge " << PII(u,v) << " for ED-edge-removal" << endl;
                 if ( consider({u,v}) ) {
@@ -101,6 +118,7 @@ VI EDReducer::reduce(VVI V0) {
                     if (write_logs)
                         clog << "\tRemoving edge " << PII(u,v) << " using ED for edge removal" << endl;
                     last_reduce_edges_removed++;
+                    ed_edge_applied_cnt++;
 
                     int t = reducible_nodes.size();
                     if ( V[u].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[u][0]);
