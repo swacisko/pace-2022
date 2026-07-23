@@ -18,6 +18,32 @@ public:
     virtual string name() = 0;
 };
 
+class EDCliqueRemovalReduction : public VCReduction {
+public:
+    EDCliqueRemovalReduction(VI C) : clq(C){}
+
+    void lift(VI &sol, VB &in_sol) override {
+        clog << "ED-clq -> lifting not supported yet - adding all but one node! " << flush;
+        for (int i=0; i+1<clq.size(); i++) {
+            sol.push_back(clq[i]);
+            in_sol[clq[i]] = true;
+        }
+    }
+
+    int offset() override{ return clq.size()-1; }
+
+    string toString() override {
+        stringstream str;
+        str << "ED-clique-reduction, clq: " << clq << endl;
+        return str.str();
+    }
+
+    string name() override { return "ed_clique"; }
+
+private:
+    VI clq;
+};
+
 class DeskReduction : public VCReduction{
 public:
     DeskReduction( VI if_nds, PII then_nds, PII else_nds ){
@@ -26,9 +52,9 @@ public:
         else_nodes = else_nds;
     }
 
-    void lift(VI &dfvs, VB &in_dfvs) override {
+    void lift(VI &sol, VB &in_sol) override {
         bool all = true;
-        for(int d : if_nodes) if(!in_dfvs[d]) all = false;
+        for(int d : if_nodes) if(!in_sol[d]) all = false;
 
         int a,b;
         if(all){
@@ -39,10 +65,10 @@ public:
             b = else_nodes.second;
         }
 
-        dfvs.push_back(a);
-        in_dfvs[a] = true;
-        dfvs.push_back(b);
-        in_dfvs[b] = true;
+        sol.push_back(a);
+        in_sol[a] = true;
+        sol.push_back(b);
+        in_sol[b] = true;
     }
 
     int offset() override { return 2; }
@@ -117,32 +143,32 @@ public:
     virtual ~GeneralFoldingReduction() {}
     int offset() override { return W.size() - edges.size(); }
 
-    void lift( VI & dfvs, VB & in_dfvs ) override{
+    void lift( VI & sol, VB & in_sol ) override{
         PII not_in = {-1,-1};
         VI vs;
         for( auto [v,a,b] : edges ){
             vs.push_back(v);
-            if(!in_dfvs[v]) not_in = {a,b};
+            if(!in_sol[v]) not_in = {a,b};
         };
 
-        StandardUtils::removeFromArrayInplace( dfvs, vs );
-        for(int v : vs) in_dfvs[v] = false;
+        StandardUtils::removeFromArrayInplace( sol, vs );
+        for(int v : vs) in_sol[v] = false;
 
         if(not_in == PII(-1,-1)){
-            dfvs += W;
-            for(int d : W) in_dfvs[d] = true;
+            sol += W;
+            for(int d : W) in_sol[d] = true;
         }else{
             int a = not_in.first;
             int b = not_in.second;
             for( int d : W ){
                 if(d != a && d != b){
-                    dfvs.push_back(d);
-                    in_dfvs[d] = true;
+                    sol.push_back(d);
+                    in_sol[d] = true;
                 }
             }
 
-            dfvs.push_back(w);
-            in_dfvs[w] = true;
+            sol.push_back(w);
+            in_sol[w] = true;
         }
     }
 
@@ -178,15 +204,15 @@ public:
 
     int offset() override { return 1; }
 
-    void lift( VI & dfvs, VB & in_dfvs ) override{
-        bool belongs = in_dfvs[if_node];
+    void lift( VI & sol, VB & in_sol ) override{
+        bool belongs = in_sol[if_node];
         if(belongs){
-            dfvs.push_back(else_node);
-            in_dfvs[else_node] = true;
+            sol.push_back(else_node);
+            in_sol[else_node] = true;
         }
         else{
-            dfvs.push_back(folding_node);
-            in_dfvs[folding_node] = true;
+            sol.push_back(folding_node);
+            in_sol[folding_node] = true;
         }
     }
 
@@ -219,15 +245,15 @@ public:
 
     int offset() override { return max(then_other_nodes.size(), folding_nodes.size() ); }
 
-    void lift( VI & dfvs, VB & in_dfvs ) override{
-        bool belongs = in_dfvs[if_node];
+    void lift( VI & sol, VB & in_sol ) override{
+        bool belongs = in_sol[if_node];
         if(belongs){
-            dfvs += then_other_nodes;
-            for(int d : then_other_nodes) in_dfvs[d] = true;
+            sol += then_other_nodes;
+            for(int d : then_other_nodes) in_sol[d] = true;
         }
         else{
-            dfvs += folding_nodes;
-            for(int d : folding_nodes) in_dfvs[d] = true;
+            sol += folding_nodes;
+            for(int d : folding_nodes) in_sol[d] = true;
         }
     }
 
@@ -256,15 +282,15 @@ public:
     virtual ~FunnelReduction() {}
     int offset() override { return 1; }
 
-    void lift( VI & dfvs, VB & in_dfvs ) override{
+    void lift( VI & sol, VB & in_sol ) override{
         bool belong_all = true;
-        for( int d : if_nodes ) if(!in_dfvs[d]) belong_all = false;
+        for( int d : if_nodes ) if(!in_sol[d]) belong_all = false;
         if(belong_all){
-            dfvs.push_back(else_node);
-            in_dfvs[else_node] = true;
+            sol.push_back(else_node);
+            in_sol[else_node] = true;
         }else{
-            dfvs.push_back(funnel_node);
-            in_dfvs[funnel_node] = true;
+            sol.push_back(funnel_node);
+            in_sol[funnel_node] = true;
         }
     }
 
@@ -292,9 +318,9 @@ public:
     virtual ~KernelizedNodesReduction() {}
     int offset() override { return ker.size(); }
 
-    void lift(VI & dfvs, VB & in_dfvs) override{
-        dfvs += ker;
-        for(int d : ker) in_dfvs[d] = true;
+    void lift(VI & sol, VB & in_sol) override{
+        sol += ker;
+        for(int d : ker) in_sol[d] = true;
     }
 
     string toString() override {

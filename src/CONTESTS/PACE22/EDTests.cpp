@@ -625,7 +625,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
                 cnf.ed_remove_added_t1_constraints_if_kernelized_node_found = true; // #TEST
                 // cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found = true; // #TEST
                 cnf.edge_use_edge_removal_and_insertion_interleaving = true;
-                cnf.ed_max_edge_removal_and_insertion_iterations_without_change = 3;
+                cnf.ed_max_edge_removal_and_insertion_iterations_without_change = 2;
             }
 
             Reducer red(GraphUtils::getGraphEdges(V),cnf);

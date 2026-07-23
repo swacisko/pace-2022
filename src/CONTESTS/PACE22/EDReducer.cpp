@@ -8,6 +8,8 @@
 
 #include "GraphUtils.h"
 #include "StandardUtils.h"
+#include "cliques/CliqueExtension.h"
+#include "cliques/CliqueUtils.h"
 #include "CONTESTS/PACE22/Reducer.h"
 #include "CONTESTS/PACE22/Utils.h"
 
@@ -60,9 +62,9 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
 
                 // clog << "\rConsidering node " << v << flush;
                 if (consider({v})) {
-                    clearAllForConsider();
                     if (write_logs)
                         clog << "\t\tNode " << v << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
+                    clearAllForConsider();
                     auto temp = propagateDeg1RuleSlow(v);
                     reducible_nodes += temp;
                     last_reduce_nodes_removed += temp.size();
@@ -143,29 +145,36 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
             }
         }
 
-        // if (cnf.ed_use_clique_removal) {
-        //     auto findClique = [&](int v)-> VI {
-        //
-        //
-        //
-        //     };
-        //
-        //
-        //     for (int v : nodes) if (!V[v].empty()) {
-        //         if (sw.tle(ed)) break;
-        //
-        //         auto C = findClique(v);
-        //
-        //         if (consider({},C)) {
-        //             clearAllForConsider();
-        //             if (write_logs)
-        //                 clog << "\t\tCliuqe " << C << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
-        //
-        //             last_reduce_nodes_removed += temp.size();
-        //             if (use_exhaustively) changes = true;
-        //         }
-        //     }
-        // }
+        if (false)
+        if (cnf.ed_use_clique_removal) {
+            auto findClique = [&](int v)-> VI {
+                return CliqueExtension::maximizeCliqueGreedy(V,{v});
+            };
+
+            for (int v : nodes) if (!V[v].empty()) {
+                if (sw.tle(ed)) break;
+
+                auto C = findClique(v);
+                if (C.size() <= 2) continue;
+
+                if (consider({},C)) {
+                    // if (write_logs)
+                        clog << "\t\tClique " << C << " of size " << C.size() << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
+                    clearAllForConsider();
+
+                    liftables.push_back( new EDCliqueRemovalReduction(C) ); // #CAUTION - here we should add liftable rule for removed edge
+                    VI C_neigh = GraphUtils::getNeighborhoodExclusive(V,C,helper);
+                    GraphUtils::removeNodes(V,C,helper);
+
+                    VI reducible_nodes;
+                    for ( int d : C_neigh ) if ( V[d].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[d][0]);
+                    if (!reducible_nodes.empty()) liftables.push_back(new KernelizedNodesReduction(reducible_nodes));
+
+                    last_reduce_nodes_removed += C.size() + reducible_nodes.size();
+                    if (use_exhaustively) changes = true;
+                }
+            }
+        }
     }
 
     return liftables;

@@ -435,7 +435,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
             assert(res.size() == edred.last_reduce_nodes_removed);
             ed_nodes_reduced += edred.ed_node_applied_cnt;
-            ed_edges_removed += edred.ed_edge_applied_cnt;
+            // ed_edges_removed += edred.ed_edge_applied_cnt;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
             addLiftables(liftables);
@@ -471,7 +471,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             auto liftables = edred.reduce(V);
             assert(res.size() == edred.last_reduce_nodes_removed);
             ed_nodes_reduced += edred.last_reduce_nodes_removed;
-            ed_edges_removed += edred.last_reduce_edges_removed;
+            // ed_edges_removed += edred.last_reduce_edges_removed;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
             addLiftables(liftables);
@@ -589,7 +589,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
                 if (!liftables.empty()) res_liftables += liftables;
                 assert(res.size() == edred.last_reduce_nodes_removed);
                 ed_nodes_reduced += edred.last_reduce_nodes_removed;
-                ed_edges_removed += edred.last_reduce_edges_removed;
+                // ed_edges_removed += edred.last_reduce_edges_removed;
                 ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
 
