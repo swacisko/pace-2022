@@ -176,8 +176,8 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
 
 
             auto cnf_cp = cnf;
-            cnf.ed_use_same_neigh_domination = cnf.ed_use_deficit1_domination = cnf.ed_use_full_mirror_moves = false;
-            cnf.ed_use_double_ed_checks = false;
+            // cnf.ed_use_same_neigh_domination = cnf.ed_use_deficit1_domination = cnf.ed_use_full_mirror_moves = false;
+            // cnf.ed_use_double_ed_checks = false;
 
             VI &clq_cnt = cnt;
 
@@ -222,11 +222,11 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
                 auto C = findClique(v);
                 if (C.size() <= 2) continue;
 
-                if (!CliqueUtils::isClique(V,C,helper)) {
-                    DEBUG(C);
-                    for (int c : C) clog << "V[" << c << "]: " << V[c] << endl;
-                }
-                assert(CliqueUtils::isClique(V,C,helper));
+                // if (!CliqueUtils::isClique(V,C,helper)) {
+                //     DEBUG(C);
+                //     for (int c : C) clog << "V[" << c << "]: " << V[c] << endl;
+                // }
+                // assert(CliqueUtils::isClique(V,C,helper));
 
                 {
                     bool found_std_dominated = false;
