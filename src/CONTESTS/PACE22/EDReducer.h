@@ -111,7 +111,7 @@ private:
      * Checks whether node u can be safely added to the solution.
      * Additionally creates constraints that can be used if it cannot.
      */
-    bool consider(VI initS);
+    bool consider(VI initS, VI initU = {});
 
     /**
      *  For node u considers all w \in N(u) \setminus W and finds all nodes x

@@ -85,6 +85,7 @@ struct ExpData {
     bool use_def1_dom = true;
     bool ed_use_edge_removal = false;
     bool ed_use_double_ed_checks = false;
+    bool ed_use_clique_removal = false;
 
     map<string,string> getEntries() {
         map<string,string> res;
@@ -613,6 +614,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             cnf.ed_use_same_neigh_domination = true;
             cnf.ed_use_deficit1_domination = exp_data.use_def1_dom;
             cnf.ed_use_edge_removal = exp_data.ed_use_edge_removal;
+            cnf.ed_use_clique_removal = exp_data.ed_use_clique_removal;
 
             cnf.ed_use_double_ed_checks = exp_data.ed_use_double_ed_checks; // time-consuming, especially for denser graphs... use for sparse graphs only
             // cnf.ed_use_edge_removal = true;
@@ -677,7 +679,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
                 EDReducer edred(coreV.size(),cnf);
                 edred.resetAllUsedTechniques();
                 edred.cnf.ed_use_node_removal = true;
-                edred.cnf.gather_t2_inf_rules = true;
+                edred.cnf.ed_gather_t2_inf_rules = true;
                 auto removed_nodes = edred.reduce(coreV);
 
                 // assert(removed_nodes.empty() && " this should hold if the preprocessing finished and did not terminate due to timeout");
@@ -985,6 +987,7 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.addOption("use_def1_dom", false); // ed2 tests
     ap.addOption("ed_use_edge_removal", false); // ed2 tests
     ap.addOption("ed_use_double_ed_checks", false); // ed2 tests
+    ap.addOption("ed_use_clique_removal", false); // ed2 tests
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -1012,6 +1015,7 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.findAndAssign("use_def1_dom", "bool", &cnf.use_def1_dom);
     ap.findAndAssign("ed_use_edge_removal", "bool", &cnf.ed_use_edge_removal);
     ap.findAndAssign("ed_use_double_ed_checks", "bool", &cnf.ed_use_double_ed_checks);
+    ap.findAndAssign("ed_use_clique_removal", "bool", &cnf.ed_use_clique_removal);
 
 
     return cnf;

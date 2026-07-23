@@ -76,7 +76,7 @@ VI EDReducer::reduce(VVI V0) {
                     for (int d : V[v]) was[d] = false;
                 }
 
-                if (cnf.gather_t2_inf_rules) {
+                if (cnf.ed_gather_t2_inf_rules) {
                     VI to_add;
                     for (int d : inf_rules_2) if (d != v) to_add.push_back(d);
                     if (!to_add.empty()) all_inf_rules_2_found.emplace_back(v,to_add);
@@ -129,6 +129,30 @@ VI EDReducer::reduce(VVI V0) {
                 }
             }
         }
+
+        if (cnf.ed_use_clique_removal) {
+            auto findClique = [&](int v)-> VI {
+
+
+
+            };
+
+
+            for (int v : nodes) if (!V[v].empty()) {
+                if (sw.tle(ed)) break;
+
+                auto C = findClique(v);
+
+                if (consider({},C)) {
+                    clearAllForConsider();
+                    if (write_logs)
+                        clog << "\t\tCliuqe " << C << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
+
+                    last_reduce_nodes_removed += temp.size();
+                    if (use_exhaustively) changes = true;
+                }
+            }
+        }
     }
 
     return reducible_nodes;
@@ -156,7 +180,7 @@ int EDReducer::getSIntersectionSize(int u) {
     return accumulate(ALL(V[u]), 0, [&](int s, auto v) {return s + inS[v];} );
 }
 
-bool EDReducer::consider(VI initS) {
+bool EDReducer::consider(VI initS, VI initU) {
     clearAllForConsider();
 
     if (write_logs) clog << "Considering initS: " << initS << endl;
@@ -168,7 +192,7 @@ bool EDReducer::consider(VI initS) {
         moveToS(v, true);
         for (int d : V[v]) if (!excluded[d] && inU1[d]) to_consider_in_next_step[d] = true;
     }
-    else {
+    else if (!initS.empty()) {
         S = W = initS;
         for (int d : S) was[d] = true;
         for (int s : S) for (int d : V[s]) if (!was[d]) temp.push_back(d);
@@ -190,6 +214,17 @@ bool EDReducer::consider(VI initS) {
         for (int u : S) for (int d : V[u]) if (!excluded[d]) {
             if (inU1[d]) to_consider_in_next_step[d] = true;
             if constexpr (keep_track_of_degrees) deg_in_S[d]++;
+        }
+    }
+
+
+    assert((initS.empty() || initU.empty()) && "initializing ED with both S and U not supported yet" );
+
+    if ( !initU.empty() ) {
+        for (int u : initU) {
+            int W_size_after_all_simultaneous_moves = initU.size();
+            bool excl = (max(0, (int)V[u].size() - W_size_after_all_simultaneous_moves  - 1) >= cnf.ed_min_nonw_deg_to_exclude_node);
+            moveToU(u,excl);
         }
     }
 

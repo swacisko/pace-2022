@@ -366,7 +366,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             auto liftables = funnel();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
-
             addLiftables(liftables);
 
             modified |= !liftables.empty();
@@ -402,7 +401,6 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             if(write_progress_on_the_fly) clog << "Running unconfined" << endl;
             VI uncon = unconfined();
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
-
 
             addKNR(uncon);
             total_unconfined_nodes += uncon.size();
@@ -940,6 +938,9 @@ vector<VCReduction*> Reducer::funnel() {
     while (changes) {
         changes = false;
 
+        // VI nodes(N); iota(ALL(nodes),0);
+        // sort(ALL(nodes), [&](int a, int b){ return V[a].size() < V[b].size(); });
+        // for (int v : nodes) if (V[v].size() >= 2) if ( (int)V[v].size()-1 <= cnf.reducer_max_funnel_clique_size ) {
         for (int v=0; v<N; v++) if (V[v].size() >= 2) if ( (int)V[v].size()-1 <= cnf.reducer_max_funnel_clique_size ) {
             auto [cand,dominates] = findIsolatedNodeCandidate(v);
 

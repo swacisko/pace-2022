@@ -165,7 +165,17 @@ public:
     /**
      * If true, the inference rules of type 2 will be created.
      */
-    bool gather_t2_inf_rules = false;
+    bool ed_gather_t2_inf_rules = false;
+
+
+    /**
+     * If true, then we consider clique-removal using ED approach.
+     * We find some clique C, then start ED using S = \emptyset and U = C.
+     * If ED returns true, then there exists a solution that does not contain some node from C.
+     * If so, we can remove C from the graph (and its common neighborhood, if the clique was not maximal),
+     * and lift solution (similarly to how it is done in edge-removal) afterwards.
+     */
+    bool ed_use_clique_removal = true;
 
     //******************************************************************** ED
 
