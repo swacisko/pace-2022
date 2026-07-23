@@ -480,7 +480,10 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         }
 
 
-        if (cnf.reducer_use_ed && cnf.ed_use_edge_removal && ed_with_edge_insertion_rules_checked == 0) {
+        if (cnf.reducer_use_ed && cnf.ed_use_edge_removal
+            && (ed_with_edge_insertion_rules_checked == 0 ||
+                        ( cnf.ed_remove_added_t1_constraints_if_kernelized_node_found && cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found))
+            ) {
             ed_with_edge_removal_rules_checked++;
             ed_rules_checked_total++;
             int edge_cnt = GraphUtils::countEdges(V);
