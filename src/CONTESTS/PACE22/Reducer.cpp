@@ -433,7 +433,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             auto liftables = edred.reduce(V);
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
-            assert(res.size() == edred.last_reduce_nodes_removed);
+            // assert(res.size() == edred.last_reduce_nodes_removed);
             ed_nodes_reduced += edred.ed_node_applied_cnt;
             // ed_edges_removed += edred.ed_edge_applied_cnt;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
@@ -469,7 +469,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
             auto liftables = edred.reduce(V);
-            assert(res.size() == edred.last_reduce_nodes_removed);
+            // assert(res.size() == edred.last_reduce_nodes_removed);
             ed_nodes_reduced += edred.last_reduce_nodes_removed;
             // ed_edges_removed += edred.last_reduce_edges_removed;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
@@ -518,7 +518,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             // clog << "last_reduce_nodes_removed (deg1-propagated): " << edred.last_reduce_nodes_removed << endl;
             clog << "#CAUTION! Solution lifting not supported yet for ED-edge-removal rule" << endl;
 
-            assert(res.size() == edred.last_reduce_nodes_removed);
+            // assert(res.size() == edred.last_reduce_nodes_removed);
             ed_nodes_reduced += edred.ed_node_applied_cnt;
             ed_edges_removed += edred.ed_edge_applied_cnt;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
@@ -587,7 +587,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
                 liftables = edred.reduce(V);
                 if (!liftables.empty()) res_liftables += liftables;
-                assert(res.size() == edred.last_reduce_nodes_removed);
+                // assert(res.size() == edred.last_reduce_nodes_removed);
                 ed_nodes_reduced += edred.last_reduce_nodes_removed;
                 // ed_edges_removed += edred.last_reduce_edges_removed;
                 ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;

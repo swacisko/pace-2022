@@ -99,7 +99,7 @@ void GraphUtils::removeNodeFromGraph(VVI &V, int a) {
     V[a].clear();
 }
 
-void GraphUtils::removeNodes(VVI &V, VI &nodes, VB &helper) {
+void GraphUtils::removeNodes(VVI &V, VI nodes, VB &helper) {
     for (int d : nodes) helper[d] = true;
 
     VI neigh;

@@ -147,22 +147,100 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
 
         if (false)
         if (cnf.ed_use_clique_removal) {
+            // be careful with clique removal!!
+            // if a mirror was found and added to U, then it might be that one node from the clique C will need to
+            // be swapped for its neighbor outside the clique -> then the offset is C.size()
+            // but if there exists an ext-dominator determined without using any mirrors, then
+            // the offset will be C.size()-1, because one node from the clique can be removed completely!
+            // for now, we simply disable using mirrors, but it might be implemented to properly lift the solution
+            // even if mirrors are used. The problem is, it seems to be difficult to determine what the offset is!
+
+
+            auto cnf_cp = cnf;
+            cnf.ed_use_same_neigh_domination = cnf.ed_use_deficit1_domination = cnf.ed_use_full_mirror_moves = false;
+            cnf.ed_use_double_ed_checks = false;
+
+            VI &clq_cnt = cnt;
+
+            IntGenerator rnd;
+
             auto findClique = [&](int v)-> VI {
-                return CliqueExtension::maximizeCliqueGreedy(V,{v});
+                VI clq = {v};
+                StandardUtils::shuffle(V[v], rnd);
+
+                bool extended = true;
+                while (extended) {
+                    extended = false;
+
+                    int c = clq.back();
+                    was[c] = true;
+                    for (int d : V[c]) if (!was[d]) clq_cnt[d]++;
+                    int extending_node = -1;
+                    for (int d : V[c]) if (!was[d] && clq_cnt[d] == clq.size()) {
+                        extending_node = d;
+                        break;
+                    }
+
+                    if (extending_node != -1) {
+                        extended = true;
+                        clq.push_back(extending_node);
+                        StandardUtils::shuffle(V[extending_node], rnd);
+                    }
+                }
+
+                for (int c : clq) {
+                    was[c] = clq_cnt[c] = 0;
+                    for (int d : V[c]) was[d] = clq_cnt[d] = 0;
+                }
+
+                return clq;
             };
 
-            for (int v : nodes) if (!V[v].empty()) {
+            for (int v : nodes) if (V[v].size() >= 3) {
                 if (sw.tle(ed)) break;
+
 
                 auto C = findClique(v);
                 if (C.size() <= 2) continue;
+
+                if (!CliqueUtils::isClique(V,C,helper)) {
+                    DEBUG(C);
+                    for (int c : C) clog << "V[" << c << "]: " << V[c] << endl;
+                }
+                assert(CliqueUtils::isClique(V,C,helper));
+
+                {
+                    bool found_std_dominated = false;
+                    VI C_neigh;
+                    // if there is some dominated node in the clique, it can be removed from the solution, and all its
+                    // neighbors added - simplicial/clique rule
+                    for (int c : C) if ( V[c].size() == C.size()-1 ) {
+                        clog << "\tfound a standard dominated node in the ED-clique!" << endl;
+                        found_std_dominated = true;
+                        C_neigh = GraphUtils::getNeighborhoodExclusive(V,C,helper);
+
+                        liftables.push_back(new KernelizedNodesReduction(V[c]));
+                        auto Vc_cp = V[c];
+                        GraphUtils::removeNodes(V,Vc_cp,helper);
+                        assert(V[c].empty());
+
+                        break;
+                    }
+                    if (found_std_dominated) {
+                        VI reducible_nodes;
+                        for ( int d : C_neigh ) if ( V[d].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[d][0]);
+                        if (!reducible_nodes.empty()) liftables.push_back(new KernelizedNodesReduction(reducible_nodes));
+
+                        continue;
+                    }
+                }
 
                 if (consider({},C)) {
                     // if (write_logs)
                         clog << "\t\tClique " << C << " of size " << C.size() << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
                     clearAllForConsider();
 
-                    liftables.push_back( new EDCliqueRemovalReduction(C) ); // #CAUTION - here we should add liftable rule for removed edge
+                    liftables.push_back( new EDCliqueRemovalReduction(C) ); // #CAUTION - here we should add liftable rule for removed clique
                     VI C_neigh = GraphUtils::getNeighborhoodExclusive(V,C,helper);
                     GraphUtils::removeNodes(V,C,helper);
 
@@ -174,6 +252,8 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
                     if (use_exhaustively) changes = true;
                 }
             }
+
+            cnf = cnf_cp;
         }
     }
 
@@ -194,6 +274,7 @@ void EDReducer::resetAllUsedTechniques() {
     cnf.ed_use_extended_edges_insertion = false;
     cnf.ed_use_edge_removal = false;
     cnf.edge_use_edge_removal_and_insertion_interleaving = false;
+    // cnf.ed_use_clique_removal = false;
 }
 
 int EDReducer::getNonWNeighborhoodSize(int u) {
@@ -250,6 +331,7 @@ bool EDReducer::consider(VI initS, VI initU) {
             bool excl = (max(0, (int)V[u].size() - W_size_after_all_simultaneous_moves  - 1) >= cnf.ed_min_nonw_deg_to_exclude_node);
             moveToU(u,excl);
         }
+        updateU1();
     }
 
     // clog << "Initial sizes: W: " << W.size() << ", U: " << U.size() << ", U1: " << U1.size() << endl;

@@ -20,17 +20,23 @@ public:
 
 class EDCliqueRemovalReduction : public VCReduction {
 public:
-    EDCliqueRemovalReduction(VI C) : clq(C){}
+    EDCliqueRemovalReduction(VI C, bool admit_mirrors=false) : clq(C), admitted_mirrors(admit_mirrors) {
+        assert(!admit_mirrors && "mirrors not supported yet");
+    }
 
     void lift(VI &sol, VB &in_sol) override {
-        clog << "ED-clq -> lifting not supported yet - adding all but one node! " << flush;
+        // clog << "ED-clq -> lifting not supported yet - adding just all but the last node! " << flush;
         for (int i=0; i+1<clq.size(); i++) {
+        // for (int i=0; i<clq.size(); i++) {
             sol.push_back(clq[i]);
             in_sol[clq[i]] = true;
         }
     }
 
-    int offset() override{ return clq.size()-1; }
+    // careful! if mirrors are admitted, then this is just the lower bound, not the exact value,
+    // because still the mirror might not have affected the clique removal...
+    int offset() override{ return clq.size() - 1; }
+    // int offset() override{ return clq.size(); }
 
     string toString() override {
         stringstream str;
@@ -42,6 +48,7 @@ public:
 
 private:
     VI clq;
+    bool admitted_mirrors = false;
 };
 
 class DeskReduction : public VCReduction{

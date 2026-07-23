@@ -92,6 +92,12 @@ public:
     bool ed_use_deficit1_domination = false;
 
     /**
+     * If true, then complete mirrors will be moved to the set U.
+     * A complete mirror of u is a node y such that N(u) \setminus (W \cup N(y)) is a clique.
+     */
+    bool ed_use_full_mirror_moves = false;
+
+    /**
      * If true, then the ``biset'' approach will be used to find nodes to move to U.
      * CAUTION! This rules is slower than other rules used to determine nodes to move to U.
      * It needs to be checked if in practice it is efficient enough, and perhaps limit it to only some special
