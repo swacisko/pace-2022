@@ -159,7 +159,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         else knr->addToKer(nodes);
     };
 
-    auto addLiftables = [&]( auto liftables ) {
+    auto addLiftables = [&]( vector<VCReduction*> liftables ) {
         if(knr != nullptr){ secondary_reduce_liftables.push_back(knr); knr = nullptr; }
         for(auto *x : liftables) secondary_reduce_liftables.push_back(x);
     };
@@ -334,6 +334,10 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
     int ed_with_edge_removal_rules_checked = 0;
     int general_folding_rules_checked = 0;
 
+    int ed_edge_insertion_iterations_without_change = 0;
+    int ed_last_edge_insertion_node_cnt = 0;
+
+
     do{
 
         modified = false;
@@ -426,7 +430,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             edred.cnf.ed_use_node_removal = true;
             edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
-            VI res = edred.reduce(V);
+            auto liftables = edred.reduce(V);
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
             assert(res.size() == edred.last_reduce_nodes_removed);
@@ -434,9 +438,10 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             ed_edges_removed += edred.ed_edge_applied_cnt;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
-            addKNR(res);
-            if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
+            addLiftables(liftables);
+
             if (edred.madeChangesInLastReduce()) V = edred.getV();
+            else assert(liftables.empty());
             modified |= edred.madeChangesInLastReduce();
 
             if(modified) continue;
@@ -463,31 +468,40 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             edred.cnf.ed_use_node_removal = true;
             edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
-            VI res = edred.reduce(V);
+            auto liftables = edred.reduce(V);
             assert(res.size() == edred.last_reduce_nodes_removed);
             ed_nodes_reduced += edred.last_reduce_nodes_removed;
             ed_edges_removed += edred.last_reduce_edges_removed;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
-            addKNR(res);
 
-            if (edred.madeChangesInLastReduce())  V = edred.getV();
+            addLiftables(liftables);
+
+            if (edred.madeChangesInLastReduce()) V = edred.getV();
+            else assert(liftables.empty());
             modified |= edred.madeChangesInLastReduce();
 
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
             if(modified) continue;
         }
 
-
+        bool first_run_condition = (ed_with_edge_removal_rules_checked == 0);
+        bool ed_insert_edges_permanently = ( !cnf.ed_remove_added_t1_constraints_if_kernelized_node_found || !cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found);
+        bool interleaving_cond = (cnf.edge_use_edge_removal_and_insertion_interleaving
+            && ed_edge_insertion_iterations_without_change <= cnf.ed_max_edge_removal_and_insertion_iterations_without_change );
         if (cnf.reducer_use_ed && cnf.ed_use_edge_removal
-            && (ed_with_edge_insertion_rules_checked == 0 ||
-                        ( cnf.ed_remove_added_t1_constraints_if_kernelized_node_found && cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found))
+            && (first_run_condition || !ed_insert_edges_permanently || interleaving_cond )
             ) {
             ed_with_edge_removal_rules_checked++;
             ed_rules_checked_total++;
             int edge_cnt = GraphUtils::countEdges(V);
             int node_cnt = ranges::count_if(V,[&](auto & v){ return !v.empty(); });
-            clog << "Running ED edge removal, time: " << sw.getTime(reducer_str) / 1000
+            clog << "Running ED EDGE REMOVAL, time: " << sw.getTime(reducer_str) / 1000
                  << ", nodes: " << node_cnt << ", edges: " << edge_cnt << endl;
+
+            if (ed_edge_insertion_iterations_without_change > 0) {
+                clog << "\tRunning iterative edge-removal and edge-insertion for the "
+                     << ed_edge_insertion_iterations_without_change << "-th iteration without success"  << endl << endl;
+            }
 
             Stopwatch s; string opt = "ED edge removal"; s.start(opt);
             EDReducer edred(V.size(), cnf);
@@ -496,7 +510,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             edred.cnf.ed_use_edge_removal = true;
             edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
-            VI res = edred.reduce(V);
+            auto liftables = edred.reduce(V);
             s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
 
@@ -509,9 +523,11 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             ed_edges_removed += edred.ed_edge_applied_cnt;
             ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
-            addKNR(res);
-            // if (edred.last_reduce_edges_removed > 0) DEBUG(edred.last_reduce_edges_removed);
+            addLiftables(liftables);
+            // if (edred.last_reduce_edges_removed > 0)
+                DEBUG(edred.last_reduce_edges_removed);
             if (edred.madeChangesInLastReduce()) V = edred.getV();
+            else assert(liftables.empty());
             modified |= edred.madeChangesInLastReduce();
 
             if(modified) continue;
@@ -535,19 +551,29 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         // standard edge-insertion - those edges that are found using consider(v) for single-node initial sets S
         if (cnf.ed_apply_type1_constraints_on_the_fly)
         if (cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
-            VI res;
+            vector<VCReduction*> res_liftables;
             bool made_changes = false;
-            VI nodes_kernelized;
             bool made_changes_in_iteration = false;
             VPII init_V_edges = GraphUtils::getGraphEdges(V);
+            addLiftables({}); // we simply want to flush any remaining knr.
+            vector<VCReduction*> liftables;
+
+            {
+                int node_cnt = ranges::count_if(V,[&](auto & v){ return !v.empty(); });
+                if (node_cnt == ed_last_edge_insertion_node_cnt) {
+                    ed_edge_insertion_iterations_without_change++;
+                }else ed_edge_insertion_iterations_without_change = 0;
+                ed_last_edge_insertion_node_cnt = node_cnt;
+            }
 
             do {
                 ed_with_edge_insertion_rules_checked++;
                 ed_rules_checked_total++;
                 int edge_cnt = GraphUtils::countEdges(V);
                 int node_cnt = ranges::count_if(V,[&](auto & v){ return !v.empty(); });
-                clog << "Running ED with edge insertion, time: " << sw.getTime(reducer_str) / 1000
+                clog << "Running ED with EDGE INSERTION, time: " << sw.getTime(reducer_str) / 1000
                      << ", nodes: " << node_cnt << ", edges: " << edge_cnt << endl;
+
 
                 made_changes_in_iteration = false;
 
@@ -556,26 +582,33 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
                 edred.resetAllUsedTechniques();
                 edred.cnf.ed_use_node_removal = true;
                 edred.cnf.ed_apply_type1_constraints_on_the_fly = true;
+                edred.cnf.edge_use_edge_removal_and_insertion_interleaving = cnf.edge_use_edge_removal_and_insertion_interleaving;
                 edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
-                res = edred.reduce(V);
+                liftables = edred.reduce(V);
+                if (!liftables.empty()) res_liftables += liftables;
                 assert(res.size() == edred.last_reduce_nodes_removed);
                 ed_nodes_reduced += edred.last_reduce_nodes_removed;
                 ed_edges_removed += edred.last_reduce_edges_removed;
                 ed_t1_inference_rules_added += edred.last_reduce_inf_rules_1_added;
 
-                addKNR(res);
-                // made_changes = edred.madeChangesInLastReduce();
+
                 made_changes_in_iteration = edred.madeChangesInLastReduce();
                 made_changes |= made_changes_in_iteration;
-                nodes_kernelized += res;
-                // modified |= made_changes_in_iteration;
                 s.stop(opt); reduction_times_millis[opt] += s.getTime(opt);
 
                 if (made_changes_in_iteration) {
+                    VI res;
+                    for ( auto r : liftables ) {
+                        if (auto* derived = dynamic_cast<KernelizedNodesReduction*>(r)) res += derived->getKer();
+                        else assert(false && "at this moment here should be only kernelized nodes, no other reductions");
+                    }
+
+                    if (!liftables.empty()) assert(!res.empty());
+
                     if (!res.empty() && cnf.ed_remove_added_t1_constraints_if_kernelized_node_found) {
-                        clog << "Found kernelized nodes when using edge-insertion mode in ED!";
-                        clog << " Reverting graph state and removing nodes" << endl;
+                        clog << "\tFound " << res.size() << " kernelized nodes when using edge-insertion mode in ED!";
+                        clog << "\tReverting graph state and removing nodes" << endl << endl;
                         V = GraphUtils::getGraphForEdges(N,init_V_edges); // revert changes to the original graph
                         GraphUtils::removeNodes(V,res,helper); // and remove nodes...
                         break;
@@ -590,12 +623,15 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
                 }
                 assert( GraphUtils::isSimple(V) );
 
-            }while (res.empty() && made_changes_in_iteration);
+            }while (liftables.empty() && made_changes_in_iteration);
 
-            if ( cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found && nodes_kernelized.empty() ) {
+            if ( cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found && res_liftables.empty() ) {
+                clog << "\tDid not find any kernelized node using ED-edge-insertion, reverting to original state" << endl;
                 V = GraphUtils::getGraphForEdges(N,init_V_edges);
                 made_changes = false;
             }
+
+            if (made_changes) secondary_reduce_liftables += res_liftables;
 
             modified |= made_changes;
 

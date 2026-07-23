@@ -535,7 +535,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         cnf.reducer_use_desk = true;
         cnf.reducer_use_unconfined = true; // the unconfined rule seems to be faulty!!
         cnf.reducer_use_twins = true;
-        cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
+        cnf.reducer_use_general_folding = false; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
         auto edges = GraphUtils::getGraphEdges(V);
         cnf.reducer_max_time_millis = exp_data_cnf.reducer_max_time_millis;
 
@@ -608,7 +608,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             cnf.reducer_use_desk = true;
             cnf.reducer_use_unconfined = true;
             cnf.reducer_use_twins = true;
-            cnf.reducer_use_general_folding = true; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
+            cnf.reducer_use_general_folding = false; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
             cnf.reducer_use_ed = true;
             cnf.ed_consider_nodes_to_move_outside_NW = true;
             cnf.ed_use_same_neigh_domination = true;
@@ -617,10 +617,16 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             cnf.ed_use_clique_removal = exp_data.ed_use_clique_removal;
 
             cnf.ed_use_double_ed_checks = exp_data.ed_use_double_ed_checks; // time-consuming, especially for denser graphs... use for sparse graphs only
-            // cnf.ed_use_edge_removal = true;
             cnf.ed_apply_type1_constraints_on_the_fly = add_constraints;
-            cnf.ed_remove_added_t1_constraints_if_kernelized_node_found = true; // #TEST
-            cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found = true; // #TEST
+
+            { // #TEST #CAUTION
+                // for testing - either removing all edges from the graph if kernelized node was found,
+                // or interleaving edge removal and edge insertion for some number of 'idle iterations'
+                cnf.ed_remove_added_t1_constraints_if_kernelized_node_found = true; // #TEST
+                // cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found = true; // #TEST
+                cnf.edge_use_edge_removal_and_insertion_interleaving = true;
+                cnf.ed_max_edge_removal_and_insertion_iterations_without_change = 3;
+            }
 
             Reducer red(GraphUtils::getGraphEdges(V),cnf);
             auto reduced_instance = red.reduce();

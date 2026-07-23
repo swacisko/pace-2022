@@ -108,6 +108,18 @@ public:
     bool ed_use_edge_removal = false;
 
     /**
+     * If we use both edge-removal and edge insertion and allow edges to remain in the graph permanently
+     * (do not revert to the original graph structure), then we might get stuck in infinity loop of adding and
+     * removing edges. In such a case, we perform edge_removal at most this number of times, if no change was done.
+     *
+     * Set to 0 to disallow any edge-insertion/edge-removal interleaving - this might be time-consuming but
+     * If this value is > 0, then nodes in edge-insertion mode will be considered in a random order, to increase
+     * randomness and chances of finding removable nodes.
+     */
+    int ed_max_edge_removal_and_insertion_iterations_without_change = 3;
+    bool edge_use_edge_removal_and_insertion_interleaving = false;
+
+    /**
      * If true, then type-1 cnstraints will be added on the fly, as the reduction rule executes.
      */
     bool ed_apply_type1_constraints_on_the_fly = false;

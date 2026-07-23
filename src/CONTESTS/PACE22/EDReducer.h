@@ -8,6 +8,8 @@
 #include "Makros.h"
 #include "CONTESTS/PACE22/Config.h"
 
+class VCReduction;
+
 class EDReducer {
 public:
     explicit EDReducer( int NN, Config c )
@@ -34,7 +36,7 @@ public:
      * We can also use extended edge insertion - for some set of candidates C (usually N^3(v)),
      * we check whether initS = {v,x} will yield true, for x \in C. If so, then we can add edge {v,x} to the graph.
      */
-    VI reduce(VVI V0);
+    vector<VCReduction *> reduce(VVI V0);
 
     /**
      * True, if recent call to [reduce] made any changes to the processed graph.

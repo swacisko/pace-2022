@@ -8,18 +8,19 @@
 
 #include "GraphUtils.h"
 #include "StandardUtils.h"
+#include "CONTESTS/PACE22/Reducer.h"
 #include "CONTESTS/PACE22/Utils.h"
 
 
-VI EDReducer::reduce(VVI V0) {
+vector<VCReduction *> EDReducer::reduce(VVI V0) {
     V = V0;
 
-    VI nodes(N);
-    iota(ALL(nodes),0);
+    VI nodes; nodes.reserve(N/2);
+    for (int i=0; i<N; i++) if (!V[i].empty()) nodes.push_back(i);
     if ( cnf.ed_node_sorting_mode == 1 ) sort(ALL(nodes), [&]( int a, int b ) { return V[a].size() > V[b].size(); });
     if ( cnf.ed_node_sorting_mode == 2 ) sort(ALL(nodes), [&]( int a, int b ) { return V[a].size() < V[b].size(); });
 
-    VI reducible_nodes;
+    vector<VCReduction*> liftables;
 
     // clog << "EDReducer - reducing graph with " << V0.size() << " nodes and " << GraphUtils::countEdges(V0) << " edges" << endl;
 
@@ -47,6 +48,13 @@ VI EDReducer::reduce(VVI V0) {
         changes = false;
 
         if (cnf.ed_use_node_removal) {
+            VI reducible_nodes;
+
+            if (cnf.edge_use_edge_removal_and_insertion_interleaving) {
+                IntGenerator rnd;
+                StandardUtils::shuffle(nodes,rnd);
+            }
+
             for (int v : nodes) if (!V[v].empty()) {
                 if (sw.tle(ed)) break;
 
@@ -83,6 +91,8 @@ VI EDReducer::reduce(VVI V0) {
                 }
 
             }
+
+            if (!reducible_nodes.empty()) liftables.push_back(new KernelizedNodesReduction(reducible_nodes));
         }
 
         if (cnf.ed_use_edge_removal) {
@@ -120,42 +130,45 @@ VI EDReducer::reduce(VVI V0) {
                     last_reduce_edges_removed++;
                     ed_edge_applied_cnt++;
 
-                    int t = reducible_nodes.size();
+                    // liftables.push_back( new EDEdgeRemovalReduction() ); // #CAUTION - here we should add liftable rule for removed edge
+
+                    VI reducible_nodes;
                     if ( V[u].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[u][0]);
                     if ( V[v].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[v][0]);
-                    last_reduce_nodes_removed += reducible_nodes.size() - t;
+                    last_reduce_nodes_removed += reducible_nodes.size();
+                    if (!reducible_nodes.empty()) liftables.push_back(new KernelizedNodesReduction(reducible_nodes));
 
                     if (use_exhaustively) changes = true;
                 }
             }
         }
 
-        if (cnf.ed_use_clique_removal) {
-            auto findClique = [&](int v)-> VI {
-
-
-
-            };
-
-
-            for (int v : nodes) if (!V[v].empty()) {
-                if (sw.tle(ed)) break;
-
-                auto C = findClique(v);
-
-                if (consider({},C)) {
-                    clearAllForConsider();
-                    if (write_logs)
-                        clog << "\t\tCliuqe " << C << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
-
-                    last_reduce_nodes_removed += temp.size();
-                    if (use_exhaustively) changes = true;
-                }
-            }
-        }
+        // if (cnf.ed_use_clique_removal) {
+        //     auto findClique = [&](int v)-> VI {
+        //
+        //
+        //
+        //     };
+        //
+        //
+        //     for (int v : nodes) if (!V[v].empty()) {
+        //         if (sw.tle(ed)) break;
+        //
+        //         auto C = findClique(v);
+        //
+        //         if (consider({},C)) {
+        //             clearAllForConsider();
+        //             if (write_logs)
+        //                 clog << "\t\tCliuqe " << C << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
+        //
+        //             last_reduce_nodes_removed += temp.size();
+        //             if (use_exhaustively) changes = true;
+        //         }
+        //     }
+        // }
     }
 
-    return reducible_nodes;
+    return liftables;
 }
 
 bool EDReducer::madeChangesInLastReduce() {
@@ -166,10 +179,12 @@ bool EDReducer::madeChangesInLastReduce() {
 }
 
 void EDReducer::resetAllUsedTechniques() {
-    cnf.ed_use_edge_removal = false;
+    cnf.ed_use_node_removal = false;
     cnf.ed_apply_type1_constraints_on_the_fly = false;
     cnf.ed_use_edge_insertion = false;
     cnf.ed_use_extended_edges_insertion = false;
+    cnf.ed_use_edge_removal = false;
+    cnf.edge_use_edge_removal_and_insertion_interleaving = false;
 }
 
 int EDReducer::getNonWNeighborhoodSize(int u) {
