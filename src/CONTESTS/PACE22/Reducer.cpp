@@ -1265,8 +1265,11 @@ VI Reducer::unconfined() {
 
     VI cand_NS;
 
+    constexpr bool check_basic_assertions = true;
+    constexpr bool check_expensive_assertions = false;
+
     auto checkAssertions = [&]() {
-        return; // do not check...
+        if constexpr (!check_expensive_assertions) return;
 
         if constexpr (debug) clog << "\t#CAUTION! Checking slow assertions in unconfined" << endl;
 
@@ -1364,19 +1367,19 @@ VI Reducer::unconfined() {
 
             int u = cand_NS.back(); // we will move node u to S - but here it is the node that has |N(u) \ N(S)| = 1
             cand_NS.pop_back();
-            assert(!inS[u]);
+            if constexpr (check_basic_assertions) assert(!inS[u]);
 
             if ( deg_in_S[u] != 1 ) continue;
             if ( deg_out_NS[u] == 0 ) return true;
-            assert(deg_out_NS[u] == 1);
+            if constexpr (check_basic_assertions) assert(deg_out_NS[u] == 1);
 
             int cnt = 0;
             for (int d : V[u]) cnt += !inNS[d];
-            assert(cnt == 1);
+            if constexpr (check_basic_assertions) assert(cnt == 1);
 
             int only_neighbor = -1;
             for ( int d : V[u] ) if ( !inNS[d] ){ only_neighbor = d; break; }
-            assert(only_neighbor != -1);
+            if constexpr (check_basic_assertions) assert(only_neighbor != -1);
 
             if constexpr (debug) clog << "\tcand u: " << u << ", only_neighbor: " << only_neighbor << endl;
 
@@ -1384,7 +1387,7 @@ VI Reducer::unconfined() {
             u = only_neighbor;
             if constexpr (debug) clog << "\tmoving node " << u << " to S, V[" << u << "]: " << V[u] << endl;
 
-            assert(deg_in_S[u] == 0);
+            if constexpr (check_basic_assertions) assert(deg_in_S[u] == 0);
             inS[u] = inNS[u] = true;
             S.push_back(u);
             deg_out_NS[u] = 0;
@@ -1402,7 +1405,7 @@ VI Reducer::unconfined() {
                 if constexpr (debug) clog << "\t\tmoving node d: " << d << " to N(S), V[" << d << "]: " << V[d] << endl;
                 inNS[d] = true;
                 ns_size++;
-                assert(deg_out_NS[d] == 0);
+                if constexpr (check_basic_assertions) assert(deg_out_NS[d] == 0);
 
                 for ( int dd : V[d] ) {
                     if (dd == u) { // this is the only neighbor of d that can be in S
@@ -1412,7 +1415,7 @@ VI Reducer::unconfined() {
                         continue;
                     }
 
-                    assert(!inS[dd]);
+                    if constexpr (check_basic_assertions) assert(!inS[dd]);
                     if ( inNS[dd] ) { // we need to update degrees of all neighbors dd of node d which is moved to N(S)
                         if ( getLbNSOutdegForUnexpandedNode(dd) <= 1 ) {
                             if ( !calculated_NS_outdeg[dd] ) calculateNSOutdeg(dd);
@@ -1420,7 +1423,7 @@ VI Reducer::unconfined() {
 
                             // if (deg_out_NS[dd] == 0) return true;
                             if (deg_out_NS[dd] == 0 && deg_in_S[dd] <= 1) {
-                                assert(deg_in_S[dd] == 1);
+                                if constexpr (check_basic_assertions) assert(deg_in_S[dd] == 1);
                                 can_return_true = true;
                             }
                             if (deg_out_NS[dd] == 1) cand_NS.push_back(dd);
@@ -1454,12 +1457,14 @@ VI Reducer::unconfined() {
     };
 
     for ( int v=0; v<N; v++ ) {
-        assert(ranges::none_of(deg_in_S, std::identity{}));
-        assert(ranges::none_of(deg_out_NS, std::identity{}));
-        assert(ranges::none_of(was, std::identity{}));
-        assert(ranges::none_of(inS, std::identity{}));
-        assert(ranges::none_of(inNS, std::identity{}));
-        assert(ranges::none_of(calculated_NS_outdeg, std::identity{}));
+        if constexpr (check_expensive_assertions) {
+            assert(ranges::none_of(deg_in_S, std::identity{}));
+            assert(ranges::none_of(deg_out_NS, std::identity{}));
+            assert(ranges::none_of(was, std::identity{}));
+            assert(ranges::none_of(inS, std::identity{}));
+            assert(ranges::none_of(inNS, std::identity{}));
+            assert(ranges::none_of(calculated_NS_outdeg, std::identity{}));
+        }
 
         if (check(v)) {
             clearForS();

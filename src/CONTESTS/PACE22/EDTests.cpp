@@ -37,6 +37,7 @@ string parseAlgorithm(Alg alg) {
     if (alg == HIGHS) return "highs";
 
     assert(false && "incorrect algorithm");
+    return "invalid algorithm";
 }
 
 struct ExpData {
@@ -479,6 +480,8 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         writeConnCompInfo(V, "Connected components after init-kernelization");
 
         DEBUG(exp_data.red_init_time_millis);
+    }else {
+        exp_data.red_init_time_millis = 0;
     }
 
 
