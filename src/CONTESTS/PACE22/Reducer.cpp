@@ -454,7 +454,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
 
         // standard node-removal version
-        if(cnf.reducer_use_ed && cnf.ed_use_node_removal && !lp_and_crown_improved){
+        if(cnf.reducer_use_ed && (cnf.ed_use_node_removal || cnf.ed_use_clique_removal ) && !lp_and_crown_improved){
             ed_rules_checked_total++;
             ed_node_removal_rules_checked++;
             int edge_cnt = GraphUtils::countEdges(V);
@@ -465,7 +465,8 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
             Stopwatch s; string opt = "ED node removal"; s.start(opt);
             EDReducer edred(V.size(), cnf);
             edred.resetAllUsedTechniques();
-            edred.cnf.ed_use_node_removal = true;
+            edred.cnf.ed_use_node_removal = cnf.ed_use_node_removal;
+            edred.cnf.ed_use_clique_removal = cnf.ed_use_clique_removal;
             edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 
             auto liftables = edred.reduce(V);
@@ -549,7 +550,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         }
 
         // standard edge-insertion - those edges that are found using consider(v) for single-node initial sets S
-        if (cnf.ed_apply_type1_constraints_on_the_fly)
+        // if (cnf.ed_apply_type1_constraints_on_the_fly)
         if (cnf.reducer_use_ed && cnf.ed_use_edge_insertion) {
             vector<VCReduction*> res_liftables;
             bool made_changes = false;
@@ -581,7 +582,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
                 EDReducer edred(V.size(), cnf);
                 edred.resetAllUsedTechniques();
                 edred.cnf.ed_use_node_removal = true;
-                edred.cnf.ed_apply_type1_constraints_on_the_fly = true;
+                edred.cnf.ed_apply_type1_constraints_on_the_fly = cnf.ed_apply_type1_constraints_on_the_fly;
                 edred.cnf.edge_use_edge_removal_and_insertion_interleaving = cnf.edge_use_edge_removal_and_insertion_interleaving;
                 edred.max_time_millis = sw.getLimit(reducer_str) - sw.getTime(reducer_str);
 

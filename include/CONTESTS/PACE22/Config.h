@@ -129,6 +129,7 @@ public:
      * If true, then type-1 cnstraints will be added on the fly, as the reduction rule executes.
      */
     bool ed_apply_type1_constraints_on_the_fly = false;
+    // bool ed_use_edge_insertion = false;
 
     /**
      * If true, then if [ed_apply_type1_constraints_on_the_fly] is set and we run the 'add edges' ED and some
@@ -193,7 +194,7 @@ public:
      * If so, we can remove C from the graph (and its common neighborhood, if the clique was not maximal),
      * and lift solution (similarly to how it is done in edge-removal) afterwards.
      */
-    bool ed_use_clique_removal = true;
+    bool ed_use_clique_removal = false;
 
     //******************************************************************** ED
 

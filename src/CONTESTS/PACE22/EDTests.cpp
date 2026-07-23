@@ -617,9 +617,9 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             cnf.ed_use_clique_removal = exp_data.ed_use_clique_removal;
 
             cnf.ed_use_double_ed_checks = exp_data.ed_use_double_ed_checks; // time-consuming, especially for denser graphs... use for sparse graphs only
-            cnf.ed_apply_type1_constraints_on_the_fly = add_constraints;
+            cnf.ed_apply_type1_constraints_on_the_fly = cnf.ed_use_edge_insertion = add_constraints;
 
-            if (false)
+            // if (false)
             { // #TEST #CAUTION
                 // for testing - either removing all edges from the graph if kernelized node was found,
                 // or interleaving edge removal and edge insertion for some number of 'idle iterations'

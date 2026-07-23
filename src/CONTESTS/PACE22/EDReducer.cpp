@@ -94,6 +94,8 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
 
             }
 
+            clearAllForConsider();
+
             if (!reducible_nodes.empty()) liftables.push_back(new KernelizedNodesReduction(reducible_nodes));
         }
 
@@ -143,10 +145,27 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
                     if (use_exhaustively) changes = true;
                 }
             }
+
+            clearAllForConsider();
         }
 
-        if (false)
+        // if (false)
         if (cnf.ed_use_clique_removal) {
+
+            int free_node_a = -1;
+            int free_node_b = -1;
+            for ( int i=0; i<N; i++ ) {
+                if ( V[i].empty() ) {
+                    if ( free_node_a == -1 ) free_node_a = i;
+                    else {
+                        free_node_b = i;
+                        break;
+                    }
+                }
+            }
+
+            if ( free_node_a == -1 || free_node_b == -1 ) continue; // we cannot create two auxiliary nodes for funnel...
+
             // be careful with clique removal!!
             // if a mirror was found and added to U, then it might be that one node from the clique C will need to
             // be swapped for its neighbor outside the clique -> then the offset is C.size()
@@ -235,14 +254,25 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
                     }
                 }
 
-                if (consider({},C)) {
+                { // adding edge that is connected to C
+                    int ind = C.size()/2;
+                    for ( int i=0; i<=ind; i++ ) GraphUtils::addEdge(V,free_node_a,C[i]);
+                    for ( int i=ind+1; i<C.size(); i++ ) GraphUtils::addEdge(V,free_node_b,C[i]);
+                    GraphUtils::addEdge(V,free_node_a,free_node_b);
+                }
+
+                if (consider({free_node_a,free_node_b})) {
+                // if (consider({},C)) {
                     // if (write_logs)
                         clog << "\t\tClique " << C << " of size " << C.size() << " is ED-reducible!   final W.size(): " << W.size() << endl << endl << endl;
                     clearAllForConsider();
 
+                    GraphUtils::removeNodes(V,{free_node_a, free_node_b},helper);
+
                     liftables.push_back( new EDCliqueRemovalReduction(C) ); // #CAUTION - here we should add liftable rule for removed clique
                     VI C_neigh = GraphUtils::getNeighborhoodExclusive(V,C,helper);
                     GraphUtils::removeNodes(V,C,helper);
+
 
                     VI reducible_nodes;
                     for ( int d : C_neigh ) if ( V[d].size() == 1 ) reducible_nodes += propagateDeg1RuleSlow(V[d][0]);
@@ -250,6 +280,9 @@ vector<VCReduction *> EDReducer::reduce(VVI V0) {
 
                     last_reduce_nodes_removed += C.size() + reducible_nodes.size();
                     if (use_exhaustively) changes = true;
+                }else {
+                    clearAllForConsider();
+                    GraphUtils::removeNodes(V,{free_node_a, free_node_b},helper);
                 }
             }
 
@@ -274,7 +307,7 @@ void EDReducer::resetAllUsedTechniques() {
     cnf.ed_use_extended_edges_insertion = false;
     cnf.ed_use_edge_removal = false;
     cnf.edge_use_edge_removal_and_insertion_interleaving = false;
-    // cnf.ed_use_clique_removal = false;
+    cnf.ed_use_clique_removal = false;
 }
 
 int EDReducer::getNonWNeighborhoodSize(int u) {
