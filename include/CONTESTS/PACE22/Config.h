@@ -7,22 +7,43 @@
 
 #include <utils/Stopwatch.h>
 
+
+
+
 class Config{
 public:
+
+    enum Alg {
+        CPSAT_SAT = 0,
+        CPSAT_LP = 1,
+        CPSAT_DEF = 2,
+        NUMVC = 3,
+        HIGHS = 4,
+    };
+
+    static string parseAlgorithm(Alg alg) {
+        if (alg == CPSAT_SAT) return "cpsat-sat";
+        if (alg == CPSAT_LP) return "cpsat-lp";
+        if (alg == CPSAT_DEF) return "cpsat-def";
+        if (alg == NUMVC) return "numvc";
+        if (alg == HIGHS) return "highs";
+
+        assert(false && "incorrect algorithm");
+        return "invalid algorithm";
+    }
+
 
 
     //************************************************************************************ REDUCER
 
 
-    bool reducer_use_twins = false;
-    bool reducer_use_folding = false;
+    bool reducer_use_twins = true;
+    bool reducer_use_folding = true;
     bool reducer_use_general_folding = false;
-    bool reducer_use_full_bipartite_blocker = false;
-    bool reducer_use_edge_neighborhood_blocker = false;
-    bool reducer_use_desk = false;
-    bool reducer_use_unconfined = false;
-    bool reducer_use_funnel = false;
-    bool reducer_use_domination = false;
+    bool reducer_use_desk = true;
+    bool reducer_use_unconfined = true;
+    bool reducer_use_funnel = true;
+    bool reducer_use_domination = true;
 
     /**
      * If true, then fast primary reduction will be used before the graph is induced by the nonisolated nodes.
@@ -71,7 +92,7 @@ public:
      * subgraphs searched by the rule.
      * This should be set to true for best performance (both quality and efficiency).
      */
-    bool ed_consider_nodes_to_move_outside_NW = false;
+    bool ed_consider_nodes_to_move_outside_NW = true;
 
     /**
      * This is the standard concept that must be used.
@@ -83,19 +104,19 @@ public:
      * This is just a special case of `deficit1 domination'' and works in the same complexity,
      * but should be slighly faster in practice (but possibly much weaker).
      */
-    bool ed_use_same_neigh_domination = false;
+    bool ed_use_same_neigh_domination = true;
 
     /**
      * If true, then the ``deficit1'' approach will be used to find nodes to move to U.
      * This is a GENERALIZATION of the ``same neighborhood'' rule.
      */
-    bool ed_use_deficit1_domination = false;
+    bool ed_use_deficit1_domination = true;
 
     /**
      * If true, then complete mirrors will be moved to the set U.
      * A complete mirror of u is a node y such that N(u) \setminus (W \cup N(y)) is a clique.
      */
-    bool ed_use_full_mirror_moves = false;
+    bool ed_use_full_mirror_moves = true;
 
     /**
      * If true, then the ``biset'' approach will be used to find nodes to move to U.
@@ -129,7 +150,6 @@ public:
      * If true, then type-1 cnstraints will be added on the fly, as the reduction rule executes.
      */
     bool ed_apply_type1_constraints_on_the_fly = false;
-    // bool ed_use_edge_insertion = false;
 
     /**
      * If true, then if [ed_apply_type1_constraints_on_the_fly] is set and we run the 'add edges' ED and some
@@ -147,6 +167,18 @@ public:
      * edge set to grow if no reduction to node set is done.
      */
     bool ed_remove_added_t1_constraints_if_no_kernelized_node_found = false;
+
+    /**
+     * If true, then in the Reducer there will be at the very end considered adding edges to the graph on the fly
+     */
+    bool ed_use_edge_insertion = false;
+
+    /**
+     * If true, then extensive edge insertion will be used.
+     * Many candidate nodes x will be considered for each node v, and pairs {v,x} will be checked using consider({v,x}).
+     * If it returns true, then edge {v,x} will be added to the graph.
+     */
+    bool ed_use_extended_edges_insertion = false;
 
     /**
      * If true, then initial sets S of the form {v} will be checked for each node in the graph.
@@ -169,17 +201,6 @@ public:
      */
     int ed_min_nonw_deg_to_exclude_node = 30;
 
-    /**
-     * If true, then in the Reducer there will be at the very end considered adding edges to the graph on the fly
-     */
-    bool ed_use_edge_insertion = true;
-
-    /**
-     * If true, then extensive edge insertion will be used.
-     * Many candidate nodes x will be considered for each node v, and pairs {v,x} will be checked using consider({v,x}).
-     * If it returns true, then edge {v,x} will be added to the graph.
-     */
-    bool ed_use_extended_edges_insertion = false;
 
     /**
      * If true, the inference rules of type 2 will be created.
@@ -219,12 +240,43 @@ public:
     int reducer_max_general_folding_antiedges = 1; // original value 1e9
 
 
+    //*********************************************************************** NOW SOLVER CONFIGURATIONS
+
+    int solver_max_time_sec = 10;
+    int solver_time_granularity = 1;
+    int solver_repeats = 1;
+    Alg alg = Alg::NUMVC;
+
+    /**
+     * Id of the configuration used, among several predefined options.
+     */
+    int cnfid = 0;
+
+    /**
+     * Standard, full kernelization without ED will be run in addition to the ED configuration if this is set.
+     * This might be set just for simplicity of testing and comparison.
+     */
+    bool run_noned = false;
+
+    /**
+     * If true, then
+     */
+    bool run_ed = true;
+
+    /**
+     * Secondary ED mode will be run, just for comparisons with the ED.
+    * This might be set just for simplicity of testing and comparison.
+     */
+    bool run_ed2 = true;
+
+
+    string metadata_filepath = "";
+
+
     void enableAllReductions(){
         reducer_use_twins = true;
         reducer_use_folding = true;
         reducer_use_general_folding = true;
-        reducer_use_full_bipartite_blocker = true;
-        reducer_use_edge_neighborhood_blocker = true;
         reducer_use_desk = true;
         reducer_use_unconfined = true;
         reducer_use_funnel = true;
@@ -235,8 +287,6 @@ public:
         reducer_use_twins = false;
         reducer_use_folding = false;
         reducer_use_general_folding = false;
-        reducer_use_full_bipartite_blocker = false;
-        reducer_use_edge_neighborhood_blocker = false;
         reducer_use_desk = false;
         reducer_use_unconfined = false;
         reducer_use_funnel = false;
@@ -247,7 +297,6 @@ public:
         reducer_use_funnel = false;
         reducer_use_folding = false;
         reducer_use_general_folding = false;
-        reducer_use_full_bipartite_blocker = false;
         reducer_use_desk = false;
     }
 

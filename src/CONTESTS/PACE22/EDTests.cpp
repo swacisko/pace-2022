@@ -21,24 +21,6 @@
 using namespace operations_research::sat;
 
 
-enum Alg {
-    CPSAT_SAT = 0,
-    CPSAT_LP = 1,
-    CPSAT_DEF = 2,
-    NUMVC = 3,
-    HIGHS = 4,
-};
-
-string parseAlgorithm(Alg alg) {
-    if (alg == CPSAT_SAT) return "cpsat-sat";
-    if (alg == CPSAT_LP) return "cpsat-lp";
-    if (alg == CPSAT_DEF) return "cpsat-def";
-    if (alg == NUMVC) return "numvc";
-    if (alg == HIGHS) return "highs";
-
-    assert(false && "incorrect algorithm");
-    return "invalid algorithm";
-}
 
 struct ExpData {
     int N0=-1, M0=-1, N1=-1, M1=-1, N2=-1, M2=-1, N3=-1, M3=-1, N4=-1, M4=-1;
@@ -51,9 +33,9 @@ struct ExpData {
     int red_ed_time_millis = -1;
     int red_ed2_time_millis = -1;
 
-    int solver_max_time_sec = -1;
-    int solver_time_granularity = -1;
-    int solver_repeats = -1;
+    // int solver_max_time_sec = -1;
+    // int solver_time_granularity = -1;
+    // int solver_repeats = -1;
     VD noned_results;
     VD ed_results;
     VD ed2_results;
@@ -69,25 +51,25 @@ struct ExpData {
     int ed_t2_inference_rules_added = -1;
     int ed2_t2_inference_rules_added = -1;
 
-    string metadata_filepath = "";
+    // string metadata_filepath = "";
 
-    int reducer_max_time_millis = 900 * 1000; // 15 minutes
+    // int reducer_max_time_millis = 900 * 1000; // 15 minutes
 
     int noned_folds = 0, noned_funnels = 0, noned_unconfined = 0, noned_ext_dom = 0, noned_desks = 0, noned_twins = 0, noned_dominations = 0;
     int ed_folds = 0, ed_funnels = 0, ed_unconfined = 0, ed_ext_dom = 0, ed_desks = 0, ed_twins = 0, ed_dominations = 0;
 
-    Alg alg = CPSAT_SAT;
+    // Alg alg = CPSAT_SAT;
 
-    bool run_noned = true;
-    bool run_ed = true;
-    bool run_ed2 = true;
+    // bool run_noned = true;
+    // bool run_ed = true;
+    // bool run_ed2 = true;
+    //
+    // bool use_def1_dom = true;
+    // bool ed_use_edge_removal = false;
+    // bool ed_use_double_ed_checks = false;
+    // bool ed_use_clique_removal = false;
 
-    bool use_def1_dom = true;
-    bool ed_use_edge_removal = false;
-    bool ed_use_double_ed_checks = false;
-    bool ed_use_clique_removal = false;
-
-    map<string,string> getEntries() {
+    map<string,string> getEntries(Config cnf) {
         map<string,string> res;
         res["N0"] = to_string(N0); res["M0"] = to_string(M0);
         res["N1"] = to_string(N1); res["M1"] = to_string(M1);
@@ -116,18 +98,18 @@ struct ExpData {
         res["red_ed_time_millis"] = to_string(red_ed_time_millis);
         res["red_ed2_time_millis"] = to_string(red_ed2_time_millis);
 
-        res["solver_max_time_sec"] = to_string(solver_max_time_sec);
-        res["solver_time_granularity"] = to_string(solver_time_granularity);
-        res["solver_repeats"] = to_string(solver_repeats);
-        res["metadata_filepath"] = metadata_filepath;
-        res["run_noned"] = to_string(run_noned);
-        res["run_ed"] = to_string(run_ed);
-        res["run_ed2"] = to_string(run_ed2);
-        res["use_def1_dom"] = to_string(use_def1_dom);
-        res["ed_use_edge_removal"] = to_string(ed_use_edge_removal);
-        res["ed_use_double_ed_checks"] = to_string(ed_use_double_ed_checks);
+        res["solver_max_time_sec"] = to_string(cnf.solver_max_time_sec);
+        res["solver_time_granularity"] = to_string(cnf.solver_time_granularity);
+        res["solver_repeats"] = to_string(cnf.solver_repeats);
+        res["metadata_filepath"] = cnf.metadata_filepath;
+        res["run_noned"] = to_string(cnf.run_noned);
+        res["run_ed"] = to_string(cnf.run_ed);
+        res["run_ed2"] = to_string(cnf.run_ed2);
+        res["ed_use_deficit1_domination"] = to_string(cnf.ed_use_deficit1_domination);
+        res["ed_use_edge_removal"] = to_string(cnf.ed_use_edge_removal);
+        res["ed_use_double_ed_checks"] = to_string(cnf.ed_use_double_ed_checks);
 
-        res["algorithm"] = parseAlgorithm(alg);
+        res["algorithm"] = Config::parseAlgorithm(cnf.alg);
 
         // ed_folds = 0, ed_funnels = 0, ed_unconfined = 0, ed_ext_dom = 0, ed_desks = 0, ed_twins
         res["ed_folds"] = to_string(ed_folds); res["ed_funnels"] = to_string(ed_funnels);
@@ -158,10 +140,10 @@ struct ExpData {
     }
 
 
-    void writeToFile(ostream & str, bool debug_entries = false, const bool debug_only = false) {
+    void writeToFile(ostream & str, Config cnf, bool debug_entries = false, const bool debug_only = false) {
         str.precision(2);
 
-        auto mapa = getEntries();
+        auto mapa = getEntries(cnf);
         vector<string> header = { "N0", "M0", "N1", "M1", "N2", "M2", "N3", "M3", "N4", "M4",
             "red1_offset", "red_noned_offset", "red_ed_offset", "red_ed2_offset",
             "ed_nodes_reduced", "ed2_nodes_reduced",
@@ -176,7 +158,7 @@ struct ExpData {
             "noned_folds", "noned_funnels", "noned_unconfined", "noned_ext_dom", "noned_desks", "noned_twins", "noned_dominations",
             "ed_folds", "ed_funnels", "ed_unconfined", "ed_ext_dom", "ed_desks", "ed_twins", "ed_dominations",
             "metadata_filepath", "run_noned", "run_ed", "run_ed2",
-            "use_def1_dom", "ed_use_edge_removal", "ed_use_double_ed_checks"
+            "ed_use_deficit1_domination", "ed_use_edge_removal", "ed_use_double_ed_checks"
         };
 
         auto writeLine = [&](vector<string> & l) {
@@ -206,14 +188,14 @@ static void updateResTimes(auto & res_times) {
 }
 
 
-pair<VI,VI> solveByFastVC(VPII & constraints, ExpData & exp_data ) {
-    int max_sec = exp_data.solver_max_time_sec;
-    int res_measure_freq_sec = exp_data.solver_time_granularity;
+pair<VI,VI> solveByFastVC(VPII & constraints, Config cnf ) {
+    int max_sec = cnf.solver_max_time_sec;
+    int res_measure_freq_sec = cnf.solver_time_granularity;
 
-    clog << "Looking for solution using NuMVC/FastVC for " << exp_data.solver_max_time_sec << " seconds" << endl;
+    clog << "Looking for solution using NuMVC/FastVC for " << cnf.solver_max_time_sec << " seconds" << endl;
 
     VVI V = GraphUtils::getGraphForEdges(constraints);
-    auto vc = VCUtils::getMinCVUsingFastVC(V, exp_data.solver_max_time_sec * 1000);
+    auto vc = VCUtils::getMinCVUsingFastVC(V, cnf.solver_max_time_sec * 1000);
     for (int & d : vc) d--;
 
     VI res = vc;
@@ -222,25 +204,25 @@ pair<VI,VI> solveByFastVC(VPII & constraints, ExpData & exp_data ) {
     return {res,res_times};
 }
 
-pair<VI,VI> solveByHIGHS(VPII & constraints,ExpData & exp_data ) {
-    int max_sec = exp_data.solver_max_time_sec;
-    int res_measure_freq_sec = exp_data.solver_time_granularity;
+pair<VI,VI> solveByHIGHS(VPII & constraints, Config cnf ) {
+    int max_sec = cnf.solver_max_time_sec;
+    int res_measure_freq_sec = cnf.solver_time_granularity;
 
-    clog << "Looking for solution using HiGHS for " << exp_data.solver_max_time_sec << " seconds" << endl;
+    clog << "Looking for solution using HiGHS for " << cnf.solver_max_time_sec << " seconds" << endl;
 
     VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1);
     return {};
 }
 
 // pair<VI,VI> solveByCPSAT(VPII & constraints, int max_sec, int res_measure_freq_sec ) {
-pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
-    int max_sec = exp_data.solver_max_time_sec;
-    int res_measure_freq_sec = exp_data.solver_time_granularity;
+pair<VI,VI> solveByCPSAT(VPII & constraints, Config cnf ) {
+    int max_sec = cnf.solver_max_time_sec;
+    int res_measure_freq_sec = cnf.solver_time_granularity;
 
     VI res, res_times(ceil(1.0*max_sec/res_measure_freq_sec)+1, -1 );
 
-    clog << "Looking for solution using CPSAT (" << parseAlgorithm(exp_data.alg) << ") for "
-         << exp_data.solver_max_time_sec << " seconds" << endl;
+    clog << "Looking for solution using CPSAT (" << Config::parseAlgorithm(cnf.alg) << ") for "
+         << cnf.solver_max_time_sec << " seconds" << endl;
 
     int N = 0;
     for ( auto [a,b] : constraints ) N = max( N, 1 + max( abs(a), abs(b) ) );
@@ -250,7 +232,7 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
     SatParameters params;
     params.set_max_time_in_seconds(max_sec);
 
-    bool use_sat_heavy_computation = (exp_data.alg == CPSAT_SAT);
+    bool use_sat_heavy_computation = (cnf.alg == Config::CPSAT_SAT);
     if (use_sat_heavy_computation) {
         clog << "Running CPSAT with SAT orientation" << endl;
         constexpr int workers = 2;
@@ -273,7 +255,7 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
         // params.set_log_subsolver_statistics(true);
     }
 
-    bool use_lp_heavy_compuation =  (exp_data.alg == CPSAT_LP);
+    bool use_lp_heavy_compuation =  (cnf.alg == Config::CPSAT_LP);
     if (use_lp_heavy_compuation) {
         clog << "Running CPSAT with LP orientation" << endl;
         constexpr int workers = 2;
@@ -299,7 +281,7 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
         // params.set_log_subsolver_statistics(true);
     }
 
-    bool use_default_computation = (exp_data.alg == CPSAT_DEF);
+    bool use_default_computation = (cnf.alg == Config::CPSAT_DEF);
     if (use_default_computation) {
         clog << "Running CPSAT with DEFAULT orientation" << endl;
         constexpr int workers = 2;
@@ -373,12 +355,12 @@ pair<VI,VI> solveByCPSAT(VPII & constraints, ExpData &exp_data ) {
 }
 
 
-pair<VI,VD> solveInstanceUsingSolver(VPII constraints, ExpData & exp_data) {
+pair<VI,VD> solveInstanceUsingSolver(VPII constraints, Config & cnf) {
 
-    int max_time_sec = exp_data.solver_max_time_sec;
-    int res_measure_freq_sec = exp_data.solver_time_granularity;
-    Alg alg = exp_data.alg;
-    int repeats = exp_data.solver_repeats;
+    int max_time_sec = cnf.solver_max_time_sec;
+    int res_measure_freq_sec = cnf.solver_time_granularity;
+    Config::Alg alg = cnf.alg;
+    int repeats = cnf.solver_repeats;
 
     // times[i] is the result found by the solver after time (i+1) * granularity seconds
     const int I = ceil(1.0 * max_time_sec / res_measure_freq_sec) + 1;
@@ -389,10 +371,10 @@ pair<VI,VD> solveInstanceUsingSolver(VPII constraints, ExpData & exp_data) {
     for (int rep=0; rep<repeats; rep++) {
 
         auto solve = [&]() {
-            if (alg == CPSAT_SAT || alg == CPSAT_LP || alg == CPSAT_DEF) return solveByCPSAT(constraints, exp_data);
+            if (alg == Config::CPSAT_SAT || alg == Config::CPSAT_LP || alg == Config::CPSAT_DEF) return solveByCPSAT(constraints, cnf);
             // if (alg == "evalmaxsat") return solveByEvalMaxSAT(constraints, max_time_sec, res_measure_freq_sec);
-            if (alg == HIGHS) return solveByHIGHS(constraints, exp_data);
-            if (alg == NUMVC) return solveByFastVC( constraints, exp_data);
+            if (alg == Config::HIGHS) return solveByHIGHS(constraints, cnf);
+            if (alg == Config::NUMVC) return solveByFastVC( constraints, cnf);
             return pair<VI,VI>{};
         };
 
@@ -417,12 +399,11 @@ pair<VI,VD> solveInstanceUsingSolver(VPII constraints, ExpData & exp_data) {
     return make_pair(res,res_times);
 }
 
-static void runVCTestforGraph(VVI V, ExpData & exp_data) {
+static ExpData runVCTestforGraph(VVI V, Config cnf) {
     int N = V.size();
     auto initV = V;
 
-    auto exp_data_cnf = exp_data;
-
+    ExpData exp_data;
     exp_data.N0 = N;
     exp_data.M0 = GraphUtils::countEdges(V);
 
@@ -522,24 +503,24 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     }
 
 
-    const bool test_noned_vc_rules = exp_data.run_noned;
+    const bool test_noned_vc_rules = cnf.run_noned;
     if (test_noned_vc_rules){ // measuring just the VC reduction time WITHOUT ED rule, and the solver results for the non-ed reduced graph
         clog << endl << "***************** CHECKING FULL NON-ED RULES" << endl;
 
         Stopwatch sw;
         sw.start("main");
-        Config cnf;
-        cnf.disableAllNonbasicReductions();
-        cnf.reducer_use_folding = true;
-        cnf.reducer_use_funnel = true;
-        cnf.reducer_use_desk = true;
-        cnf.reducer_use_unconfined = true; // the unconfined rule seems to be faulty!!
-        cnf.reducer_use_twins = true;
-        cnf.reducer_use_general_folding = false; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
         auto edges = GraphUtils::getGraphEdges(V);
-        cnf.reducer_max_time_millis = exp_data_cnf.reducer_max_time_millis;
 
         Reducer red(edges,cnf);
+        red.cnf.disableAllNonbasicReductions();
+        red.cnf.reducer_use_folding = true;
+        red.cnf.reducer_use_funnel = true;
+        red.cnf.reducer_use_desk = true;
+        red.cnf.reducer_use_unconfined = true;
+        red.cnf.reducer_use_twins = true;
+        red.cnf.reducer_use_general_folding = false; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
+        red.cnf.reducer_max_time_millis = cnf.reducer_max_time_millis;
+
         auto reduced_instance = red.reduce();
 
         sw.stop("main");
@@ -575,7 +556,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
 
         VPII constraints = GraphUtils::getGraphEdges(coreV);
         for (auto & [a,b] : constraints){a++; b++;}
-        auto [solver_vc,times] = solveInstanceUsingSolver(constraints, exp_data_cnf);
+        auto [solver_vc,times] = solveInstanceUsingSolver(constraints, cnf);
         DEBUG(times);
         for (auto& d : times) if (d != -1) d += noned_solution_lift_overhead;
         exp_data.noned_results = times;
@@ -601,23 +582,25 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             // now measuring VC reduction time WITH ED rule
             Stopwatch sw;
             sw.start("main");
-            Config cnf;
-            cnf.disableAllNonbasicReductions();
-            cnf.reducer_use_folding = true;
-            cnf.reducer_use_funnel = true;
-            cnf.reducer_use_desk = true;
-            cnf.reducer_use_unconfined = true;
-            cnf.reducer_use_twins = true;
-            cnf.reducer_use_general_folding = false; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
-            cnf.reducer_use_ed = true;
-            cnf.ed_consider_nodes_to_move_outside_NW = true;
-            cnf.ed_use_same_neigh_domination = true;
-            cnf.ed_use_deficit1_domination = exp_data.use_def1_dom;
-            cnf.ed_use_edge_removal = exp_data.ed_use_edge_removal;
-            cnf.ed_use_clique_removal = exp_data.ed_use_clique_removal;
 
-            cnf.ed_use_double_ed_checks = exp_data.ed_use_double_ed_checks; // time-consuming, especially for denser graphs... use for sparse graphs only
-            cnf.ed_apply_type1_constraints_on_the_fly = cnf.ed_use_edge_insertion = add_constraints;
+
+            Reducer red(GraphUtils::getGraphEdges(V),cnf);
+            red.cnf.disableAllNonbasicReductions();
+            red.cnf.reducer_use_folding = true;
+            red.cnf.reducer_use_funnel = true;
+            red.cnf.reducer_use_desk = true;
+            red.cnf.reducer_use_unconfined = true;
+            red.cnf.reducer_use_twins = true;
+            red.cnf.reducer_use_general_folding = false; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
+            red.cnf.reducer_use_ed = true;
+            red.cnf.ed_consider_nodes_to_move_outside_NW = true;
+            red.cnf.ed_use_same_neigh_domination = true;
+            red.cnf.ed_use_deficit1_domination = cnf.ed_use_deficit1_domination;
+            red.cnf.ed_use_edge_removal = cnf.ed_use_edge_removal;
+            red.cnf.ed_use_clique_removal = cnf.ed_use_clique_removal;
+
+            red.cnf.ed_use_double_ed_checks = cnf.ed_use_double_ed_checks; // time-consuming, especially for denser graphs... use for sparse graphs only
+            red.cnf.ed_apply_type1_constraints_on_the_fly = cnf.ed_use_edge_insertion = add_constraints;
 
             // if (false)
             { // #TEST #CAUTION
@@ -629,7 +612,6 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
                 cnf.ed_max_edge_removal_and_insertion_iterations_without_change = 2;
             }
 
-            Reducer red(GraphUtils::getGraphEdges(V),cnf);
             auto reduced_instance = red.reduce();
             sw.stop("main");
             red.writeTotals();
@@ -678,7 +660,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             auto edges = GraphUtils::getGraphEdges(coreV);
             for ( auto [a,b] : edges ) constraints.emplace_back(a+1,b+1);
 
-            bool add_t2_constraints = (add_constraints && exp_data.alg != NUMVC); // for numvc we do not want to add t2-constraints
+            bool add_t2_constraints = (add_constraints && cnf.alg != Config::NUMVC); // for numvc we do not want to add t2-constraints
             // bool add_t2_constraints = true;
             if (add_t2_constraints) {
 
@@ -735,7 +717,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
             }
 
 
-            auto [solver_vc,times] = solveInstanceUsingSolver(constraints, exp_data_cnf);
+            auto [solver_vc,times] = solveInstanceUsingSolver(constraints, cnf);
             DEBUG(times);
             for (auto& d : times) if (d != -1) d += ed_solution_lift_overhead;
             exp_data.ed_results = times;
@@ -752,10 +734,10 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
     };
 
     // now checking the impact without adding t1-constraints on the fly
-    if (exp_data.run_ed) testEDRules(exp_data, false);
+    if (cnf.run_ed) testEDRules(exp_data, false);
 
 
-    if (exp_data.run_ed2) {
+    if (cnf.run_ed2) {
         // now checking the impact with adding t1-constraints on the fly and t2 constraints on the used solver
         ExpData dummy_exp_data = exp_data;
         testEDRules( dummy_exp_data, true);
@@ -779,6 +761,7 @@ static void runVCTestforGraph(VVI V, ExpData & exp_data) {
         DEBUG(numvc_control_check_ed2);
     }
 
+    return exp_data;
 }
 
 VVI getTestV1() {
@@ -865,8 +848,8 @@ void trimAllDegreeOneNodes(VVI & V) {
 }
 
 
-ExpData parseArguments(int argc, char ** argv) {
-    ExpData cnf{};
+Config parseArguments(int argc, char ** argv) {
+    Config cnf{};
 
     class ArgParser {
     public:
@@ -991,7 +974,7 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.addOption("run_noned", false); // noned tests
     ap.addOption("run_ed", false); // ed tests
     ap.addOption("run_ed2", false); // ed2 tests
-    ap.addOption("use_def1_dom", false); // ed2 tests
+    ap.addOption("ed_use_deficit1_domination", false); // ed2 tests
     ap.addOption("ed_use_edge_removal", false); // ed2 tests
     ap.addOption("ed_use_double_ed_checks", false); // ed2 tests
     ap.addOption("ed_use_clique_removal", false); // ed2 tests
@@ -1006,11 +989,11 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.findAndAssign("alg", "string", &alg);
     std::transform(alg.begin(), alg.end(), alg.begin(), [](unsigned char c){ return std::tolower(c); });
     DEBUG(alg);
-    if ( alg == "cpsat-sat" ) cnf.alg = CPSAT_SAT;
-    if ( alg == "cpsat-def" ) cnf.alg = CPSAT_DEF;
-    if ( alg == "cpsat-lp" ) cnf.alg = CPSAT_LP;
-    if ( alg == "highs" ) cnf.alg = HIGHS;
-    if ( alg == "numvc" ) cnf.alg = NUMVC;
+    if ( alg == "cpsat-sat" ) cnf.alg = Config::CPSAT_SAT;
+    if ( alg == "cpsat-def" ) cnf.alg = Config::CPSAT_DEF;
+    if ( alg == "cpsat-lp" ) cnf.alg = Config::CPSAT_LP;
+    if ( alg == "highs" ) cnf.alg = Config::HIGHS;
+    if ( alg == "numvc" ) cnf.alg = Config::NUMVC;
 
     ap.findAndAssign("mtd", "string", &cnf.metadata_filepath);
     ap.findAndAssign("time", "int", &cnf.solver_max_time_sec);
@@ -1019,7 +1002,7 @@ ExpData parseArguments(int argc, char ** argv) {
     ap.findAndAssign("run_noned", "bool", &cnf.run_noned);
     ap.findAndAssign("run_ed", "bool", &cnf.run_ed);
     ap.findAndAssign("run_ed2", "bool", &cnf.run_ed2);
-    ap.findAndAssign("use_def1_dom", "bool", &cnf.use_def1_dom);
+    ap.findAndAssign("ed_use_deficit1_domination", "bool", &cnf.ed_use_deficit1_domination);
     ap.findAndAssign("ed_use_edge_removal", "bool", &cnf.ed_use_edge_removal);
     ap.findAndAssign("ed_use_double_ed_checks", "bool", &cnf.ed_use_double_ed_checks);
     ap.findAndAssign("ed_use_clique_removal", "bool", &cnf.ed_use_clique_removal);
@@ -1069,18 +1052,20 @@ int main(int argc, char** argv) {
     assert(GraphUtils::isSimple(V));
 
 
-    ExpData exp_data = parseArguments(argc, argv);
-    exp_data.writeToFile(clog, true, true); // just log the parameters from the input
+    Config cnf = parseArguments(argc, argv);
 
-    runVCTestforGraph(V,  exp_data);
+    ExpData exp_data;
+    exp_data.writeToFile(clog, cnf, true, true); // just log the parameters from the input
+
+    exp_data = runVCTestforGraph(V, cnf);
 
     ENDL(5);
     clog << "FINISHED TESTS!" << endl;
 
-    ofstream mtd_str(exp_data.metadata_filepath);
+    ofstream mtd_str(cnf.metadata_filepath);
     mtd_str << fixed;
     mtd_str.precision(2);
-    exp_data.writeToFile(mtd_str, true);
+    exp_data.writeToFile(mtd_str, cnf, true);
 
     return 0;
 }
