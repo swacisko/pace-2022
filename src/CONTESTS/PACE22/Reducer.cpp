@@ -486,9 +486,10 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
         }
 
         bool first_run_condition = (ed_with_edge_removal_rules_checked == 0);
-        bool ed_insert_edges_permanently = ( !cnf.ed_remove_added_t1_constraints_if_kernelized_node_found || !cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found);
+        bool ed_insert_edges_permanently = ( !cnf.ed_eins_revert_if_reducible
+            || !cnf.ed_eins_revert_if_no_reducible) && cnf.ed_use_edge_insertion;
         bool interleaving_cond = (cnf.edge_use_edge_removal_and_insertion_interleaving
-            && ed_edge_insertion_iterations_without_change <= cnf.ed_max_edge_removal_and_insertion_iterations_without_change );
+            && ed_edge_insertion_iterations_without_change <= cnf.ed_max_einsrem_interleaving_iters_no_change );
         if (cnf.reducer_use_ed && cnf.ed_use_edge_removal
             && (first_run_condition || !ed_insert_edges_permanently || interleaving_cond )
             ) {
@@ -607,7 +608,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
                     if (!liftables.empty()) assert(!res.empty());
 
-                    if (!res.empty() && cnf.ed_remove_added_t1_constraints_if_kernelized_node_found) {
+                    if (!res.empty() && cnf.ed_eins_revert_if_reducible) {
                         clog << "\tFound " << res.size() << " kernelized nodes when using edge-insertion mode in ED!";
                         clog << "\tReverting graph state and removing nodes" << endl << endl;
                         V = GraphUtils::getGraphForEdges(N,init_V_edges); // revert changes to the original graph
@@ -626,7 +627,7 @@ pair<VVI, vector<VCReduction*>> Reducer::secondaryReduce() {
 
             }while (liftables.empty() && made_changes_in_iteration);
 
-            if ( cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found && res_liftables.empty() ) {
+            if ( cnf.ed_eins_revert_if_no_reducible && res_liftables.empty() ) {
                 clog << "\tDid not find any kernelized node using ED-edge-insertion, reverting to original state" << endl;
                 V = GraphUtils::getGraphForEdges(N,init_V_edges);
                 made_changes = false;

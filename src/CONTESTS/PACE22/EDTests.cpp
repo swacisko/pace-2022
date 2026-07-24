@@ -518,7 +518,7 @@ static ExpData runVCTestforGraph(VVI V, Config cnf) {
         red.cnf.reducer_use_desk = true;
         red.cnf.reducer_use_unconfined = true;
         red.cnf.reducer_use_twins = true;
-        red.cnf.reducer_use_general_folding = false; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
+        red.cnf.reducer_use_general_folding = false; red.cnf.reducer_max_general_folding_antiedges = 1; red.cnf.reducer_max_general_folding_neighborhood_size = 4;
         red.cnf.reducer_max_time_millis = cnf.reducer_max_time_millis;
 
         auto reduced_instance = red.reduce();
@@ -591,7 +591,7 @@ static ExpData runVCTestforGraph(VVI V, Config cnf) {
             red.cnf.reducer_use_desk = true;
             red.cnf.reducer_use_unconfined = true;
             red.cnf.reducer_use_twins = true;
-            red.cnf.reducer_use_general_folding = false; cnf.reducer_max_general_folding_antiedges = 1; cnf.reducer_max_general_folding_neighborhood_size = 4;
+            red.cnf.reducer_use_general_folding = false; red.cnf.reducer_max_general_folding_antiedges = 1; red.cnf.reducer_max_general_folding_neighborhood_size = 4;
             red.cnf.reducer_use_ed = true;
             red.cnf.ed_consider_nodes_to_move_outside_NW = true;
             red.cnf.ed_use_same_neigh_domination = true;
@@ -604,12 +604,11 @@ static ExpData runVCTestforGraph(VVI V, Config cnf) {
 
             // if (false)
             { // #TEST #CAUTION
-                // for testing - either removing all edges from the graph if kernelized node was found,
-                // or interleaving edge removal and edge insertion for some number of 'idle iterations'
-                cnf.ed_remove_added_t1_constraints_if_kernelized_node_found = true; // #TEST
+                red.cnf.ed_use_edge_insertion = add_constraints;
+                red.cnf.ed_eins_revert_if_reducible = true; // #TEST
                 // cnf.ed_remove_added_t1_constraints_if_no_kernelized_node_found = true; // #TEST
-                cnf.edge_use_edge_removal_and_insertion_interleaving = true;
-                cnf.ed_max_edge_removal_and_insertion_iterations_without_change = 2;
+                red.cnf.edge_use_edge_removal_and_insertion_interleaving = true;
+                red.cnf.ed_max_einsrem_interleaving_iters_no_change = 2;
             }
 
             auto reduced_instance = red.reduce();
@@ -968,16 +967,24 @@ Config parseArguments(int argc, char ** argv) {
     ArgParser ap;
     ap.addOption("alg", false);
     ap.addOption("mtd", true);
-    ap.addOption("time", false); // max time for solvers in seconds
-    ap.addOption("rep", false); // max time for solvers in seconds
-    ap.addOption("gran", false); // granularity
-    ap.addOption("run_noned", false); // noned tests
-    ap.addOption("run_ed", false); // ed tests
-    ap.addOption("run_ed2", false); // ed2 tests
-    ap.addOption("ed_use_deficit1_domination", false); // ed2 tests
-    ap.addOption("ed_use_edge_removal", false); // ed2 tests
-    ap.addOption("ed_use_double_ed_checks", false); // ed2 tests
-    ap.addOption("ed_use_clique_removal", false); // ed2 tests
+    ap.addOption("time", false);
+    ap.addOption("rep", false);
+    ap.addOption("ed_ext_dom_max_node_neigh", false);
+
+    ap.addOption("gran", false);
+    ap.addOption("run_noned", false);
+    ap.addOption("run_ed", false);
+    ap.addOption("run_ed2", false);
+    ap.addOption("ed_use_deficit1_domination", false);
+    ap.addOption("ed_use_node_removal", false);
+    ap.addOption("ed_use_edge_removal", false);
+    ap.addOption("ed_use_double_ed_checks", false);
+    ap.addOption("ed_use_clique_removal", false);
+    ap.addOption("ed_use_edge_insertion", false);
+    ap.addOption("ed_use_extended_edges_insertion", false);
+    ap.addOption("ed_eins_revert_if_no_reducible", false);
+    ap.addOption("ed_eins_revert_if_reducible", false);
+    ap.addOption("ed_min_nonw_deg_to_exclude_node", false);
 
     ap.parse(argc, argv);
     for ( const string& opt : ap.required_options ) if( !ap.hasProvidedOption(opt) ) {
@@ -999,13 +1006,21 @@ Config parseArguments(int argc, char ** argv) {
     ap.findAndAssign("time", "int", &cnf.solver_max_time_sec);
     ap.findAndAssign("gran", "int", &cnf.solver_time_granularity);
     ap.findAndAssign("rep", "int", &cnf.solver_repeats);
+    ap.findAndAssign("ed_ext_dom_max_node_neigh", "int", &cnf.ed_ext_dom_max_node_neigh);
+    ap.findAndAssign("ed_min_nonw_deg_to_exclude_node", "int", &cnf.ed_min_nonw_deg_to_exclude_node);
+
     ap.findAndAssign("run_noned", "bool", &cnf.run_noned);
     ap.findAndAssign("run_ed", "bool", &cnf.run_ed);
     ap.findAndAssign("run_ed2", "bool", &cnf.run_ed2);
     ap.findAndAssign("ed_use_deficit1_domination", "bool", &cnf.ed_use_deficit1_domination);
+    ap.findAndAssign("ed_use_node_removal", "bool", &cnf.ed_use_node_removal);
     ap.findAndAssign("ed_use_edge_removal", "bool", &cnf.ed_use_edge_removal);
     ap.findAndAssign("ed_use_double_ed_checks", "bool", &cnf.ed_use_double_ed_checks);
     ap.findAndAssign("ed_use_clique_removal", "bool", &cnf.ed_use_clique_removal);
+    ap.findAndAssign("ed_use_edge_insertion", "bool", &cnf.ed_use_edge_insertion);
+    ap.findAndAssign("ed_use_extended_edges_insertion", "bool", &cnf.ed_use_extended_edges_insertion);
+    ap.findAndAssign("ed_eins_revert_if_no_reducible", "bool", &cnf.ed_eins_revert_if_no_reducible);
+    ap.findAndAssign("ed_eins_revert_if_reducible", "bool", &cnf.ed_eins_revert_if_reducible);
 
 
     return cnf;

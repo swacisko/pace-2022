@@ -143,7 +143,7 @@ public:
      * If this value is > 0, then nodes in edge-insertion mode will be considered in a random order, to increase
      * randomness and chances of finding removable nodes.
      */
-    int ed_max_edge_removal_and_insertion_iterations_without_change = 3;
+    int ed_max_einsrem_interleaving_iters_no_change = 3;
     bool edge_use_edge_removal_and_insertion_interleaving = false;
 
     /**
@@ -158,7 +158,7 @@ public:
      * This way, if a reducible node is identified, effectively no additional edges will be inserted.
      * This is therefore kind of a realisation of the prospective variant of ED rule.
      */
-    bool ed_remove_added_t1_constraints_if_kernelized_node_found = false;
+    bool ed_eins_revert_if_reducible = false;
 
     /**
      * If edge-insertion did not contribute to the identification of a reducible node and
@@ -166,7 +166,7 @@ public:
      * state. This can be set to use edge insertion only in the prospective mode, but not allow the graph
      * edge set to grow if no reduction to node set is done.
      */
-    bool ed_remove_added_t1_constraints_if_no_kernelized_node_found = false;
+    bool ed_eins_revert_if_no_reducible = false;
 
     /**
      * If true, then in the Reducer there will be at the very end considered adding edges to the graph on the fly
@@ -249,6 +249,7 @@ public:
 
     /**
      * Id of the configuration used, among several predefined options.
+     * Value 0 denotes that no predefined configuration was selected.
      */
     int cnfid = 0;
 
@@ -271,6 +272,52 @@ public:
 
 
     string metadata_filepath = "";
+
+
+    void setConfiguration(int config_id) {
+        cnfid = config_id;
+
+        if ( cnfid == 1 ) {
+            // just basic preprocessing - use only degree-1
+
+        }else if ( cnfid == 2 ) {
+            // basic preprocessing - degree-1 + domination + folding
+
+        }else if ( cnfid == 3 ) {
+            // standard full suite: degree-1 + domination + folding + funnel + unconfined + desk + twins + LP + crown
+
+        }else if ( cnfid == 4 ) {
+            // adds basic ED - just node removal, with only BASIC moves - considering only nodes in N(W) + basic mirrors
+
+        }else if ( cnfid == 5 ) {
+            // adds ED - just node removal, with more extension - considering nodes outside N(W) + basic mirrors
+
+        }else if ( cnfid == 6 ) {
+            // adds ED - just node removal, with more extension - considering nodes outside N(W) + full mirrors
+
+        }else if ( cnfid == 7 ) {
+            // adds ED - full node removal + edge insertion without retaining edges
+
+        }else if ( cnfid == 8 ) {
+            // adds ED - full node removal + edge insertion with retaining edges
+
+        }else if ( cnfid == 9 ) {
+            // adds ED - full node removal + edge removal
+
+        }else if ( cnfid == 10 ) {
+            // adds ED - full node removal + edge removal + edge insertion without retaining edges
+
+        }else if ( cnfid == 11 ) {
+            // adds ED - full node removal + edge removal + edge insertion + (ins/rem)-interleaving
+
+        }else if ( cnfid == 12 ) {
+
+        }else if ( cnfid == 13 ) {
+
+        }else if ( cnfid == 14 ) {
+
+        }
+    }
 
 
     void enableAllReductions(){
